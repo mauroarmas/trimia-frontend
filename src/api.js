@@ -1,14 +1,40 @@
 const API_BASE = 'http://localhost:3000';
 
+/**
+ * Error de API con el cuerpo del backend adjunto.
+ *
+ * Los endpoints del Sprint 5A no devuelven solo un `message`: mandan datos que
+ * la UI necesita para decidir QUÉ ofrecer, no solo qué texto mostrar. Un 413
+ * con `reason: "MULTIMODAL_LIMIT"` pide comprimir; uno con `"FILE_LIMIT"` pide
+ * partir el archivo. Un 409 de edición trae el `currentVersion` con el que se
+ * puede regenerar la propuesta, y uno de subida trae el archivo previo.
+ * Aplastando todo a un string se pierde eso.
+ */
+export class ApiError extends Error {
+  constructor(message, { status, body } = {}) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.body = body ?? null;
+    this.reason = body?.reason ?? null; // atajo: es lo que más se consulta
+  }
+}
+
 async function request(path, { method = 'GET', token, secret, body } = {}) {
-  const headers = { 'Content-Type': 'application/json' };
+  const isFormData = body instanceof FormData;
+  const headers = {};
+
+  // Con FormData el Content-Type NO se pone: lo arma el browser junto con el
+  // `boundary`, que es lo que el server necesita para separar las partes.
+  // Forzar application/json —como hacía antes— volvía imposible la subida.
+  if (!isFormData) headers['Content-Type'] = 'application/json';
   if (token) headers['Authorization'] = `Bearer ${token}`;
   if (secret) headers['x-n8n-secret'] = secret;
 
   const res = await fetch(`${API_BASE}${path}`, {
     method,
     headers,
-    body: body ? JSON.stringify(body) : undefined,
+    body: body ? (isFormData ? body : JSON.stringify(body)) : undefined,
   });
 
   const isJson = res.headers.get('content-type')?.includes('application/json');
@@ -16,7 +42,10 @@ async function request(path, { method = 'GET', token, secret, body } = {}) {
 
   if (!res.ok) {
     const msg = data?.message || res.statusText || `Error ${res.status}`;
-    throw new Error(Array.isArray(msg) ? msg.join(', ') : msg);
+    throw new ApiError(Array.isArray(msg) ? msg.join(', ') : msg, {
+      status: res.status,
+      body: data,
+    });
   }
   return data;
 }
@@ -266,4 +295,176 @@ export function createSalesClient(token, { name, phone, dni, assignedCollectorId
   if (dni) body.dni = dni;
   if (assignedCollectorId) body.assignedCollectorId = assignedCollectorId;
   return request('/sales/clients', { method: 'POST', token, body });
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Sprint 5A — Base de Conocimiento, archivos, chat web y los tres cierres
+//
+// OJO con la autenticación: hasta el Sprint 4 `/knowledge` iba con
+// `x-n8n-secret`. Ahora TODO `/knowledge/*` exige JWT + rol SUPERVISOR.
+// ─────────────────────────────────────────────────────────────────────
+
+/** Listado del panel. Trae `summary` (240 chars), no el contenido entero. */
+export function listKnowledge(token, params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  return request(`/knowledge${qs ? `?${qs}` : ''}`, { token });
+}
+
+/** Detalle: contenido completo + `source` + `usage` + bitácora `changes[]`. */
+export function getKnowledgeDoc(token, id) {
+  return request(`/knowledge/${id}`, { token });
+}
+
+/**
+ * Editar. Cambiar `content`, `audience` o `agentType` dispara reindexación
+ * (el doc queda `PENDING_REINDEX` un rato); solo título o categoría, no.
+ */
+export function updateKnowledgeDoc(token, id, fields) {
+  return request(`/knowledge/${id}`, { method: 'PUT', token, body: fields });
+}
+
+/** Desactivar no borra los vectores: solo los saca de la búsqueda. */
+export function setKnowledgeActive(token, id, isActive) {
+  return request(`/knowledge/${id}/active`, {
+    method: 'PATCH',
+    token,
+    body: { isActive },
+  });
+}
+
+export function deleteKnowledgeDoc(token, id) {
+  return request(`/knowledge/${id}`, { method: 'DELETE', token });
+}
+
+/** Reintenta un documento que quedó en REINDEX_FAILED. Responde 202. */
+export function reindexKnowledgeDoc(token, id) {
+  return request(`/knowledge/${id}/reindex`, { method: 'POST', token });
+}
+
+/**
+ * Subida de archivo (multipart). Responde **202**: NO espera a que se extraiga
+ * el texto — hay que seguir el avance con `listKnowledgeFiles`.
+ *
+ * `force` reintenta un archivo que el backend ya vio (409 por checksum).
+ */
+export function uploadKnowledgeFile(token, { file, title, category, audience, agentType }, force = false) {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('category', category);
+  if (title) form.append('title', title);
+  if (audience) form.append('audience', audience);
+  if (agentType) form.append('agentType', agentType);
+  return request(`/knowledge/upload${force ? '?force=true' : ''}`, {
+    method: 'POST',
+    token,
+    body: form,
+  });
+}
+
+/** "Cargas recientes": se consulta en loop hasta que no queden PROCESSING. */
+export function listKnowledgeFiles(token, params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  return request(`/knowledge/files${qs ? `?${qs}` : ''}`, { token });
+}
+
+/**
+ * Descarga del original. Devuelve la Response cruda (no JSON), igual que
+ * `getPaymentProofImage`. **404 si el origen fue un audio**: el binario se
+ * elimina al transcribir.
+ */
+export function downloadKnowledgeFile(token, id) {
+  return fetch(`${API_BASE}/knowledge/files/${id}/download`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Propuesta de edición en lenguaje natural. **No persiste nada**: el documento
+ * queda intacto hasta que se llame a `applyAiEdit`.
+ *
+ * Con `confident: false` viene el contenido ORIGINAL sin tocar y
+ * `changedSections: []` — hay que mostrar la advertencia y no ofrecer aplicar.
+ */
+export function previewAiEdit(token, id, instruction) {
+  return request(`/knowledge/${id}/ai-edit/preview`, {
+    method: 'POST',
+    token,
+    body: { instruction },
+  });
+}
+
+/**
+ * Aplica el texto aprobado. Se manda el `content` final —que puede venir
+ * editado a mano— y el `baseVersion` del preview: si otro supervisor guardó
+ * mientras tanto, responde 409 con `currentVersion`.
+ */
+export function applyAiEdit(token, id, { baseVersion, content, instruction }) {
+  return request(`/knowledge/${id}/ai-edit/apply`, {
+    method: 'POST',
+    token,
+    body: { baseVersion, content, instruction },
+  });
+}
+
+// --- Los tres cierres de una escalación (US3) ---
+
+/**
+ * Propuesta de respuesta con el conocimiento cargado. NO resuelve el caso:
+ * sigue PENDING. Con `hasContext: false` viene `suggestion: null` + `reason`.
+ *
+ * ⭐ Mirar `audienceUsed`: sale del userType de la conversación escalada, no
+ * del supervisor que consulta.
+ */
+export function getEscalationSuggestion(token, id) {
+  return request(`/supervisor/escalations/${id}/suggestion`, { token });
+}
+
+/**
+ * Aprobar y guardar SIN enviar: no le llega nada al usuario, la respuesta se
+ * incorpora al RAG y la conversación vuelve al asistente. `title` y `category`
+ * son obligatorios acá (la ingesta es la acción entera, no un opcional).
+ */
+export function saveEscalationUnsent(token, id, { message, title, category, agentType }) {
+  const body = { message, title, category };
+  if (agentType) body.agentType = agentType;
+  return request(`/supervisor/escalations/${id}/save-unsent`, {
+    method: 'POST',
+    token,
+    body,
+  });
+}
+
+/** Descartar: sin mensaje y sin ingesta. El `reason` deja el rastro auditable. */
+export function discardEscalation(token, id, reason) {
+  return request(`/supervisor/escalations/${id}/discard`, {
+    method: 'POST',
+    token,
+    body: { reason },
+  });
+}
+
+// --- Chat web (US4) ---
+
+/**
+ * Mensaje al asistente desde el panel. Solo exige JWT (cualquier empleado, no
+ * solo SUPERVISOR). El teléfono NO viaja: sale del token.
+ *
+ * Responde 202 y encola. 409 si el empleado no tiene teléfono cargado.
+ */
+export function sendWebMessage(token, message) {
+  return request('/messaging/web', { method: 'POST', token, body: { message } });
+}
+
+/** Historial propio, cronológico ascendente. 403 sobre una conversación ajena. */
+export function getWebMessages(token, convId, params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  return request(`/messaging/web/${convId}/messages${qs ? `?${qs}` : ''}`, { token });
+}
+
+/**
+ * Vista unificada: los mensajes de WhatsApp y web de un mismo contacto en una
+ * línea de tiempo. Cada entrada trae su `channel` y `conversationId`.
+ */
+export function getContactTimeline(token, externalId) {
+  return request(`/supervisor/conversations/by-contact/${externalId}/timeline`, { token });
 }
