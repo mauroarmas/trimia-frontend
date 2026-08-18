@@ -4,6 +4,9 @@ import {
   getEscalation,
   getConversation,
   resolveEscalation,
+  getEscalationSuggestion,
+  saveEscalationUnsent,
+  discardEscalation,
   delegateEscalation,
   listEmployees,
 } from '../api';
@@ -29,6 +32,11 @@ export default function EscalationsQueue({ token, me }) {
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState('');
 
+  // Propuesta de respuesta (US3). `null` = todavía no se pidió.
+  const [suggestion, setSuggestion] = useState(null);
+  const [suggesting, setSuggesting] = useState(false);
+  const [discardReason, setDiscardReason] = useState('');
+
   async function loadQueue() {
     setLoading(true);
     setError('');
@@ -52,6 +60,8 @@ export default function EscalationsQueue({ token, me }) {
   }, [status]);
 
   async function openCase(escalation) {
+    setSuggestion(null);
+    setDiscardReason('');
     setSelected(escalation);
     setConversation(null);
     setActionError('');
@@ -96,6 +106,66 @@ export default function EscalationsQueue({ token, me }) {
         audience: knowledgeAudience || undefined,
         agentType: knowledgeAgentType || undefined,
       });
+      setSelected(null);
+      setConversation(null);
+      await loadQueue();
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  /**
+   * Pide la propuesta y la precarga en el editor. NO resuelve el caso: sigue
+   * PENDING, y lo que se envíe será siempre lo que quede en el textarea.
+   */
+  async function handleSuggest() {
+    setSuggesting(true);
+    setActionError('');
+    try {
+      const s = await getEscalationSuggestion(token, selected.id);
+      setSuggestion(s);
+      if (s.suggestion) setReplyMessage(s.suggestion);
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
+  /** Aprobar y guardar SIN enviar: no le llega nada al usuario. */
+  async function handleSaveUnsent() {
+    if (!knowledgeTitle.trim() || !knowledgeCategory.trim()) {
+      setActionError('Para guardar sin enviar hacen falta título y categoría: la respuesta se incorpora al conocimiento.');
+      return;
+    }
+    setActionBusy(true);
+    setActionError('');
+    try {
+      await saveEscalationUnsent(token, selected.id, {
+        message: replyMessage,
+        title: knowledgeTitle,
+        category: knowledgeCategory,
+        agentType: knowledgeAgentType || undefined,
+      });
+      setSelected(null);
+      setConversation(null);
+      await loadQueue();
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  /** Descartar: sin mensaje y sin ingesta. */
+  async function handleDiscard() {
+    if (!confirm('¿Descartar el caso? El usuario no va a recibir respuesta y no se incorpora nada al conocimiento.')) return;
+    setActionBusy(true);
+    setActionError('');
+    try {
+      await discardEscalation(token, selected.id, discardReason || undefined);
       setSelected(null);
       setConversation(null);
       await loadQueue();
@@ -208,6 +278,14 @@ export default function EscalationsQueue({ token, me }) {
           {selected.status === 'PENDING' && (
             <div className="panel-section">
               <h4>Resolver caso</h4>
+
+              <div style={{ marginBottom: 12 }}>
+                <button type="button" className="secondary" onClick={handleSuggest} disabled={suggesting}>
+                  {suggesting ? 'Redactando…' : 'Proponer respuesta con la base de conocimiento'}
+                </button>
+                {suggestion && <SuggestionPanel suggestion={suggestion} />}
+              </div>
+
               <form onSubmit={handleResolve}>
                 <div className="field">
                   <label>Mensaje de respuesta al cliente</label>
@@ -281,6 +359,47 @@ export default function EscalationsQueue({ token, me }) {
                 </button>
               </form>
 
+              {/* Los otros dos cierres. Van juntos y con la diferencia
+                  explicada porque las tres acciones son terminales: elegir
+                  mal no se deshace. */}
+              <div className="panel-section" style={{ marginTop: 16 }}>
+                <h4>Otras formas de cerrar el caso</h4>
+
+                <p className="hint">
+                  <strong>Guardar sin enviar:</strong> no le llega nada al
+                  usuario, pero la respuesta queda como conocimiento para la
+                  próxima vez. Sirve cuando la consulta ya se resolvió por otra
+                  vía (llamó, lo atendieron en el local).
+                </p>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={handleSaveUnsent}
+                  disabled={actionBusy || !replyMessage.trim()}
+                >
+                  Guardar sin enviar
+                </button>
+                <span className="hint" style={{ marginLeft: 8 }}>
+                  Usa el mismo texto y los campos de título/categoría de arriba.
+                </span>
+
+                <p className="hint" style={{ marginTop: 16 }}>
+                  <strong>Descartar:</strong> ni respuesta ni conocimiento. Para
+                  una consulta puntual que no amerita una respuesta estándar.
+                </p>
+                <div className="field">
+                  <label>Motivo (opcional, pero queda registrado)</label>
+                  <input
+                    value={discardReason}
+                    onChange={(e) => setDiscardReason(e.target.value)}
+                    placeholder="ej. consulta puntual, ya se resolvió en el local"
+                  />
+                </div>
+                <button type="button" className="secondary" onClick={handleDiscard} disabled={actionBusy}>
+                  Descartar caso
+                </button>
+              </div>
+
               <h4 style={{ marginTop: 16 }}>Delegar a otro supervisor</h4>
               <form onSubmit={handleDelegate}>
                 <div className="field-row">
@@ -314,6 +433,60 @@ export default function EscalationsQueue({ token, me }) {
             </div>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Resultado de la propuesta de respuesta (US3).
+ *
+ * Muestra tres cosas que no son decorativas:
+ *
+ * - **`audienceUsed`**: la propuesta se redacta con el conocimiento que le
+ *   corresponde a QUIEN VA A RECIBIRLA, no al supervisor que la pide. Verlo es
+ *   lo que permite notar si algo salió mal.
+ * - **las fuentes**: para poder verificar de dónde salió cada afirmación antes
+ *   de mandarla, en vez de confiar en el texto porque sí.
+ * - **el motivo cuando no hay contexto**: el sistema no inventa una respuesta
+ *   sin respaldo; dice por qué no puede y el supervisor la escribe.
+ */
+function SuggestionPanel({ suggestion }) {
+  if (!suggestion.hasContext) {
+    return (
+      <div className="error" style={{ marginTop: 12 }}>
+        <p><strong>No hay con qué redactar una propuesta.</strong></p>
+        <p className="hint">{suggestion.reason}</p>
+        <p className="hint">
+          Se buscó con audiencia <strong>{suggestion.audienceUsed}</strong>, que
+          es la que le corresponde a esta conversación.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="success-msg" style={{ marginTop: 12 }}>
+      <p>
+        Propuesta cargada en el mensaje de abajo. <strong>Es editable</strong>:
+        se envía lo que quede escrito ahí, no la propuesta original.
+      </p>
+      <p className="hint">
+        Redactada con conocimiento{' '}
+        <span className={`badge ${suggestion.audienceUsed === 'INTERNO' ? 'status-warning' : 'status-idle'}`}>
+          {suggestion.audienceUsed}
+        </span>{' '}
+        — la audiencia de esta conversación, no la tuya.
+      </p>
+      {suggestion.sources?.length > 0 && (
+        <>
+          <p className="hint" style={{ marginBottom: 4 }}>Se usó:</p>
+          <ul className="hint" style={{ marginTop: 0 }}>
+            {suggestion.sources.map((s) => (
+              <li key={s.documentId}>{s.title} ({s.score}%)</li>
+            ))}
+          </ul>
+        </>
       )}
     </div>
   );
