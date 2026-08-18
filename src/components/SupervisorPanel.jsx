@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getAgentsStatus, getMetrics, getConversations, getConversation } from '../api';
+import { getAgentsStatus, getMetrics, getConversations, getConversation, getContactTimeline } from '../api';
 import ConversationControls from './ConversationControls';
 import { statusBadgeClass } from '../statusBadge';
 
@@ -8,6 +8,7 @@ export default function SupervisorPanel({ token, me }) {
   const [metrics, setMetrics] = useState(null);
   const [conversations, setConversations] = useState([]);
   const [selectedConv, setSelectedConv] = useState(null);
+  const [timeline, setTimeline] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -35,6 +36,7 @@ export default function SupervisorPanel({ token, me }) {
   }, []);
 
   async function openConversation(id) {
+    setTimeline(null);
     setError('');
     try {
       const conv = await getConversation(token, id);
@@ -160,12 +162,26 @@ export default function SupervisorPanel({ token, me }) {
                 <td>{c.userType}</td>
                 <td>{c.currentAgent ?? '—'}</td>
                 <td>{c._count?.messages ?? 0}</td>
-                <td><button className="secondary" onClick={() => openConversation(c.id)}>Ver</button></td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <button className="secondary" onClick={() => openConversation(c.id)}>Ver</button>{' '}
+                  <button
+                    className="secondary"
+                    title="Los mensajes de WhatsApp y del chat web de este contacto, juntos"
+                    onClick={async () => {
+                      setSelectedConv(null);
+                      setTimeline(await getContactTimeline(token, c.externalId));
+                    }}
+                  >
+                    Ambos canales
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {timeline && <ContactTimeline data={timeline} onClose={() => setTimeline(null)} />}
 
       {selectedConv && (
         <div className="card">
@@ -190,6 +206,47 @@ export default function SupervisorPanel({ token, me }) {
           />
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Vista unificada de un contacto (FR-018).
+ *
+ * Es de **lectura**: no fusiona los hilos ni le da memoria compartida al
+ * asistente. Cada mensaje se muestra con su canal a propósito — sin esa marca,
+ * dos conversaciones con agentes distintos intercaladas en el tiempo se leen
+ * como una sola que nunca existió.
+ */
+function ContactTimeline({ data, onClose }) {
+  return (
+    <div className="card">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h4 style={{ margin: 0 }}>
+          {data.contact.externalId}
+          {data.contact.employee && ` · ${data.contact.employee.name}`}
+        </h4>
+        <button className="secondary" onClick={onClose}>Cerrar</button>
+      </div>
+
+      <p className="hint">
+        {data.conversations.length} conversación(es):{' '}
+        {data.conversations.map((c) => `${c.channel} (${c.currentAgent ?? 'sin agente'})`).join(' · ')}
+        . Son hilos separados; se muestran juntos solo para leerlos.
+      </p>
+
+      <ul className="msg-list" style={{ marginTop: 12 }}>
+        {data.timeline.map((m, i) => (
+          <li key={`${m.conversationId}-${i}`}>
+            <span className={`badge ${m.channel === 'WEB' ? 'status-info' : 'status-idle'}`}>
+              {m.channel}
+            </span>{' '}
+            <strong>{m.role === 'USER' ? 'Usuario' : `Asistente${m.agentType ? ` (${m.agentType})` : ''}`}:</strong>{' '}
+            {m.content}
+            <div className="msg-time">{new Date(m.createdAt).toLocaleString()}</div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

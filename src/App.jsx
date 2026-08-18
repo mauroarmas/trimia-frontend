@@ -3,6 +3,7 @@ import Login from './components/Login';
 import SupervisorPanel from './components/SupervisorPanel';
 import ChatSimulator from './components/ChatSimulator';
 import KnowledgeIngest from './components/KnowledgeIngest';
+import WebChat from './components/WebChat';
 import EscalationsQueue from './components/EscalationsQueue';
 import CollectionsPanel from './components/CollectionsPanel';
 import SalesClientForm from './components/SalesClientForm';
@@ -12,6 +13,12 @@ const SUPERVISOR_TABS = [
   { id: 'supervisor', label: 'Panel del Supervisor' },
   { id: 'chat', label: 'Simulador de Chat' },
   { id: 'knowledge', label: 'Base de Conocimiento' },
+];
+
+// El chat web solo exige JWT: cualquier empleado autenticado puede usarlo.
+// Por eso no vive en SUPERVISOR_TABS.
+const COMMON_TABS = [
+  { id: 'webchat', label: 'Chat con el Asistente' },
 ];
 
 const COLLECTOR_TABS = [
@@ -54,6 +61,7 @@ export default function App() {
   // Un SUPERVISOR de Ventas (como Diego en el seed) ve ambos conjuntos.
   const visibleTabs = [
     ...(isSupervisor ? SUPERVISOR_TABS : []),
+    ...COMMON_TABS,
     ...(isCollector ? COLLECTOR_TABS : []),
     ...(isSales ? SALES_TABS : []),
   ];
@@ -86,6 +94,7 @@ export default function App() {
         ))}
       </div>
 
+      {currentTab === 'webchat' && <WebChat token={token} />}
       {currentTab === 'collections' && <CollectionsPanel token={token} me={user} isCollector={isCollector} />}
       {currentTab === 'sales' && <SalesClientForm token={token} />}
       {isSupervisor && currentTab === 'escalations' && <EscalationsQueue token={token} me={user} />}

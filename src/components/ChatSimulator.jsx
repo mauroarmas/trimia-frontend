@@ -6,7 +6,11 @@ const POLL_MAX_TRIES = 20; // ~40s
 
 export default function ChatSimulator({ token }) {
   const [phone, setPhone] = useState('5493764000000');
-  const [secret, setSecret] = useState('517501d018dbf1a441248e8be7283f1a7d1d50c79e28d9c5');
+  // El secreto NO va hardcodeado: este archivo se commitea, y el valor es el
+  // mismo `N8N_WEBHOOK_SECRET` que protege el webhook real. Se pega a mano
+  // cada vez. Para conversar como el empleado logueado no hace falta ningún
+  // secreto — para eso está la pestaña "Chat con el Asistente" (usa JWT).
+  const [secret, setSecret] = useState('');
   const [text, setText] = useState('Hola, quiero consultar por un producto');
   const [status, setStatus] = useState('');
   const [conversation, setConversation] = useState(null);
@@ -95,7 +99,12 @@ export default function ChatSimulator({ token }) {
             </div>
             <div className="field">
               <label>x-n8n-secret</label>
-              <input value={secret} onChange={(e) => setSecret(e.target.value)} />
+              <input
+                type="password"
+                value={secret}
+                onChange={(e) => setSecret(e.target.value)}
+                placeholder="pegalo desde .env (N8N_WEBHOOK_SECRET)"
+              />
             </div>
           </div>
           <div className="field">
