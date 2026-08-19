@@ -20,7 +20,16 @@ export class ApiError extends Error {
   }
 }
 
-async function request(path, { method = 'GET', token, secret, body } = {}) {
+/**
+ * Cliente HTTP único del panel.
+ *
+ * Acepta `token` y nada más: **ya no existe forma de mandar un secreto compartido
+ * desde el navegador**. La soportaba para el simulador (que pegaba contra
+ * `/messaging/webhook`) y para `/knowledge/*`; las dos superficies pasaron a JWT,
+ * así que se quitó a propósito en vez de dejarla sin usar — dejar la cañería
+ * puesta invita a volver a enchufar el `N8N_WEBHOOK_SECRET` de producción acá.
+ */
+async function request(path, { method = 'GET', token, body } = {}) {
   const isFormData = body instanceof FormData;
   const headers = {};
 
@@ -29,7 +38,6 @@ async function request(path, { method = 'GET', token, secret, body } = {}) {
   // Forzar application/json —como hacía antes— volvía imposible la subida.
   if (!isFormData) headers['Content-Type'] = 'application/json';
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  if (secret) headers['x-n8n-secret'] = secret;
 
   const res = await fetch(`${API_BASE}${path}`, {
     method,
@@ -73,14 +81,6 @@ export function getConversations(token, params = {}) {
 
 export function getConversation(token, id) {
   return request(`/supervisor/conversations/${id}`, { token });
-}
-
-export function sendWebhookMessage(secret, { phone, message, channel }) {
-  return request('/messaging/webhook', {
-    method: 'POST',
-    secret,
-    body: { phone, message, channel },
-  });
 }
 
 export function checkHealth() {
@@ -459,6 +459,147 @@ export function sendWebMessage(token, message) {
 export function getWebMessages(token, convId, params = {}) {
   const qs = new URLSearchParams(params).toString();
   return request(`/messaging/web/${convId}/messages${qs ? `?${qs}` : ''}`, { token });
+}
+
+/** Termina la conversación con el asistente. 409 si un responsable la atiende. */
+export function closeWebConversation(token, convId) {
+  return request(`/messaging/web/${convId}/close`, { method: 'POST', token });
+}
+
+/**
+ * Simula un mensaje entrante desde cualquier teléfono (spec 004, US3).
+ *
+ * Reemplaza el uso de `sendWebhookMessage` desde el simulador: aquel exigía el
+ * `x-n8n-secret`, que es el MISMO secreto que protege el canal real de WhatsApp
+ * en producción, y había que pegarlo a mano en un input. Acá alcanza con la
+ * sesión (rol SUPERVISOR) y ninguna credencial de producción pasa por el
+ * navegador. Devuelve `{ queued, conversationId }`.
+ */
+export function simulateMessage(token, { phone, message }) {
+  return request('/messaging/simulate', {
+    method: 'POST',
+    token,
+    body: { phone, message },
+  });
+}
+
+/**
+ * Abre un stream de eventos de una conversación (spec 004).
+ *
+ * **Con `fetch`, no con `EventSource`**, y no es una preferencia de estilo:
+ * `EventSource` no admite headers, así que obligaría a mandar el JWT en la query
+ * string, donde termina escrito en los logs de acceso de cualquier intermediario.
+ *
+ * Es `async` a propósito: espera a los headers de la respuesta, así que un `401`
+ * o un `403` se lanzan como `ApiError` **antes** de que el stream arranque, y el
+ * llamador puede distinguirlos con un `try/catch` normal. Resuelve con
+ * `{ close }` para poder abortarlo en el cleanup del `useEffect`.
+ *
+ * Los callbacks reciben la carga útil ya desanidada: el evento viaja como
+ * `{ type, conversationId, data }` y lo que llega a `onMessage`/`onStatus` es el
+ * `data`.
+ */
+export async function openConversationStream(
+  token,
+  path,
+  { after, onMessage, onStatus, onError, onClose } = {},
+) {
+  const controller = new AbortController();
+  const qs = after ? `?after=${encodeURIComponent(after)}` : '';
+
+  const res = await fetch(`${API_BASE}${path}${qs}`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'text/event-stream' },
+    signal: controller.signal,
+  });
+
+  if (!res.ok) {
+    const isJson = res.headers.get('content-type')?.includes('application/json');
+    const data = isJson ? await res.json().catch(() => null) : null;
+    const msg = data?.message || res.statusText || `Error ${res.status}`;
+    throw new ApiError(Array.isArray(msg) ? msg.join(', ') : msg, {
+      status: res.status,
+      body: data,
+    });
+  }
+
+  // Se marca acá y se informa al cerrar: es el ÚNICO motivo de cierre que el
+  // servidor comunica explícitamente. Los otros tres (inactividad, sesión
+  // vencida, permiso perdido) terminan el stream de la misma forma y solo se
+  // distinguen por lo que pasa al intentar reabrirlo — ver la tabla en
+  // specs/004-chat-tiempo-real/contracts/messaging-web-stream.md.
+  let conversacionTerminada = false;
+
+  let evento = null;
+  let datos = [];
+
+  function despachar() {
+    // Sin `data` no hay nada que despachar: es el keepalive, que solo existe
+    // para que ningún intermediario corte la conexión por inactividad.
+    if (datos.length === 0) {
+      evento = null;
+      return;
+    }
+    let payload;
+    try {
+      payload = JSON.parse(datos.join('\n'));
+    } catch {
+      datos = [];
+      evento = null;
+      return;
+    }
+    datos = [];
+    const tipo = evento ?? payload?.type;
+    evento = null;
+
+    if (tipo === 'message') onMessage?.(payload.data);
+    else if (tipo === 'status') {
+      if (payload.data?.status === 'CLOSED') conversacionTerminada = true;
+      onStatus?.(payload.data);
+    }
+  }
+
+  async function consumir() {
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    try {
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        let corte;
+        while ((corte = buffer.indexOf('\n')) !== -1) {
+          const linea = buffer.slice(0, corte).replace(/\r$/, '');
+          buffer = buffer.slice(corte + 1);
+
+          if (linea === '') {
+            despachar();
+          } else if (!linea.startsWith(':')) {
+            const i = linea.indexOf(':');
+            const campo = i === -1 ? linea : linea.slice(0, i);
+            const valor = i === -1 ? '' : linea.slice(i + 1).replace(/^ /, '');
+            if (campo === 'event') evento = valor;
+            else if (campo === 'data') datos.push(valor);
+            // `id:` se ignora a propósito: lo pone NestJS con un contador
+            // propio y NO es el id del mensaje. El cursor de la reanudación
+            // sale de `data.id`.
+          }
+        }
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') onError?.(err);
+    } finally {
+      onClose?.({
+        conversacionTerminada,
+        abortado: controller.signal.aborted,
+      });
+    }
+  }
+
+  void consumir();
+
+  return { close: () => controller.abort() };
 }
 
 /**
