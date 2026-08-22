@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ingestKnowledge,
   searchKnowledge,
+  getAgentsStatus,
   listKnowledge,
   getEmployee,
   listSectors,
@@ -319,6 +320,19 @@ function SearchForm({ token }) {
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState(null);
   const [error, setError] = useState('');
+  // Umbral vigente (spec 006). No hace falta endpoint nuevo: `agents/status` ya
+  // lo devuelve y el Panel del Supervisor ya lo pinta.
+  const [umbral, setUmbral] = useState(null);
+
+  useEffect(() => {
+    let vivo = true;
+    getAgentsStatus(token)
+      .then((d) => { if (vivo) setUmbral(d?.confidenceThreshold ?? null); })
+      // Si falla, la tabla se muestra igual pero sin la marca de umbral: es
+      // información de más, no un requisito para buscar.
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, [token]);
 
   async function handleSearch(e) {
     e.preventDefault();
@@ -340,6 +354,21 @@ function SearchForm({ token }) {
       <p className="hint">
         Sirve para comprobar la confidencialidad: la misma consulta con
         audiencia PUBLICO no debería recuperar documentos INTERNO.
+      </p>
+      {/*
+        Spec 006. Este buscador NO aplica el umbral a propósito: muestra lo
+        crudo que devuelve el RAG para poder inspeccionarlo. Sin decirlo, cinco
+        resultados en 53% se leen como «encontró esto» cuando en una
+        conversación real esos mismos habrían derivado a un humano — que es
+        justo lo que hizo pensar que había un bug donde no lo había.
+      */}
+      <p className="hint">
+        <strong>Muestra todo lo que recupera, sin filtrar.</strong> En una
+        conversación real el asistente solo responde si el mejor resultado
+        alcanza el umbral
+        {umbral !== null && <> de <strong>{(umbral * 100).toFixed(0)}%</strong></>};
+        por debajo deriva a una persona. Acá no se aplica ese corte a propósito,
+        para poder ver lo crudo.
       </p>
       <form onSubmit={handleSearch}>
         <div className="field">
@@ -369,16 +398,42 @@ function SearchForm({ token }) {
       {error && <p className="error" style={{ marginTop: 12 }}>{error}</p>}
       {results && (
         <table style={{ marginTop: 12 }}>
-          <thead><tr><th>Score</th><th>Título</th><th>Contenido</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Score</th>
+              <th>¿Alcanza?</th>
+              <th>Título</th>
+              <th>Contenido</th>
+            </tr>
+          </thead>
           <tbody>
-            {results.length === 0 && <tr><td colSpan={3}>Sin resultados.</td></tr>}
-            {results.map((r) => (
-              <tr key={r.documentId + r.content.slice(0, 10)}>
-                <td>{r.score.toFixed(3)}</td>
-                <td>{r.title}</td>
-                <td>{r.content.slice(0, 140)}{r.content.length > 140 ? '…' : ''}</td>
-              </tr>
-            ))}
+            {results.length === 0 && <tr><td colSpan={4}>Sin resultados.</td></tr>}
+            {results.map((r) => {
+              // `null` mientras no se conozca el umbral: sin dato no se opina.
+              const alcanza = umbral === null ? null : r.score >= umbral;
+              return (
+                <tr key={r.documentId + r.content.slice(0, 10)}>
+                  <td style={alcanza === false ? { color: 'var(--text-muted)' } : undefined}>
+                    {r.score.toFixed(3)}
+                  </td>
+                  <td>
+                    {alcanza === null && <span className="hint">—</span>}
+                    {alcanza === true && (
+                      <span className="badge status-active">sí</span>
+                    )}
+                    {alcanza === false && (
+                      // No es un error del sistema: es el corte funcionando.
+                      // Por eso va en gris/aviso y no en rojo de error.
+                      <span className="badge status-idle" title="Por debajo del umbral: en una conversación real esto habría derivado a una persona">
+                        derivaría
+                      </span>
+                    )}
+                  </td>
+                  <td>{r.title}</td>
+                  <td>{r.content.slice(0, 140)}{r.content.length > 140 ? '…' : ''}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}
