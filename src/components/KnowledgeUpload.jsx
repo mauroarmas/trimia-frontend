@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { uploadKnowledgeFile, listKnowledgeFiles } from '../api';
+import { motivoDeBloqueo } from '../areas';
 
 const AGENT_TYPES = ['SALES', 'COLLECTIONS', 'LOGISTICS', 'DEPOSITS', 'ADMIN'];
 
@@ -21,7 +22,7 @@ const FILE_STATUS_CLASS = {
  * no puede quedarse colgada: muestra el archivo en `PROCESSING` y hace polling
  * hasta que el worker lo resuelve.
  */
-export default function KnowledgeUpload({ token, onIngested }) {
+export default function KnowledgeUpload({ token, alcance, onIngested }) {
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
@@ -77,6 +78,10 @@ export default function KnowledgeUpload({ token, onIngested }) {
     }
   }
 
+  const bloqueo = alcance?.misAreas
+    ? motivoDeBloqueo(alcance.misAreas, alcance.totalAreas, agentType || null)
+    : '';
+
   return (
     <div className="card">
       <h3>Subir un archivo</h3>
@@ -126,7 +131,11 @@ export default function KnowledgeUpload({ token, onIngested }) {
             </select>
           </div>
         </div>
-        <button type="submit" disabled={uploading || !file}>
+        {/* Subir es una de las puertas de escritura (spec 005): vale la misma
+            regla de área que cargar texto o editar. Se avisa antes de que la
+            persona elija el archivo y complete el formulario. */}
+        {bloqueo && <p className="hint">{bloqueo}</p>}
+        <button type="submit" disabled={uploading || !file || !!bloqueo}>
           {uploading ? 'Subiendo...' : 'Subir'}
         </button>
       </form>

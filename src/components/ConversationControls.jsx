@@ -62,6 +62,16 @@ export default function ConversationControls({ token, conversation, me, onRefres
   const [error, setError] = useState('');
   const [replyText, setReplyText] = useState('');
   const [noteText, setNoteText] = useState('');
+  /**
+   * ¿Se le contestó algo desde que se tomó el control?
+   *
+   * Al escalar, al cliente se le prometió que un responsable le iba a contestar. Si
+   * el control se libera sin haber respondido, esa promesa queda colgada y **el
+   * cliente no se entera de nada**: la conversación vuelve a manos del asistente en
+   * silencio. Por WhatsApp no hay ningún cartel de estado — lo único que tiene es lo
+   * que se le escribió.
+   */
+  const [respondio, setRespondio] = useState(false);
 
   const iHoldControl =
     conversation.status === 'HUMAN_HANDLING' && conversation.handledById === me.id;
@@ -83,10 +93,26 @@ export default function ConversationControls({ token, conversation, me, onRefres
   }
 
   function handleTakeover() {
+    setRespondio(false);
     run(() => takeoverConversation(token, conversation.id));
   }
 
   function handleRelease() {
+    // Avisar, no impedir: puede haberse resuelto por teléfono o en el local, y en
+    // ese caso liberar sin escribir nada es lo correcto. Lo que no puede pasar es
+    // que se libere sin darse cuenta.
+    if (
+      !respondio &&
+      !confirm(
+        'Vas a liberar el control sin haberle respondido nada.\n\n' +
+          'Cuando el caso se escaló se le dijo que un responsable le iba a ' +
+          'contestar. Si liberás ahora, la conversación vuelve al asistente y esa ' +
+          'persona no recibe ningún aviso: se queda esperando una respuesta que no ' +
+          'va a llegar.\n\n¿Liberar igual?',
+      )
+    ) {
+      return;
+    }
     run(() => releaseConversation(token, conversation.id));
   }
 
@@ -96,6 +122,7 @@ export default function ConversationControls({ token, conversation, me, onRefres
     run(async () => {
       await replyManually(token, conversation.id, replyText);
       setReplyText('');
+      setRespondio(true);
     });
   }
 

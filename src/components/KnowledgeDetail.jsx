@@ -8,6 +8,7 @@ import {
   previewAiEdit,
   applyAiEdit,
 } from '../api';
+import { motivoDeBloqueo, puedeEscribirEn } from '../areas';
 
 const AGENT_TYPES = ['SALES', 'COLLECTIONS', 'LOGISTICS', 'DEPOSITS', 'ADMIN'];
 
@@ -15,7 +16,7 @@ const AGENT_TYPES = ['SALES', 'COLLECTIONS', 'LOGISTICS', 'DEPOSITS', 'ADMIN'];
  * Detalle de un documento (US2/US6/US7): edición manual, activar/desactivar,
  * borrado, indicador de uso, origen y el editor asistido por IA.
  */
-export default function KnowledgeDetail({ token, id, onClose, onChanged }) {
+export default function KnowledgeDetail({ token, id, alcance, onClose, onChanged }) {
   const [doc, setDoc] = useState(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -78,6 +79,18 @@ export default function KnowledgeDetail({ token, id, onClose, onChanged }) {
   if (error && !doc) return <p className="error">{error}</p>;
   if (!doc || !form) return <p className="hint">Cargando…</p>;
 
+  /**
+   * Spec 005: el documento se **ve** siempre; se **modifica** solo si es de un área
+   * propia. Mientras el alcance no cargó no se bloquea nada — el backend sigue
+   * siendo el que decide, así que en el peor caso responde 403.
+   */
+  const soloLectura =
+    !!alcance?.misAreas &&
+    !puedeEscribirEn(alcance.misAreas, alcance.totalAreas, doc.agentType);
+  const motivo = soloLectura
+    ? motivoDeBloqueo(alcance.misAreas, alcance.totalAreas, doc.agentType)
+    : '';
+
   return (
     <div className="card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
@@ -90,7 +103,15 @@ export default function KnowledgeDetail({ token, id, onClose, onChanged }) {
         <button type="button" className="secondary" onClick={onClose}>Volver</button>
       </div>
 
-      <SyncIndicator doc={doc} onReindex={handleReindex} />
+      {soloLectura && (
+        <div className="hint" style={{ marginTop: 12 }}>
+          <strong>Solo lectura.</strong> {motivo} Podés leerlo entero —para no
+          duplicarlo, o para saber a quién pedirle el cambio—, pero las acciones de
+          edición están deshabilitadas.
+        </div>
+      )}
+
+      <SyncIndicator doc={doc} onReindex={handleReindex} soloLectura={soloLectura} />
 
       <div className="field-row" style={{ marginTop: 16 }}>
         <UsagePanel usage={doc.usage} />
@@ -133,16 +154,38 @@ export default function KnowledgeDetail({ token, id, onClose, onChanged }) {
           documento. Cambiar solo el título o la categoría, no.
         </p>
         <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-          <button type="submit" disabled={saving}>{saving ? 'Guardando…' : 'Guardar cambios'}</button>
-          <button type="button" className="secondary" onClick={handleToggleActive}>
+          <button type="submit" disabled={saving || soloLectura} title={motivo}>
+            {saving ? 'Guardando…' : 'Guardar cambios'}
+          </button>
+          <button
+            type="button"
+            className="secondary"
+            onClick={handleToggleActive}
+            disabled={soloLectura}
+            title={motivo}
+          >
             {doc.isActive ? 'Desactivar' : 'Reactivar'}
           </button>
-          <button type="button" className="secondary" onClick={handleDelete}>Borrar</button>
+          <button
+            type="button"
+            className="secondary"
+            onClick={handleDelete}
+            disabled={soloLectura}
+            title={motivo}
+          >
+            Borrar
+          </button>
         </div>
         {error && <p className="error" style={{ marginTop: 12 }}>{error}</p>}
       </form>
 
-      <AiEditor token={token} doc={doc} onApplied={async () => { await load(); onChanged?.(); }} />
+      <AiEditor
+        token={token}
+        doc={doc}
+        soloLectura={soloLectura}
+        motivo={motivo}
+        onApplied={async () => { await load(); onChanged?.(); }}
+      />
 
       <ChangeLog changes={doc.changes} />
     </div>
@@ -154,7 +197,7 @@ export default function KnowledgeDetail({ token, id, onClose, onChanged }) {
  * anterior**. Decirlo importa: sin esa aclaración el estado se lee como "se
  * perdió el cambio" y alguien vuelve a guardar.
  */
-function SyncIndicator({ doc, onReindex }) {
+function SyncIndicator({ doc, onReindex, soloLectura }) {
   if (doc.syncStatus === 'SYNCED') return null;
 
   const pendiente = doc.syncStatus === 'PENDING_REINDEX';
@@ -172,7 +215,15 @@ function SyncIndicator({ doc, onReindex }) {
             El asistente sigue respondiendo con el contenido anterior hasta que
             la indexación funcione.
           </p>
-          <button type="button" className="secondary" onClick={onReindex}>Reintentar</button>
+          {/* Reindexar también es escribir: entra por la misma regla. */}
+          <button
+            type="button"
+            className="secondary"
+            onClick={onReindex}
+            disabled={soloLectura}
+          >
+            Reintentar
+          </button>
         </>
       )}
     </div>
@@ -253,7 +304,7 @@ function SourcePanel({ source, token }) {
  * toca el documento, y lo que se guarda es el texto que el supervisor confirma
  * —editable— nunca uno regenerado.
  */
-function AiEditor({ token, doc, onApplied }) {
+function AiEditor({ token, doc, soloLectura, motivo, onApplied }) {
   const [instruction, setInstruction] = useState('');
   const [proposal, setProposal] = useState(null);
   const [editedContent, setEditedContent] = useState('');
@@ -295,6 +346,18 @@ function AiEditor({ token, doc, onApplied }) {
     } finally {
       setLoading(false);
     }
+  }
+
+  // La propuesta no persiste nada, así que podría generarse igual; pero ofrecerla
+  // sabiendo que el "Aplicar" va a dar 403 es hacer trabajar al modelo —y a la
+  // persona— para nada.
+  if (soloLectura) {
+    return (
+      <div className="panel-section" style={{ marginTop: 24 }}>
+        <h4>Editar con la IA</h4>
+        <p className="hint">No disponible: {motivo}</p>
+      </div>
+    );
   }
 
   return (

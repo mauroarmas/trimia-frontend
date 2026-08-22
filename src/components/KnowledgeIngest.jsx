@@ -1,18 +1,58 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ingestKnowledge, searchKnowledge, listKnowledge } from '../api';
+import {
+  ingestKnowledge,
+  searchKnowledge,
+  listKnowledge,
+  getEmployee,
+  listSectors,
+} from '../api';
 import KnowledgeUpload from './KnowledgeUpload';
 import KnowledgeDetail from './KnowledgeDetail';
+import { motivoDeBloqueo, puedeEscribirEn } from '../areas';
 
 const AGENT_TYPES = ['ORCHESTRATOR', 'SALES', 'COLLECTIONS', 'LOGISTICS', 'DEPOSITS', 'ADMIN'];
 const PAGE_SIZE = 15;
 
-export default function KnowledgeIngest({ token }) {
+export default function KnowledgeIngest({ token, me }) {
   const [view, setView] = useState('lista'); // lista | subir | alta | buscar
   const [selectedId, setSelectedId] = useState(null);
 
+  /**
+   * De qué áreas es responsable quien está mirando (spec 005).
+   *
+   * Se usa **solo para deshabilitar acciones de escritura con el motivo a la
+   * vista**. Los documentos se siguen viendo todos, de todas las áreas: hace falta
+   * ver lo ajeno para no duplicarlo y para saber a quién derivar. Ocultarlos
+   * rompería justo lo que la restricción de escritura protege.
+   */
+  const [misAreas, setMisAreas] = useState(null);
+  const [totalAreas, setTotalAreas] = useState(0);
+
+  useEffect(() => {
+    if (!me) return undefined;
+    let vigente = true;
+    Promise.all([getEmployee(token, me.id), listSectors(token)])
+      .then(([empleado, sectores]) => {
+        if (!vigente) return;
+        setMisAreas(empleado.areasSupervisadas ?? []);
+        setTotalAreas(sectores.length);
+      })
+      .catch(() => {});
+    return () => {
+      vigente = false;
+    };
+  }, [token, me]);
+
+  const alcance = { misAreas, totalAreas };
+
   if (selectedId) {
     return (
-      <KnowledgeDetail token={token} id={selectedId} onClose={() => setSelectedId(null)} />
+      <KnowledgeDetail
+        token={token}
+        id={selectedId}
+        alcance={alcance}
+        onClose={() => setSelectedId(null)}
+      />
     );
   }
 
@@ -35,16 +75,18 @@ export default function KnowledgeIngest({ token }) {
         ))}
       </div>
 
-      {view === 'lista' && <KnowledgeList token={token} onSelect={setSelectedId} />}
-      {view === 'subir' && <KnowledgeUpload token={token} />}
-      {view === 'alta' && <TextIngestForm token={token} />}
+      {view === 'lista' && (
+        <KnowledgeList token={token} alcance={alcance} onSelect={setSelectedId} />
+      )}
+      {view === 'subir' && <KnowledgeUpload token={token} alcance={alcance} />}
+      {view === 'alta' && <TextIngestForm token={token} alcance={alcance} />}
       {view === 'buscar' && <SearchForm token={token} />}
     </div>
   );
 }
 
 /** Listado con filtros por área, categoría y estado (FR-019). */
-function KnowledgeList({ token, onSelect }) {
+function KnowledgeList({ token, alcance, onSelect }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -123,7 +165,18 @@ function KnowledgeList({ token, onSelect }) {
                     {d.title}
                     <div className="hint">{d.summary?.slice(0, 90)}…</div>
                   </td>
-                  <td>{d.agentType ?? 'general'}</td>
+                  <td>
+                    {d.agentType ?? 'general'}
+                    {/* Se marca, no se esconde: ver no es editar (FR-013). Saber
+                        de entrada cuáles no vas a poder tocar evita abrir el
+                        detalle para descubrirlo. */}
+                    {alcance?.misAreas &&
+                      !puedeEscribirEn(alcance.misAreas, alcance.totalAreas, d.agentType) && (
+                        <div className="hint" title="Podés verlo, no modificarlo">
+                          solo lectura
+                        </div>
+                      )}
+                  </td>
                   <td>
                     <span className={`badge ${d.audience === 'INTERNO' ? 'status-warning' : 'status-idle'}`}>
                       {d.audience}
@@ -176,7 +229,7 @@ function UsoCorto({ usage }) {
   );
 }
 
-function TextIngestForm({ token }) {
+function TextIngestForm({ token, alcance }) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [category, setCategory] = useState('');
@@ -200,6 +253,12 @@ function TextIngestForm({ token }) {
       setBusy(false);
     }
   }
+
+  // `agentType` vacío en el formulario es "sin asignar", que en el backend es un
+  // documento transversal: lo escribe solo quien es responsable de todas las áreas.
+  const bloqueo = alcance?.misAreas
+    ? motivoDeBloqueo(alcance.misAreas, alcance.totalAreas, agentType || null)
+    : '';
 
   return (
     <div className="card">
@@ -235,7 +294,13 @@ function TextIngestForm({ token }) {
             </select>
           </div>
         </div>
-        <button type="submit" disabled={busy}>{busy ? 'Ingestando...' : 'Ingestar'}</button>
+        {/* Las áreas ajenas siguen en la lista a propósito: verlas y leer por qué
+            no se puede enseña la regla. Sacarlas del desplegable dejaría a alguien
+            pensando que el área no existe. */}
+        {bloqueo && <p className="hint">{bloqueo}</p>}
+        <button type="submit" disabled={busy || !!bloqueo}>
+          {busy ? 'Ingestando...' : 'Ingestar'}
+        </button>
       </form>
       {error && <p className="error" style={{ marginTop: 12 }}>{error}</p>}
       {result && (

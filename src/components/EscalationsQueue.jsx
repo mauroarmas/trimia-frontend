@@ -9,8 +9,16 @@ import {
   discardEscalation,
   delegateEscalation,
   listEmployees,
+  getEmployee,
+  listSectors,
 } from '../api';
 import ConversationControls from './ConversationControls';
+import {
+  etiquetaDeCandidato,
+  motivoDeBloqueo,
+  ordenarCandidatos,
+  puedeEscribirEn,
+} from '../areas';
 
 export default function EscalationsQueue({ token, me }) {
   const [status, setStatus] = useState('PENDING');
@@ -31,6 +39,16 @@ export default function EscalationsQueue({ token, me }) {
   const [delegateTo, setDelegateTo] = useState('');
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState('');
+
+  /**
+   * De qué áreas es responsable quien está resolviendo (spec 005).
+   *
+   * Resolver un caso "enseñándole al agente" **escribe un documento**, así que vale
+   * la misma regla de área que la pantalla de conocimiento. Es la puerta que se
+   * olvida: se llega por la cola de casos, no por la base de conocimiento.
+   */
+  const [misAreas, setMisAreas] = useState(null);
+  const [totalAreas, setTotalAreas] = useState(0);
 
   // Propuesta de respuesta (US3). `null` = todavía no se pidió.
   const [suggestion, setSuggestion] = useState(null);
@@ -58,6 +76,23 @@ export default function EscalationsQueue({ token, me }) {
     loadQueue();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
+
+  useEffect(() => {
+    if (!me) return undefined;
+    let vigente = true;
+    Promise.all([getEmployee(token, me.id), listSectors(token)])
+      .then(([empleado, sectores]) => {
+        if (!vigente) return;
+        setMisAreas(empleado.areasSupervisadas ?? []);
+        setTotalAreas(sectores.length);
+      })
+      // Que falle no puede romper la cola: sin esto no se anticipa el bloqueo,
+      // y el backend igual rechaza.
+      .catch(() => {});
+    return () => {
+      vigente = false;
+    };
+  }, [token, me]);
 
   async function openCase(escalation) {
     setSuggestion(null);
@@ -193,6 +228,22 @@ export default function EscalationsQueue({ token, me }) {
     }
   }
 
+  /**
+   * En qué área va a quedar el documento si se marca "enseñar al RAG".
+   *
+   * Es la misma cuenta que hace el backend: el agente elegido a mano, y si no se
+   * eligió ninguno, el de la conversación. Por eso "— sin especificar —" NO
+   * significa "documento general": significa "el del caso".
+   */
+  const areaDelDocumento =
+    knowledgeAgentType || conversation?.currentAgent || null;
+  const puedeEnsenar =
+    misAreas === null || puedeEscribirEn(misAreas, totalAreas, areaDelDocumento);
+  const motivoNoEnsena =
+    misAreas === null
+      ? ''
+      : motivoDeBloqueo(misAreas, totalAreas, areaDelDocumento);
+
   return (
     <div>
       <div className="tabs" style={{ marginBottom: 12 }}>
@@ -300,8 +351,9 @@ export default function EscalationsQueue({ token, me }) {
                   <input
                     type="checkbox"
                     id="teachAgent"
-                    checked={teachAgent}
+                    checked={teachAgent && puedeEnsenar}
                     onChange={(e) => setTeachAgent(e.target.checked)}
+                    disabled={!puedeEnsenar}
                     style={{ width: 'auto' }}
                   />
                   <label htmlFor="teachAgent" style={{ margin: 0 }}>
@@ -309,7 +361,19 @@ export default function EscalationsQueue({ token, me }) {
                   </label>
                 </div>
 
-                {teachAgent && (
+                {/* La distinción que no se puede aplastar: RESPONDER no está
+                    restringido por área, ESCRIBIR conocimiento sí. Quien recibe
+                    un caso de otra área puede contestarlo igual; lo único que no
+                    puede es dejar el documento. Deshabilitar el caso entero sería
+                    quitarle algo que sí puede hacer. */}
+                {!puedeEnsenar && (
+                  <p className="hint" style={{ marginTop: -4 }}>
+                    {motivoNoEnsena} Podés responder el caso igual — lo único que no
+                    podés es dejar la respuesta como conocimiento de esa área.
+                  </p>
+                )}
+
+                {teachAgent && puedeEnsenar && (
                   <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, padding: 12, marginTop: 12 }}>
                     <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 0 }}>
                       Campos para ingestar como conocimiento en el RAG:
@@ -340,9 +404,13 @@ export default function EscalationsQueue({ token, me }) {
                         </select>
                       </div>
                       <div className="field">
-                        <label>Agente (opcional)</label>
+                        <label>Área del documento</label>
                         <select value={knowledgeAgentType} onChange={(e) => setKnowledgeAgentType(e.target.value)}>
-                          <option value="">— sin especificar —</option>
+                          <option value="">
+                            {conversation?.currentAgent
+                              ? `— la del caso (${conversation.currentAgent}) —`
+                              : '— sin área (transversal) —'}
+                          </option>
                           <option value="SALES">Ventas</option>
                           <option value="COLLECTIONS">Cobranzas</option>
                           <option value="LOGISTICS">Logística</option>
@@ -370,12 +438,21 @@ export default function EscalationsQueue({ token, me }) {
                   usuario, pero la respuesta queda como conocimiento para la
                   próxima vez. Sirve cuando la consulta ya se resolvió por otra
                   vía (llamó, lo atendieron en el local).
+                  {!puedeEnsenar && (
+                    <>
+                      {' '}
+                      <strong>No disponible acá:</strong> {motivoNoEnsena} Esta
+                      acción es solo escritura, así que sin el área no queda nada
+                      que hacer con ella.
+                    </>
+                  )}
                 </p>
                 <button
                   type="button"
                   className="secondary"
                   onClick={handleSaveUnsent}
-                  disabled={actionBusy || !replyMessage.trim()}
+                  disabled={actionBusy || !replyMessage.trim() || !puedeEnsenar}
+                  title={puedeEnsenar ? undefined : motivoNoEnsena}
                 >
                   Guardar sin enviar
                 </button>
@@ -406,8 +483,16 @@ export default function EscalationsQueue({ token, me }) {
                   <div className="field">
                     <select value={delegateTo} onChange={(e) => setDelegateTo(e.target.value)}>
                       <option value="">— elegir supervisor —</option>
-                      {employees.filter((e) => e.id !== me.id).map((e) => (
-                        <option key={e.id} value={e.id}>{e.name} ({e.email})</option>
+                      {/* Primero quien maneja el área del caso, con ★. Se puede
+                          elegir a otro —responder no está restringido por área—
+                          pero no por no saber quién correspondía. */}
+                      {ordenarCandidatos(
+                        employees.filter((e) => e.id !== me.id),
+                        conversation?.currentAgent ?? null,
+                      ).map((e) => (
+                        <option key={e.id} value={e.id}>
+                          {etiquetaDeCandidato(e, conversation?.currentAgent ?? null)}
+                        </option>
                       ))}
                     </select>
                   </div>

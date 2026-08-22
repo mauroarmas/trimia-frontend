@@ -163,6 +163,42 @@ export function listEmployees(token) {
   return request('/employees', { token });
 }
 
+// --- Áreas de las que alguien es responsable (spec 005) ---
+
+/**
+ * Detalle de un empleado, **con sus `areasSupervisadas`**.
+ *
+ * Es de acá —y no de `getMe()` ni del token— de donde el panel saca de qué áreas
+ * es responsable quien está logueado. Las áreas **no viajan en la sesión** a
+ * propósito: si viajaran, un guard del backend podría terminar ramificando por
+ * ellas. Pedirlas al servidor no rompe esa garantía; guardarlas en el token sí.
+ */
+export function getEmployee(token, id) {
+  return request(`/employees/${id}`, { token });
+}
+
+/** Las áreas que existen. Alimenta la selección múltiple de la pantalla de empleados. */
+export function listSectors(token) {
+  return request('/employees/sectors', { token });
+}
+
+/**
+ * Define de qué áreas es responsable una persona (US3).
+ *
+ * La lista **reemplaza** a la anterior, así que sirve igual para asignar y para
+ * quitar: mandar `[]` la deja sin ninguna. No existe ningún campo "gerente" —
+ * se es gerente al tener todas, y mandarlo da 400.
+ *
+ * 409 si la persona no es SUPERVISOR; 404 si algún sector no existe.
+ */
+export function setSupervisedAreas(token, employeeId, sectorIds) {
+  return request(`/employees/${employeeId}/supervised-areas`, {
+    method: 'PUT',
+    token,
+    body: { sectorIds },
+  });
+}
+
 // --- Collections (Sprint 4) ---
 
 export function listPaymentProofs(token, params = {}) {
@@ -464,6 +500,26 @@ export function getWebMessages(token, convId, params = {}) {
 /** Termina la conversación con el asistente. 409 si un responsable la atiende. */
 export function closeWebConversation(token, convId) {
   return request(`/messaging/web/${convId}/close`, { method: 'POST', token });
+}
+
+/**
+ * Deriva la consulta propia a otra persona (spec 005, US4).
+ *
+ * Es la contracara del aviso de baja confianza: a un responsable no se le crea
+ * ningún caso, así que cuando el tema no es de sus áreas necesita poder pasarlo.
+ * El caso se crea recién acá.
+ *
+ * El texto de la consulta **no se manda**: el backend lo saca de la conversación,
+ * para que el caso no pueda llegarle a otro con una pregunta distinta de la que
+ * se hizo. 409 si se intenta derivar a uno mismo o a alguien que no es supervisor
+ * activo; 403 sobre una conversación ajena.
+ */
+export function delegateFromChat(token, convId, toEmployeeId) {
+  return request(`/messaging/web/${convId}/delegate`, {
+    method: 'POST',
+    token,
+    body: { toEmployeeId },
+  });
 }
 
 /**
