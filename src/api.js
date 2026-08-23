@@ -112,7 +112,7 @@ export function getEscalation(token, id) {
   return request(`/supervisor/escalations/${id}`, { token });
 }
 
-export function resolveEscalation(token, id, { message, teachAgent, title, category, audience, agentType }) {
+export function resolveEscalation(token, id, { message, teachAgent, title, category, audience, agentType, correctKnowledge }) {
   const body = { message, teachAgent };
   if (teachAgent) {
     body.title = title;
@@ -120,10 +120,44 @@ export function resolveEscalation(token, id, { message, teachAgent, title, categ
     if (audience) body.audience = audience;
     if (agentType) body.agentType = agentType;
   }
+  // Spec 007: corregir un documento existente en vez de crear uno nuevo.
+  // Excluyente con teachAgent — el backend rechaza pedir las dos cosas.
+  if (correctKnowledge) body.correctKnowledge = correctKnowledge;
   return request(`/supervisor/escalations/${id}/resolve`, {
     method: 'POST',
     token,
     body,
+  });
+}
+
+/**
+ * Spec 007 — qué documentos se consultaron en este caso y NO alcanzaron.
+ *
+ * Lista vacía es una respuesta normal: el caso escaló sin recuperar nada, así
+ * que no hay nada que corregir y corresponde crear un documento nuevo.
+ *
+ * OJO: cada candidato trae `corregible`. Los de otras áreas vienen igual en la
+ * lista —ver lo ajeno es lo que evita duplicarlo— pero con `corregible: false`
+ * y el motivo en `motivoSiNo`. No filtrarlos: mostrarlos deshabilitados con el
+ * motivo es justamente el punto.
+ */
+export function getKnowledgeCandidates(token, escalationId) {
+  return request(`/supervisor/escalations/${escalationId}/knowledge-candidates`, { token });
+}
+
+/**
+ * Spec 007 — cómo quedaría el documento si se le incorpora la respuesta.
+ *
+ * NO guarda nada: la aprobación es el `correctKnowledge` de resolveEscalation.
+ * Devuelve { baseVersion, proposedContent, summary, changedSections, confident }.
+ * Con `confident: false` no hay propuesta que aprobar: devuelve el contenido
+ * original y conviene crear un documento nuevo.
+ */
+export function previewCorrection(token, escalationId, { documentId, message }) {
+  return request(`/supervisor/escalations/${escalationId}/correction-preview`, {
+    method: 'POST',
+    token,
+    body: { documentId, message },
   });
 }
 

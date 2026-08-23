@@ -3,7 +3,8 @@ import { login, getMe } from '../api';
 
 // Emails del seed (prisma/seed.ts). La contraseña de dev es única: trimia2026.
 const TEST_USERS = [
-  { label: 'Supervisor — Diego Bazán', email: 'diego.bazan@credimision.com' },
+  { label: 'Supervisor (todas las áreas) — Diego Bazán', email: 'diego.bazan@credimision.com' },
+  { label: 'Supervisora (solo Cobranzas) — Silvia Ríos', email: 'silvia.rios@credimision.com' },
   { label: 'Cobrador — Roberto Sosa', email: 'roberto.sosa@credimision.com' },
   { label: 'Cobradora Controladora — Marisa Paz', email: 'marisa.paz@credimision.com' },
 ];
@@ -74,7 +75,11 @@ export default function Login({ onLogin }) {
         </div>
 
         <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 12 }}>
-          <b>Supervisor:</b> casos escalados, panel, chat y base de conocimiento.
+          <b>Supervisor (Diego):</b> casos escalados, panel, chat y base de conocimiento
+          de las cinco áreas — es gerente por tener todas (spec 005).
+          <br />
+          <b>Supervisora (Silvia):</b> lo mismo, pero solo puede corregir/enseñar
+          conocimiento de Cobranzas — sirve para probar el rechazo por área.
           <br />
           <b>Cobrador:</b> solo sus clientes y comprobantes.
           <br />

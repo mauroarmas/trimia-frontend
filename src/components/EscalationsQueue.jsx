@@ -4,6 +4,8 @@ import {
   getEscalation,
   getConversation,
   resolveEscalation,
+  getKnowledgeCandidates,
+  previewCorrection,
   getEscalationSuggestion,
   saveEscalationUnsent,
   discardEscalation,
@@ -51,6 +53,14 @@ export default function EscalationsQueue({ token, me }) {
   const [totalAreas, setTotalAreas] = useState(0);
 
   // Propuesta de respuesta (US3). `null` = todavía no se pidió.
+  // Spec 007: corregir el documento que quedó corto, en vez de crear otro que
+  // compita con él. `candidates` sale del caso; `correction` es la propuesta
+  // que todavía NO se guardó.
+  const [candidates, setCandidates] = useState(null);
+  const [correctDocId, setCorrectDocId] = useState('');
+  const [correction, setCorrection] = useState(null);
+  const [correcting, setCorrecting] = useState(false);
+
   const [suggestion, setSuggestion] = useState(null);
   const [suggesting, setSuggesting] = useState(false);
   const [discardReason, setDiscardReason] = useState('');
@@ -107,6 +117,9 @@ export default function EscalationsQueue({ token, me }) {
     setKnowledgeAudience('');
     setKnowledgeAgentType('');
     setDelegateTo('');
+    setCandidates(null);
+    setCorrectDocId('');
+    setCorrection(null);
     try {
       const [escDetail, conv] = await Promise.all([
         getEscalation(token, escalation.id),
@@ -114,8 +127,42 @@ export default function EscalationsQueue({ token, me }) {
       ]);
       setSelected(escDetail);
       setConversation(conv);
+      // Los candidatos se piden aparte: si fallan, el caso igual se puede
+      // resolver como siempre. Es información de más, no un requisito.
+      try {
+        setCandidates(await getKnowledgeCandidates(token, escalation.id));
+      } catch {
+        setCandidates([]);
+      }
     } catch (err) {
       setActionError(err.message);
+    }
+  }
+
+  /**
+   * Pide la propuesta de corrección. NO guarda nada: se aprueba recién al
+   * resolver, mandando el texto que quede en el editor.
+   */
+  async function handleCorrectionPreview(documentId) {
+    if (!replyMessage.trim()) {
+      setActionError('Escribí primero la respuesta: de ahí sale la corrección.');
+      return;
+    }
+    setCorrecting(true);
+    setActionError('');
+    try {
+      const prev = await previewCorrection(token, selected.id, {
+        documentId,
+        message: replyMessage,
+      });
+      setCorrectDocId(documentId);
+      setCorrection(prev);
+      // Corregir y crear son excluyentes: el backend rechaza pedir las dos.
+      setTeachAgent(false);
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setCorrecting(false);
     }
   }
 
@@ -140,6 +187,16 @@ export default function EscalationsQueue({ token, me }) {
         category: knowledgeCategory,
         audience: knowledgeAudience || undefined,
         agentType: knowledgeAgentType || undefined,
+        // Se manda el texto del editor, que pudo corregirse a mano después de
+        // ver la propuesta: es lo que el supervisor aprueba, no lo que
+        // propuso el modelo.
+        correctKnowledge: correction
+          ? {
+              documentId: correctDocId,
+              baseVersion: correction.baseVersion,
+              content: correction.proposedContent,
+            }
+          : undefined,
       });
       setSelected(null);
       setConversation(null);
@@ -347,17 +404,128 @@ export default function EscalationsQueue({ token, me }) {
                     required
                   />
                 </div>
+                {/*
+                  Spec 007 — corregir en vez de duplicar.
+
+                  Va ARRIBA de "enseñar al RAG" a propósito: cuando el caso
+                  escaló porque un documento quedó corto, crear otro sobre el
+                  mismo tema hace que los dos se repartan la señal y ninguno
+                  gane. El propio aviso de baja confianza ya se lo dice al
+                  supervisor; hasta esta spec no había forma de hacerlo.
+                */}
+                {candidates && candidates.length > 0 && (
+                  <div className="panel-section">
+                    <strong>Documentos que quedaron cortos en este caso</strong>
+                    <p className="hint">
+                      Si alguno es el tema y le faltó información, conviene
+                      <strong> corregir ese</strong> en vez de crear uno nuevo:
+                      dos documentos parecidos se compiten entre sí y las
+                      respuestas salen peor.
+                    </p>
+                    <table>
+                      <thead>
+                        <tr><th>Cercanía</th><th>Documento</th><th></th></tr>
+                      </thead>
+                      <tbody>
+                        {candidates.map((c) => (
+                          <tr key={c.id}>
+                            <td>{c.score.toFixed(1)}%</td>
+                            <td>
+                              {c.title}
+                              {/* Los de otras áreas se muestran igual: saber que
+                                  existe algo cercano es lo que evita duplicarlo.
+                                  Lo que se bloquea es corregirlo. */}
+                              {!c.corregible && (
+                                <div className="hint" title={c.motivoSiNo}>
+                                  solo lectura — {c.motivoSiNo}
+                                </div>
+                              )}
+                            </td>
+                            <td>
+                              <button
+                                type="button"
+                                className="secondary"
+                                disabled={!c.corregible || correcting}
+                                onClick={() => handleCorrectionPreview(c.id)}
+                              >
+                                {correctDocId === c.id && correction
+                                  ? 'Ver de nuevo'
+                                  : 'Corregir este'}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+
+                    {correction && (
+                      <div style={{ marginTop: 12 }}>
+                        {/* `confident: false` = el modelo no pudo determinar qué
+                            tocar. No hay propuesta que aprobar: conviene crear
+                            un documento nuevo. */}
+                        {!correction.confident ? (
+                          <p className="error">{correction.summary}</p>
+                        ) : (
+                          <>
+                            <p className="hint">
+                              <strong>Propuesta:</strong> {correction.summary}
+                              {' · '}versión base {correction.baseVersion}
+                            </p>
+                            <div className="field">
+                              <label>
+                                Cómo quedaría el documento (editable — se guarda
+                                esto, no lo que propuso la IA)
+                              </label>
+                              <textarea
+                                rows={8}
+                                value={correction.proposedContent}
+                                onChange={(e) =>
+                                  setCorrection({
+                                    ...correction,
+                                    proposedContent: e.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+                            <p className="hint">
+                              Al responder el caso se envía el mensaje al cliente
+                              <strong> y</strong> se guarda esta corrección.
+                              Todavía no se guardó nada.
+                            </p>
+                            <button
+                              type="button"
+                              className="secondary"
+                              onClick={() => {
+                                setCorrection(null);
+                                setCorrectDocId('');
+                              }}
+                            >
+                              Cancelar la corrección
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="field" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input
                     type="checkbox"
                     id="teachAgent"
-                    checked={teachAgent && puedeEnsenar}
+                    checked={teachAgent && puedeEnsenar && !correction}
                     onChange={(e) => setTeachAgent(e.target.checked)}
-                    disabled={!puedeEnsenar}
+                    disabled={!puedeEnsenar || !!correction}
                     style={{ width: 'auto' }}
                   />
                   <label htmlFor="teachAgent" style={{ margin: 0 }}>
                     Enseñar esta respuesta al RAG (queda como conocimiento reutilizable)
+                    {correction && (
+                      <span className="hint">
+                        {' '}— deshabilitado: ya elegiste corregir un documento
+                        existente. Son excluyentes.
+                      </span>
+                    )}
                   </label>
                 </div>
 
@@ -515,6 +683,24 @@ export default function EscalationsQueue({ token, me }) {
                 Resuelto {selected.resolvedAt ? `el ${new Date(selected.resolvedAt).toLocaleString()}` : ''}.
               </p>
               <p><b>Respuesta enviada:</b> {selected.resolution}</p>
+              {/*
+                Spec 007 — cómo se capitalizó el conocimiento, si se capitalizó.
+                `resolvedWithAction` es null en el caso de siempre (se creó un
+                documento nuevo con "enseñar al RAG", o no se enseñó nada): ahí
+                no hay nada más que mostrar.
+              */}
+              {selected.resolvedWithAction === 'CORRECTED' && (
+                <p className="hint">
+                  Se corrigió «{selected.resolvedWithDocument?.title}» en vez de
+                  crear un documento nuevo.
+                </p>
+              )}
+              {selected.resolvedWithAction === 'REUSED' && (
+                <p className="hint">
+                  El contenido ya existía como «{selected.resolvedWithDocument?.title}»:
+                  no se creó un documento nuevo.
+                </p>
+              )}
             </div>
           )}
         </div>
