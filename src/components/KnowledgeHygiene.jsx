@@ -23,6 +23,16 @@ export default function KnowledgeHygiene({ token }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const pollRef = useRef(null);
+  // Parejas que se fusionaron o descartaron EN ESTA SESIÓN de pantalla. No hay
+  // estado "resuelta" en HygienePair (data-model.md §5): la corrida ya
+  // calculada no se recalcula sola, así que sin este filtro local la tarjeta
+  // seguiría en la lista hasta el próximo análisis, como si no hubiera pasado
+  // nada.
+  const [resueltas, setResueltas] = useState(() => new Set());
+
+  function ocultarPareja(pairId) {
+    setResueltas((prev) => new Set(prev).add(pairId));
+  }
 
   async function loadLatest() {
     try {
@@ -57,6 +67,7 @@ export default function KnowledgeHygiene({ token }) {
       const started = await startHygieneScan(token);
       // El 201 ya trae RUNNING: se pinta de una y se sigue consultando solo.
       setScan((prev) => ({ ...prev, ...started, pairs: prev?.pairs ?? [] }));
+      setResueltas(new Set()); // corrida nueva: los pairId anteriores ni existen
       pollUntilDone();
     } catch (err) {
       // 409 SCAN_ALREADY_RUNNING: ya hay uno corriendo, alguien más lo lanzó.
@@ -120,20 +131,44 @@ export default function KnowledgeHygiene({ token }) {
           </p>
         )}
 
-        {scan?.pairs?.length === 0 && status !== 'NEVER_RUN' && !corriendo && (
-          <p className="success-msg">
-            No se encontraron documentos que compitan entre sí. Corpus sano.
-          </p>
-        )}
+        {(() => {
+          const pairs = scan?.pairs ?? [];
+          const visibles = pairs.filter((p) => !resueltas.has(p.pairId));
 
-        {scan?.pairs?.map((pair) => (
-          <HygienePairCard
-            key={pair.pairId}
-            token={token}
-            pair={pair}
-            onResolved={loadLatest}
-          />
-        ))}
+          if (status === 'NEVER_RUN' || corriendo) return null;
+
+          // Dos mensajes distintos a propósito: "corpus sano" es un dato del
+          // backend (pairsFound: 0, esta corrida no encontró nada). Si lo que
+          // vació la lista fue resolver las de acá, decirlo aparte — no es lo
+          // mismo que el corpus esté sano a que ya no quede nada por MIRAR.
+          if (pairs.length === 0) {
+            return (
+              <p className="success-msg">
+                No se encontraron documentos que compitan entre sí. Corpus sano.
+              </p>
+            );
+          }
+          if (visibles.length === 0) {
+            return (
+              <p className="success-msg">
+                Ya revisaste las {pairs.length} pareja(s) de esta corrida. Corré
+                un análisis nuevo para confirmar que no quedan pendientes.
+              </p>
+            );
+          }
+          return null;
+        })()}
+
+        {(scan?.pairs ?? [])
+          .filter((p) => !resueltas.has(p.pairId))
+          .map((pair) => (
+            <HygienePairCard
+              key={pair.pairId}
+              token={token}
+              pair={pair}
+              onResolved={ocultarPareja}
+            />
+          ))}
       </div>
     </div>
   );
@@ -162,11 +197,18 @@ export function HygienePairCard({ token, pair, onResolved }) {
   const [error, setError] = useState('');
   const [discardReason, setDiscardReason] = useState('');
   const [discarding, setDiscarding] = useState(false);
-  // Una vez fusionada o descartada, la pareja SIGUE apareciendo en esta lista
-  // hasta el próximo barrido: no hay un estado "resuelta" en HygienePair, la
-  // corrida ya calculada no se recalcula sola (data-model.md §5). Sin este
-  // aviso, la tarjeta parecería no haber hecho nada.
+  // No hay un estado "resuelta" en HygienePair (data-model.md §5): la corrida
+  // ya calculada no se recalcula sola. La lista de la pantalla la saca por su
+  // cuenta apenas se resuelve; este mensaje es lo que se ve en el instante
+  // antes de que `onResolved` la quite de la vista del padre.
   const [resultMsg, setResultMsg] = useState(null);
+  const cierreRef = useRef(null);
+
+  useEffect(() => () => clearTimeout(cierreRef.current), []);
+
+  function cerrarTrasUnRato() {
+    cierreRef.current = setTimeout(() => onResolved(pair.pairId), 1800);
+  }
 
   const docs = { [pair.documentA.id]: pair.documentA, [pair.documentB.id]: pair.documentB };
   const absorbId = keepId === pair.documentA.id ? pair.documentB.id : pair.documentA.id;
@@ -200,10 +242,9 @@ export function HygienePairCard({ token, pair, onResolved }) {
       setProposal(null);
       setResultMsg(
         `Fusión aplicada: «${docs[result.keptDocumentId]?.title ?? 'el documento'}» subió a la ` +
-          `versión ${result.newVersion}. El otro quedó desactivado, no borrado. Esta pareja va a ` +
-          'seguir apareciendo acá hasta el próximo análisis, con los documentos ya actualizados.',
+          `versión ${result.newVersion}. El otro quedó desactivado, no borrado.`,
       );
-      onResolved(); // refresca el resto de la pantalla igual, aunque esta tarjeta ya se cierre sola
+      cerrarTrasUnRato();
     } catch (err) {
       if (err.status === 409) setConflict(err.body);
       else if (err.status === 404) {
@@ -220,10 +261,9 @@ export function HygienePairCard({ token, pair, onResolved }) {
     try {
       await discardHygienePair(token, pair.pairId, discardReason || undefined);
       setResultMsg(
-        'Descartada: no se va a volver a proponer mientras ninguno de los dos documentos cambie. ' +
-          'Esta pareja va a seguir apareciendo acá hasta el próximo análisis.',
+        'Descartada: no se va a volver a proponer mientras ninguno de los dos documentos cambie.',
       );
-      onResolved();
+      cerrarTrasUnRato();
     } catch (err) {
       setError(err.message);
     } finally {
