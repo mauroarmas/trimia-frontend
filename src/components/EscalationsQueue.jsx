@@ -13,8 +13,11 @@ import {
   listEmployees,
   getEmployee,
   listSectors,
+  getEscalationHygieneWarning,
+  getLatestHygieneScan,
 } from '../api';
 import ConversationControls from './ConversationControls';
+import { HygienePairCard } from './KnowledgeHygiene';
 import {
   etiquetaDeCandidato,
   motivoDeBloqueo,
@@ -60,6 +63,11 @@ export default function EscalationsQueue({ token, me }) {
   const [correctDocId, setCorrectDocId] = useState('');
   const [correction, setCorrection] = useState(null);
   const [correcting, setCorrecting] = useState(false);
+
+  // Spec 008 (US3): si los documentos consultados en ESTE caso compiten entre
+  // sí. `null` = todavía no se cargó; `[]` es la respuesta normal (no hay
+  // nada que avisar, o nunca se corrió un barrido).
+  const [hygieneWarning, setHygieneWarning] = useState(null);
 
   const [suggestion, setSuggestion] = useState(null);
   const [suggesting, setSuggesting] = useState(false);
@@ -120,6 +128,7 @@ export default function EscalationsQueue({ token, me }) {
     setCandidates(null);
     setCorrectDocId('');
     setCorrection(null);
+    setHygieneWarning(null);
     try {
       const [escDetail, conv] = await Promise.all([
         getEscalation(token, escalation.id),
@@ -133,6 +142,24 @@ export default function EscalationsQueue({ token, me }) {
         setCandidates(await getKnowledgeCandidates(token, escalation.id));
       } catch {
         setCandidates([]);
+      }
+      // Spec 008 (US3): mismo criterio — si falla, el caso se resuelve igual.
+      //
+      // El aviso solo trae títulos (`pairId`, `titleA`, `titleB`, `fusionable`);
+      // para poder REVISAR y FUSIONAR sin salir del caso hace falta la pareja
+      // completa, que ya está en la última corrida `READY` — no se re-detecta
+      // nada, se cruza contra lo que el barrido ya calculó (FR-015).
+      try {
+        const w = await getEscalationHygieneWarning(token, escalation.id);
+        if (w.pairs.length > 0) {
+          const latest = await getLatestHygieneScan(token);
+          const idsConAviso = new Set(w.pairs.map((p) => p.pairId));
+          setHygieneWarning((latest.pairs ?? []).filter((p) => idsConAviso.has(p.pairId)));
+        } else {
+          setHygieneWarning([]);
+        }
+      } catch {
+        setHygieneWarning([]);
       }
     } catch (err) {
       setActionError(err.message);
@@ -381,6 +408,31 @@ export default function EscalationsQueue({ token, me }) {
                 onRefresh={refreshConversation}
               />
             </>
+          )}
+
+          {/*
+            Spec 008 (US3) — el disparador reactivo. No es un mecanismo nuevo:
+            la misma `HygienePairCard` de "Limpiar base de conocimiento" (US1),
+            con acceso a revisar y fusionar sin salir del caso.
+          */}
+          {hygieneWarning && hygieneWarning.length > 0 && (
+            <div className="panel-section">
+              <strong>Los documentos consultados en este caso se compiten entre sí</strong>
+              <p className="hint">
+                Dos (o más) de los documentos que se consultaron para este turno
+                se solapan por encima del umbral. Conviene revisarlos y, si
+                corresponde, fusionarlos — así no vuelven a repartirse la señal
+                en la próxima consulta parecida.
+              </p>
+              {hygieneWarning.map((pair) => (
+                <HygienePairCard
+                  key={pair.pairId}
+                  token={token}
+                  pair={pair}
+                  onResolved={() => openCase(selected)}
+                />
+              ))}
+            </div>
           )}
 
           {selected.status === 'PENDING' && (

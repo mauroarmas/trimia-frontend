@@ -476,6 +476,68 @@ export function applyAiEdit(token, id, { baseVersion, content, instruction }) {
   });
 }
 
+// --- Higiene del corpus (spec 008): documentos que compiten entre sí ---
+
+/**
+ * Lanza un barrido de detección. Encola y responde en milisegundos —la
+ * detección corre en un worker, no acá—; **409** si ya hay uno corriendo.
+ */
+export function startHygieneScan(token) {
+  return request('/knowledge/hygiene/scan', { method: 'POST', token });
+}
+
+/**
+ * El resultado de la última corrida. `status: "NEVER_RUN"` no es un error:
+ * es el estado normal antes del primer barrido. `RUNNING`/`FAILED` vienen con
+ * las parejas de la última corrida `READY` anterior, si hubo alguna.
+ */
+export function getLatestHygieneScan(token) {
+  return request('/knowledge/hygiene/scan/latest', { token });
+}
+
+/** "Son distintos a propósito". Vuelve a proponerse si alguno de los dos cambia. */
+export function discardHygienePair(token, pairId, reason) {
+  return request(`/knowledge/hygiene/pairs/${pairId}/discard`, {
+    method: 'POST',
+    token,
+    body: { reason },
+  });
+}
+
+/**
+ * Propuesta de fusión. **No persiste nada.** `confident: false` cuando los
+ * dos documentos se contradicen o el absorbido no aporta nada nuevo — viene
+ * con el contenido del que sobrevive sin tocar.
+ */
+export function previewMerge(token, pairId, keepDocumentId) {
+  return request(`/knowledge/hygiene/pairs/${pairId}/merge-preview`, {
+    method: 'POST',
+    token,
+    body: { keepDocumentId },
+  });
+}
+
+/**
+ * Aplica la fusión aprobada. Se manda el `content` final —editable tras el
+ * preview— y el `baseVersion`: si el documento cambió mientras tanto, 409.
+ */
+export function applyMerge(token, pairId, { keepDocumentId, baseVersion, content }) {
+  return request(`/knowledge/hygiene/pairs/${pairId}/merge-apply`, {
+    method: 'POST',
+    token,
+    body: { keepDocumentId, baseVersion, content },
+  });
+}
+
+/**
+ * Si los documentos consultados en ESTE caso escalado compiten entre sí
+ * (US3). `pairs: []` es la respuesta normal — no hay nada que avisar, o
+ * todavía no se corrió ningún barrido.
+ */
+export function getEscalationHygieneWarning(token, escalationId) {
+  return request(`/supervisor/escalations/${escalationId}/hygiene-warning`, { token });
+}
+
 // --- Los tres cierres de una escalación (US3) ---
 
 /**
