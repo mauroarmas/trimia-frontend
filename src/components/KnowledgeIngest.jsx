@@ -10,6 +10,7 @@ import {
 import KnowledgeUpload from './KnowledgeUpload';
 import KnowledgeDetail from './KnowledgeDetail';
 import KnowledgeHygiene from './KnowledgeHygiene';
+import KnowledgeCoverage from './KnowledgeCoverage';
 import { motivoDeBloqueo, puedeEscribirEn } from '../areas';
 
 const AGENT_TYPES = ['ORCHESTRATOR', 'SALES', 'COLLECTIONS', 'LOGISTICS', 'DEPOSITS', 'ADMIN'];
@@ -67,6 +68,7 @@ export default function KnowledgeIngest({ token, me }) {
           ['alta', 'Cargar texto'],
           ['buscar', 'Probar búsqueda'],
           ['higiene', 'Limpiar base de conocimiento'],
+          ['cobertura', '¿Qué me falta?'],
         ].map(([id, label]) => (
           <button
             key={id}
@@ -82,6 +84,14 @@ export default function KnowledgeIngest({ token, me }) {
         <KnowledgeList token={token} alcance={alcance} onSelect={setSelectedId} />
       )}
       {view === 'higiene' && <KnowledgeHygiene token={token} />}
+      {view === 'cobertura' && (
+        <KnowledgeCoverage
+          token={token}
+          onOpenDocument={setSelectedId}
+          onOpenHygiene={() => setView('higiene')}
+          onOpenAlta={() => setView('alta')}
+        />
+      )}
       {view === 'subir' && <KnowledgeUpload token={token} alcance={alcance} />}
       {view === 'alta' && <TextIngestForm token={token} alcance={alcance} />}
       {view === 'buscar' && <SearchForm token={token} />}

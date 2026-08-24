@@ -64,7 +64,7 @@ export default function SupervisorPanel({ token, me }) {
           <thead>
             <tr>
               <th>Agente</th><th>Status</th><th>Conversaciones</th><th>Activas</th>
-              <th>Turnos ruteados</th><th>Confianza prom.</th><th>Escalaciones</th><th>% escalación</th>
+              <th>Turnos ruteados</th><th>Cobertura</th><th>Margen</th><th>Escalaciones</th><th>% escalación</th>
             </tr>
           </thead>
           <tbody>
@@ -75,7 +75,27 @@ export default function SupervisorPanel({ token, me }) {
                 <td>{a.totalConversations}</td>
                 <td>{a.activeConversations}</td>
                 <td>{a.routedTurns}</td>
-                <td>{a.avgConfidence != null ? a.avgConfidence.toFixed(2) : '—'}</td>
+                {/* `hasData: false` NO es `coverage: 0` — es "todavía no hay con qué
+                    juzgarlo" (spec 009, US2). Mostrar 0% ahí sería el mismo defecto
+                    que la spec vino a arreglar: pintar contra un piso de ruido como
+                    si fuera una calificación. Se muestra cuánto falta en su lugar. */}
+                <td>
+                  {a.hasData ? (
+                    `${(a.coverage * 100).toFixed(0)}%`
+                  ) : (
+                    <span className="hint" title="Faltan turnos para poder mostrar cobertura">
+                      {a.sampleSize} de {a.minimumSample}
+                    </span>
+                  )}
+                </td>
+                {/* `marginPoints` es una distancia con signo respecto del umbral,
+                    NO un porcentaje: +13.4 es holgado, −2.7 es que en promedio no
+                    llega. Formatearlo 0-100% lo devuelve a leerse como "nota". */}
+                <td>
+                  {a.hasData && a.marginPoints != null
+                    ? `${a.marginPoints > 0 ? '+' : ''}${a.marginPoints.toFixed(1)} pp`
+                    : '—'}
+                </td>
                 <td>{a.escalations}</td>
                 <td>{a.escalationRate != null ? (a.escalationRate * 100).toFixed(0) + '%' : '—'}</td>
               </tr>

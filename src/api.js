@@ -761,3 +761,50 @@ export async function openConversationStream(
 export function getContactTimeline(token, externalId) {
   return request(`/supervisor/conversations/by-contact/${externalId}/timeline`, { token });
 }
+
+// --- Qué falta para responder mejor (spec 009) ---
+
+/**
+ * Dispara una corrida de cobertura. Encola y responde; no espera (Principio
+ * IV). `window` es opcional: `{ windowFrom, windowTo }` en ISO — sin eso, el
+ * backend usa `COVERAGE_WINDOW_DAYS`. 409 con el `scanId` en curso si ya hay
+ * una corrida corriendo.
+ */
+export function startCoverageScan(token, window) {
+  return request('/knowledge/coverage/scan', {
+    method: 'POST',
+    token,
+    body: window ?? {},
+  });
+}
+
+/**
+ * La última corrida, con sus temas. `notice.code` tiene tres valores que NO
+ * son intercambiables aunque `themes` esté vacío en los tres: `SIN_CORRIDA`
+ * (nunca se corrió), `SIN_MUESTRA_SUFICIENTE` (corrió, no alcanza — trae
+ * `queriesInWindow`/`minimumSample` para decir cuánto falta) y
+ * `TODO_CUBIERTO` (corrió y no encontró temas).
+ */
+export function getLatestCoverageScan(token) {
+  return request('/knowledge/coverage/latest', { token });
+}
+
+/**
+ * Marca un tema como atendido. 403 si quien pide no es responsable del área
+ * del tema (el body trae de cuáles sí lo es); 409 si ya estaba marcado.
+ */
+export function markThemeHandled(token, themeId, note) {
+  return request(`/knowledge/coverage/themes/${themeId}/handled`, {
+    method: 'POST',
+    token,
+    body: { note },
+  });
+}
+
+/** Revierte una marca puesta por error. Mismo criterio de autorización que marcar. */
+export function unmarkThemeHandled(token, themeId) {
+  return request(`/knowledge/coverage/themes/${themeId}/handled`, {
+    method: 'DELETE',
+    token,
+  });
+}
