@@ -808,3 +808,112 @@ export function unmarkThemeHandled(token, themeId) {
     token,
   });
 }
+
+/**
+ * Entrevista desde el tráfico real (spec 010, RF11): las preguntas salen de
+ * lo que el agente realmente no pudo contestar (`/knowledge/coverage`), no
+ * de un cuestionario a ciegas.
+ *
+ * Abre y encola la redacción de preguntas (Principio IV) — responde antes de
+ * que estén listas. 409 con la sesión existente si ya hay una sin cerrar
+ * para esta área; 422 con `reason` (`SIN_CORRIDA` / `SIN_MUESTRA_SUFICIENTE`
+ * / `TODO_CUBIERTO`) si no hay ni temas de cobertura ni escalados de
+ * respaldo — los tres NO son intercambiables.
+ */
+export function openInterview(token, sectorId) {
+  return request('/interviews', { method: 'POST', token, body: { sectorId } });
+}
+
+/**
+ * El estado de la sesión. Para consultar mientras `PREPARANDO`/`CERRANDO`
+ * (D4: no hay stream, hay que hacer poll). `current` es `null` sin
+ * pendientes o si el estado no es `EN_CURSO` — una sesión cerrada
+ * anticipadamente llega a `EN_REVISION` con preguntas sin contestar.
+ */
+export function getInterview(token, id) {
+  return request(`/interviews/${id}`, { token });
+}
+
+/**
+ * Sin llamada al modelo: la pregunta ya está redactada desde que se abrió la
+ * sesión. `retry: true` en la respuesta significa que se consideró vacía
+ * ("no sé", "ok") y se repregunta — solo pasa una vez por pregunta.
+ */
+export function answerInterview(token, id, questionId, text) {
+  return request(`/interviews/${id}/answer`, {
+    method: 'POST',
+    token,
+    body: { questionId, text },
+  });
+}
+
+/** No produce candidato: la pregunta salteada no genera ficha. */
+export function skipInterviewQuestion(token, id, questionId) {
+  return request(`/interviews/${id}/skip`, {
+    method: 'POST',
+    token,
+    body: { questionId },
+  });
+}
+
+/**
+ * Termina la sesión ahora — disponible con preguntas pendientes (manda
+ * `confirmPending: true` para forzarlo) o con la sesión `ABANDONADA` por
+ * inactividad. Sin `confirmPending`, un 400 dice cuántas preguntas quedan:
+ * en revisión ya no se contesta nada, así que cerrar por error cuesta el
+ * resto de la entrevista.
+ */
+export function finishInterview(token, id, confirmPending = false) {
+  return request(`/interviews/${id}/finish`, {
+    method: 'POST',
+    token,
+    body: { confirmPending },
+  });
+}
+
+/**
+ * La pantalla de revisión: una ficha por respuesta útil. `candidateKind`
+ * (`NUEVO`/`CORRECCION`) es un eje distinto del `kind` de la pregunta —
+ * dice qué se va a escribir, no qué se preguntó. `similar` viene calculado
+ * ya, antes de aprobar nada.
+ */
+export function getInterviewCandidates(token, id) {
+  return request(`/interviews/${id}/candidates`, { token });
+}
+
+/**
+ * Edita un candidato antes de aprobarlo. Mandar `targetDocumentId` lo
+ * convierte en corrección de ese documento (desde el aviso de parecido);
+ * en `null` lo devuelve a nuevo.
+ */
+export function patchInterviewCandidate(token, candidateId, patch) {
+  return request(`/interviews/candidates/${candidateId}`, {
+    method: 'PATCH',
+    token,
+    body: patch,
+  });
+}
+
+/**
+ * Aprueba uno o varios candidatos de una sesión — "aprobar todo" es esto
+ * mismo con más de un id. La respuesta trae un resultado POR CANDIDATO,
+ * nunca una excepción de conjunto: uno con `AREA_AJENA` no cancela a los
+ * demás. `code` en el fallo: `NOT_FOUND`, `ALREADY_RESOLVED`, `AREA_AJENA`,
+ * `VERSION_CAMBIO` (trae `currentVersion`), `DOCUMENTO_AUSENTE`,
+ * `DUPLICADO_EXACTO` o `ERROR`.
+ */
+export function approveInterviewCandidates(token, sessionId, ids) {
+  return request(`/interviews/${sessionId}/candidates/approve`, {
+    method: 'POST',
+    token,
+    body: { ids },
+  });
+}
+
+/** No se borra: queda `DESCARTADO` con su respuesta cruda. */
+export function discardInterviewCandidate(token, candidateId) {
+  return request(`/interviews/candidates/${candidateId}/discard`, {
+    method: 'POST',
+    token,
+  });
+}

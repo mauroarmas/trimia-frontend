@@ -3,6 +3,7 @@ import Login from './components/Login';
 import SupervisorPanel from './components/SupervisorPanel';
 import ChatSimulator from './components/ChatSimulator';
 import KnowledgeIngest from './components/KnowledgeIngest';
+import Interview from './components/Interview';
 import WebChat from './components/WebChat';
 import EscalationsQueue from './components/EscalationsQueue';
 import CollectionsPanel from './components/CollectionsPanel';
@@ -14,6 +15,7 @@ const SUPERVISOR_TABS = [
   { id: 'supervisor', label: 'Panel del Supervisor' },
   { id: 'chat', label: 'Simulador de Chat' },
   { id: 'knowledge', label: 'Base de Conocimiento' },
+  { id: 'interview', label: 'Entrevista' },
   { id: 'employees', label: 'Empleados y Áreas' },
 ];
 
@@ -35,6 +37,11 @@ export default function App() {
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
   const [tab, setTab] = useState('escalations');
+  // Salto desde "¿Qué me falta?" a la entrevista de ESE área. Se guarda el
+  // agentType (que es lo que conoce un tema de cobertura) y la entrevista lo
+  // resuelve a sector; se limpia al consumirlo, si no volver atrás la
+  // reabriría sola.
+  const [interviewAgentType, setInterviewAgentType] = useState(null);
 
   if (!token) {
     return <Login onLogin={(t, u) => { setToken(t); setUser(u); }} />;
@@ -102,7 +109,24 @@ export default function App() {
       {isSupervisor && currentTab === 'escalations' && <EscalationsQueue token={token} me={user} />}
       {isSupervisor && currentTab === 'supervisor' && <SupervisorPanel token={token} me={user} />}
       {isSupervisor && currentTab === 'chat' && <ChatSimulator token={token} />}
-      {isSupervisor && currentTab === 'knowledge' && <KnowledgeIngest token={token} me={user} />}
+      {isSupervisor && currentTab === 'knowledge' && (
+        <KnowledgeIngest
+          token={token}
+          me={user}
+          onOpenInterview={(agentType) => {
+            setInterviewAgentType(agentType);
+            setTab('interview');
+          }}
+        />
+      )}
+      {isSupervisor && currentTab === 'interview' && (
+        <Interview
+          token={token}
+          me={user}
+          initialAgentType={interviewAgentType}
+          onConsumedInitial={() => setInterviewAgentType(null)}
+        />
+      )}
       {isSupervisor && currentTab === 'employees' && <EmployeesPanel token={token} />}
     </div>
   );

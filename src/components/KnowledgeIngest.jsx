@@ -16,7 +16,7 @@ import { motivoDeBloqueo, puedeEscribirEn } from '../areas';
 const AGENT_TYPES = ['ORCHESTRATOR', 'SALES', 'COLLECTIONS', 'LOGISTICS', 'DEPOSITS', 'ADMIN'];
 const PAGE_SIZE = 15;
 
-export default function KnowledgeIngest({ token, me }) {
+export default function KnowledgeIngest({ token, me, onOpenInterview }) {
   const [view, setView] = useState('lista'); // lista | subir | alta | buscar
   const [selectedId, setSelectedId] = useState(null);
 
@@ -90,6 +90,7 @@ export default function KnowledgeIngest({ token, me }) {
           onOpenDocument={setSelectedId}
           onOpenHygiene={() => setView('higiene')}
           onOpenAlta={() => setView('alta')}
+          onOpenInterview={onOpenInterview}
         />
       )}
       {view === 'subir' && <KnowledgeUpload token={token} alcance={alcance} />}

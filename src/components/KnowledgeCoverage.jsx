@@ -13,7 +13,7 @@ const ACTION_LABEL = {
   CORREGIR_DOCUMENTO: 'Corregir el documento señalado',
   REVISAR_HIGIENE: 'Revisar en higiene del corpus — puede que se estén compitiendo',
   DERIVAR: 'Derivar a quien es responsable de esta área',
-  NINGUNA: 'Ninguna — se contestó por encima del umbral',
+  NINGUNA: 'Ninguna',
 };
 
 const BAND_LABEL = {
@@ -31,7 +31,13 @@ const BAND_LABEL = {
  * justo la información que esta pantalla existe para dar. Con 7-10 turnos en
  * la base real, `SIN_MUESTRA_SUFICIENTE` es el estado que más se va a ver.
  */
-export default function KnowledgeCoverage({ token, onOpenDocument, onOpenHygiene, onOpenAlta }) {
+export default function KnowledgeCoverage({
+  token,
+  onOpenDocument,
+  onOpenHygiene,
+  onOpenAlta,
+  onOpenInterview,
+}) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -153,6 +159,7 @@ export default function KnowledgeCoverage({ token, onOpenDocument, onOpenHygiene
                 onOpenDocument={onOpenDocument}
                 onOpenHygiene={onOpenHygiene}
                 onOpenAlta={onOpenAlta}
+                onOpenInterview={onOpenInterview}
                 onChanged={(patch) => handleThemeChanged(theme.id, patch)}
               />
             ))}
@@ -194,7 +201,15 @@ function NoticeCard({ notice }) {
   return null;
 }
 
-function ThemeCard({ token, theme, onOpenDocument, onOpenHygiene, onOpenAlta, onChanged }) {
+function ThemeCard({
+  token,
+  theme,
+  onOpenDocument,
+  onOpenHygiene,
+  onOpenAlta,
+  onOpenInterview,
+  onChanged,
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [showQuotes, setShowQuotes] = useState(false);
@@ -228,7 +243,17 @@ function ThemeCard({ token, theme, onOpenDocument, onOpenHygiene, onOpenAlta, on
     }
   }
 
-  function actionButton() {
+  /**
+   * `REVISAR_HIGIENE` va a higiene y NO ofrece entrevista: la entrevista
+   * excluye a propósito los temas donde dos documentos compiten (spec 010,
+   * FR-008) — preguntar ahí agrega un tercero al conflicto. Eso se resuelve
+   * fusionando.
+   *
+   * `CARGAR` y `CORREGIR_DOCUMENTO` sí ofrecen entrevista: es el camino que
+   * la spec 010 construyó para ellos. La carga a mano y el ver el documento
+   * quedan como alternativa, no como la vía principal.
+   */
+  function actionButtons() {
     if (theme.action === 'REVISAR_HIGIENE' && onOpenHygiene) {
       return (
         <button type="button" className="secondary" onClick={onOpenHygiene}>
@@ -236,21 +261,33 @@ function ThemeCard({ token, theme, onOpenDocument, onOpenHygiene, onOpenAlta, on
         </button>
       );
     }
-    if (theme.action === 'CORREGIR_DOCUMENTO' && theme.documents[0] && onOpenDocument) {
-      return (
-        <button type="button" className="secondary" onClick={() => onOpenDocument(theme.documents[0].id)}>
-          Ver documento
-        </button>
-      );
-    }
-    if (theme.action === 'CARGAR' && onOpenAlta) {
-      return (
-        <button type="button" className="secondary" onClick={onOpenAlta}>
-          Cargar conocimiento
-        </button>
-      );
-    }
-    return null;
+
+    const entrevistable =
+      theme.action === 'CARGAR' || theme.action === 'CORREGIR_DOCUMENTO';
+
+    return (
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {entrevistable && onOpenInterview && (
+          <button type="button" onClick={() => onOpenInterview(theme.agentType)}>
+            Entrevistar sobre esto
+          </button>
+        )}
+        {theme.action === 'CORREGIR_DOCUMENTO' && theme.documents[0] && onOpenDocument && (
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => onOpenDocument(theme.documents[0].id)}
+          >
+            Ver documento
+          </button>
+        )}
+        {theme.action === 'CARGAR' && onOpenAlta && (
+          <button type="button" className="secondary" onClick={onOpenAlta}>
+            Cargar a mano
+          </button>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -277,7 +314,7 @@ function ThemeCard({ token, theme, onOpenDocument, onOpenHygiene, onOpenAlta, on
         <strong>Qué hacer:</strong> {ACTION_LABEL[theme.action] ?? theme.action}
       </p>
 
-      {actionButton()}
+      {actionButtons()}
 
       {theme.documents.length > 0 && (
         <table style={{ marginTop: 8 }}>
