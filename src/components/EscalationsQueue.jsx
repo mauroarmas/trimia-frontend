@@ -25,8 +25,38 @@ import {
   puedeEscribirEn,
 } from '../areas';
 
+/**
+ * Spec 013 — cómo se muestra la pertenencia de un caso.
+ *
+ * Los **tres** estados se pintan distinto a propósito. `SIN_AREA` no es "no es
+ * mío": es un caso que se escaló antes de rutearse, así que no le toca a nadie
+ * en particular y cualquiera puede tomarlo. Mostrarlo igual que `AJENA` sería
+ * decirle a cada supervisor que es problema de otro — y entonces no lo mira
+ * nadie.
+ */
+const PERTENENCIA = {
+  PROPIA: { texto: 'Mía', color: '#137333', title: 'De un área que supervisás, o derivado a vos' },
+  SIN_AREA: { texto: 'Sin área', color: '#8a6d0b', title: 'El caso no llegó a rutearse: no le toca a nadie en particular' },
+  AJENA: { texto: 'Otra área', color: '#5f6368', title: 'De un área que no supervisás. Podés verlo, responderlo o derivarlo' },
+};
+
+function EtiquetaPertenencia({ valor }) {
+  // Sin `pertenencia` (backend viejo o consulta interna) no se inventa nada.
+  const p = PERTENENCIA[valor];
+  if (!p) return <span>—</span>;
+  return (
+    <span title={p.title} style={{ color: p.color, fontWeight: valor === 'PROPIA' ? 600 : 400 }}>
+      {p.texto}
+    </span>
+  );
+}
+
 export default function EscalationsQueue({ token, me }) {
   const [status, setStatus] = useState('PENDING');
+  // Spec 013 — apagado por defecto: el defecto es la cola completa, priorizada
+  // pero sin filtrar. Ocultar lo ajeno dejaría sin cobertura las áreas que no
+  // tienen responsable activo.
+  const [soloMios, setSoloMios] = useState(false);
   const [escalations, setEscalations] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -78,7 +108,13 @@ export default function EscalationsQueue({ token, me }) {
     setError('');
     try {
       const [escRes, empRes] = await Promise.all([
-        listEscalations(token, { status, limit: 100 }),
+        // `soloMios` solo viaja cuando está puesto: así la URL de la cola normal
+        // no cambia respecto de antes de la spec 013.
+        listEscalations(token, {
+          status,
+          limit: 100,
+          ...(soloMios ? { soloMios: true } : {}),
+        }),
         listEmployees(token),
       ]);
       setEscalations(escRes.data);
@@ -93,7 +129,7 @@ export default function EscalationsQueue({ token, me }) {
   useEffect(() => {
     loadQueue();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
+  }, [status, soloMios]);
 
   useEffect(() => {
     if (!me) return undefined;
@@ -345,23 +381,43 @@ export default function EscalationsQueue({ token, me }) {
         </button>
       </div>
 
-      <button className="secondary" onClick={loadQueue} disabled={loading} style={{ marginBottom: 12 }}>
-        {loading ? 'Cargando...' : 'Refrescar'}
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+        <button className="secondary" onClick={loadQueue} disabled={loading}>
+          {loading ? 'Cargando...' : 'Refrescar'}
+        </button>
+        {/*
+          Spec 013 — apagado por defecto y a la vista. Que se vea que existe y
+          que no está puesto: el defecto es la cola completa priorizada.
+        */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={soloMios}
+            onChange={(ev) => setSoloMios(ev.target.checked)}
+          />
+          <span>Ver solo lo mío</span>
+        </label>
+        {soloMios && (
+          <span className="hint" style={{ margin: 0 }}>
+            Se ocultan los casos de otras áreas. Los que no tienen área siguen
+            apareciendo: no le tocan a nadie en particular.
+          </span>
+        )}
+      </div>
       {error && <p className="error">{error}</p>}
 
       <div className="card">
         <table>
           <thead>
             <tr>
-              <th>Motivo</th><th>Cliente</th><th>Canal</th><th>Agente</th><th>Creado</th>
+              <th>Motivo</th><th>Cliente</th><th>Canal</th><th>Agente</th><th>Área</th><th>Creado</th>
               {status === 'PENDING' && <th>Delegado a</th>}
               <th></th>
             </tr>
           </thead>
           <tbody>
             {escalations.length === 0 && (
-              <tr><td colSpan={6}>Sin casos {status === 'PENDING' ? 'pendientes' : 'resueltos'}.</td></tr>
+              <tr><td colSpan={7}>Sin casos {status === 'PENDING' ? 'pendientes' : 'resueltos'}{soloMios ? ' que sean tuyos' : ''}.</td></tr>
             )}
             {escalations.map((e) => (
               <tr key={e.id}>
@@ -369,6 +425,7 @@ export default function EscalationsQueue({ token, me }) {
                 <td>{e.conversation?.externalId}</td>
                 <td>{e.conversation?.channel}</td>
                 <td>{e.conversation?.currentAgent ?? '—'}</td>
+                <td><EtiquetaPertenencia valor={e.pertenencia} /></td>
                 <td>{new Date(e.createdAt).toLocaleString()}</td>
                 {status === 'PENDING' && (
                   <td>{e.delegatedToId ? employees.find((emp) => emp.id === e.delegatedToId)?.name ?? e.delegatedToId : '—'}</td>
@@ -447,6 +504,29 @@ export default function EscalationsQueue({ token, me }) {
               </div>
 
               <form onSubmit={handleResolve}>
+                {/*
+                  Spec 013 (FR-018) — avisar que el caso no es de tus áreas y que
+                  la respuesta queda registrada como tal.
+
+                  ⚠️ Es INFORMACIÓN, no una traba (FR-019). Nada de `confirm()`,
+                  ni un checkbox que haya que tildar para enviar: eso
+                  reintroduciría por la puerta de atrás el bloqueo que la spec
+                  descartó a propósito —dejaría clientes esperando a un
+                  responsable que no está— y nadie lo notaría, porque "avisa".
+
+                  Solo para AJENA. Un caso SIN_AREA no le toca a nadie:
+                  responderlo es lo esperado y avisar sería ruido.
+                */}
+                {selected.pertenencia === 'AJENA' && (
+                  <p
+                    className="hint"
+                    style={{ borderLeft: '3px solid #8a6d0b', paddingLeft: 8, marginBottom: 12 }}
+                  >
+                    Este caso es de <strong>otra área</strong>. Podés responderlo
+                    igual —mejor eso que dejar al cliente esperando— y va a quedar
+                    registrado que lo respondió alguien de otra área.
+                  </p>
+                )}
                 <div className="field">
                   <label>Mensaje de respuesta al cliente</label>
                   <textarea

@@ -128,13 +128,28 @@ export default function Interview({ token, me, start, onSalir }) {
     }
   }
 
-  function handleAnswered(next) {
+  // Spec 012: `history` NO viaja en la respuesta de answer/skip — solo en
+  // `GET /interviews/:id`. Y el poll está apagado durante `EN_CURSO` (D4), que
+  // es justo cuando se contesta. Sin este refetch el historial se congelaría
+  // en lo que había al abrir: se vería la conversación de hace tres preguntas.
+  //
+  // Se aplica primero lo que ya vino en la respuesta (así la pregunta cambia
+  // sin esperar al GET) y después llega el historial fresco.
+  async function handleAnswered(next) {
     setSession((prev) => ({
       ...prev,
       progress: next.progress,
       current: next.next,
       status: next.status,
     }));
+    try {
+      const s = await getInterview(token, sessionId);
+      setSession(s);
+    } catch (err) {
+      // El historial quedó viejo, pero la respuesta se guardó: no es un error
+      // que valga la pena tirarle encima a quien está contestando.
+      setError(err.message);
+    }
   }
 
   function handleReset() {
@@ -302,6 +317,10 @@ function QuestionPanel({ token, sessionId, session, onAnswered, onFinished, onEr
 
   return (
     <div style={{ marginTop: 12 }}>
+      {/* Spec 012 (FR-001): el prototipo la dibujó como una conversación —
+          lo ya contestado queda a la vista "para seguir el hilo". */}
+      <History history={session.history} />
+
       <p className="hint" style={{ margin: 0 }}>
         Pregunta {answered + 1} de {total} · {KIND_LABEL[current.kind] ?? current.kind}
       </p>
@@ -309,6 +328,11 @@ function QuestionPanel({ token, sessionId, session, onAnswered, onFinished, onEr
       <QuestionBody kind={current.kind} current={current} />
 
       {retryHint && <p className="hint">{retryHint}</p>}
+
+      {/* FR-007/008: tocar CARGA el texto, no envía. Tocar otra reemplaza lo
+          cargado; borrar el textarea devuelve la pregunta a texto libre vacío
+          con las tarjetas todavía disponibles. */}
+      <Options options={current.options} onPick={setText} disabled={busy} />
 
       <div className="field" style={{ marginTop: 12 }}>
         <textarea
@@ -334,6 +358,105 @@ function QuestionPanel({ token, sessionId, session, onAnswered, onFinished, onEr
           onFinished={onFinished}
           onError={onError}
         />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * El historial de la conversación (spec 012, FR-001/002/003).
+ *
+ * Sale del backend, no de lo que esta pantalla acumuló: por eso sobrevive a
+ * recargar y a retomar una sesión pausada.
+ *
+ * ⚠️ Los tres finales NO se aplastan en "sin respuesta" (FR-003). `SALTEADA`
+ * es "no quise contestar" y no tiene nada que la persona haya puesto;
+ * `SIN_RESPONDER` es "contesté, se repreguntó, y tampoco alcanzó" — el texto
+ * es suyo y se muestra. Mostrarlas igual tira información real.
+ *
+ * No se colapsa ni se recorta por longitud (T033): en una entrevista larga
+ * hay que poder subir a leer lo de tres preguntas atrás, que es el punto.
+ */
+export function History({ history }) {
+  if (!history || history.length === 0) return null;
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <p className="hint" style={{ marginBottom: 4 }}>
+        Lo que ya contestaste ({history.length}):
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {history.map((h) => (
+          <div key={h.id} className="panel-section" style={{ opacity: 0.85 }}>
+            <p className="hint" style={{ margin: 0, marginBottom: 4 }}>
+              {h.order}. {h.text}
+            </p>
+            <HistoryAnswer item={h} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HistoryAnswer({ item }) {
+  if (item.status === 'SALTEADA') {
+    return (
+      <p style={{ margin: 0, fontStyle: 'italic', color: '#888' }}>
+        Salteada — preferiste no contestarla.
+      </p>
+    );
+  }
+
+  if (item.status === 'SIN_RESPONDER') {
+    // Contestó: el texto es suyo y se muestra. Lo que se aclara es que no
+    // alcanzó, no que no haya dicho nada.
+    return (
+      <>
+        <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{item.answer}</p>
+        <p className="hint" style={{ margin: 0, marginTop: 4, fontStyle: 'italic' }}>
+          Quedó sin responder: no alcanzó para armar una ficha.
+        </p>
+      </>
+    );
+  }
+
+  return <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{item.answer}</p>;
+}
+
+/**
+ * Las opciones propuestas (spec 012, FR-004..FR-008).
+ *
+ * ⚠️ Tocar una CARGA el texto en el textarea, no lo envía (FR-007/008). La
+ * edición previa al envío es toda la defensa contra el riesgo principal de la
+ * spec: si elegir fuera más fácil que contar lo que realmente pasa, el corpus
+ * se llena de respuestas plausibles que nadie dijo.
+ *
+ * ⚠️ `options: []` NO es un error (FR-006): es "contestá con tus palabras".
+ * Por eso este componente no renderiza nada —ni hueco, ni mensaje de falla— y
+ * la pregunta se ve como se veía antes de esta spec.
+ */
+export function Options({ options, onPick, disabled }) {
+  if (!options || options.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      <p className="hint" style={{ marginBottom: 4 }}>
+        Podés elegir una y editarla, o escribir la tuya:
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {options.map((opt, i) => (
+          <button
+            key={i}
+            type="button"
+            className="secondary"
+            onClick={() => onPick(opt)}
+            disabled={disabled}
+            style={{ textAlign: 'left', whiteSpace: 'normal', lineHeight: 1.35 }}
+          >
+            {opt}
+          </button>
+        ))}
       </div>
     </div>
   );

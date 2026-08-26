@@ -103,6 +103,23 @@ export function searchKnowledge(token, { query, audience, agentType, k }) {
 
 // --- Human-in-the-loop (Sprint 3): escalados y control manual ---
 
+/**
+ * Spec 013 — la cola viene priorizada por área y cada caso trae `pertenencia`.
+ *
+ * `params` pasa tal cual, así que `soloMios: true` va sin tocar la firma.
+ *
+ * OJO con `pertenencia`: son **tres** valores, no un booleano.
+ *   - `PROPIA`   — de un área de quien mira, o derivado a esa persona
+ *   - `SIN_AREA` — el caso no llegó a rutearse: NO le toca a nadie
+ *   - `AJENA`    — de otra área
+ *
+ * `SIN_AREA` **no es** "no es mío": aplastarlo contra `AJENA` lo manda al fondo
+ * de la lista y nadie lo mira nunca, que es justo lo que el backend evita.
+ *
+ * La cola NO oculta lo ajeno: lo ordena detrás. Ver lo de otras áreas hace falta
+ * para no dejar sin cobertura las que no tienen responsable activo y para saber
+ * a quién derivar.
+ */
 export function listEscalations(token, params = {}) {
   const qs = new URLSearchParams(params).toString();
   return request(`/supervisor/escalations${qs ? `?${qs}` : ''}`, { token });
