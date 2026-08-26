@@ -127,6 +127,9 @@ function CandidateCard({ token, sessionId, candidate, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [showRaw, setShowRaw] = useState(false);
+  // AGREGAR | REEMPLAZAR — solo en una corrección. Ver `handleApplyModeChange`.
+  const [applyMode, setApplyMode] = useState(candidate.applyMode ?? 'AGREGAR');
+  const [verActual, setVerActual] = useState(false);
 
   const editado = title !== candidate.title || content !== candidate.content;
 
@@ -172,6 +175,20 @@ function CandidateCard({ token, sessionId, candidate, onChanged }) {
     setAudience(next);
     await patchInterviewCandidate(token, candidate.id, { audience: next });
     onChanged({ audience: next });
+  }
+
+  /**
+   * Agregar o pisar el documento.
+   *
+   * ⚠️ El default es AGREGAR y no es un detalle: la pregunta que originó esta
+   * ficha fue "¿qué le FALTA a este documento?", y quien la redactó no vio el
+   * documento original. Aprobarla como reemplazo borra lo que ya decía — pasó
+   * con «Sobre Nosotros», que quedó hablando solo de facturas.
+   */
+  async function handleApplyModeChange(next) {
+    setApplyMode(next);
+    await patchInterviewCandidate(token, candidate.id, { applyMode: next });
+    onChanged({ applyMode: next });
   }
 
   async function handleConvertToCorrection(documentId) {
@@ -241,6 +258,46 @@ function CandidateCard({ token, sessionId, candidate, onChanged }) {
               <option value="INTERNO">Interno (solo equipo)</option>
             </select>
           </div>
+
+          {candidate.candidateKind === 'CORRECCION' && (
+            <div className="field">
+              <label>Qué hacer con el documento</label>{' '}
+              <select
+                value={applyMode}
+                onChange={(e) => handleApplyModeChange(e.target.value)}
+              >
+                <option value="AGREGAR">Agregar al contenido actual</option>
+                <option value="REEMPLAZAR">Reemplazar todo el contenido</option>
+              </select>
+              {applyMode === 'REEMPLAZAR' && (
+                <p className="hint" style={{ color: '#b45309', marginTop: 4 }}>
+                  ⚠️ Se va a borrar todo lo que el documento dice hoy y quedará
+                  solo este texto. La pregunta fue qué le <em>falta</em>, así que
+                  esta ficha probablemente no lo cubra entero.
+                </p>
+              )}
+              {candidate.target?.currentContent && (
+                <>
+                  <button
+                    type="button"
+                    className="secondary"
+                    style={{ marginTop: 6 }}
+                    onClick={() => setVerActual((v) => !v)}
+                  >
+                    {verActual ? 'Ocultar' : 'Ver'} lo que dice hoy
+                  </button>
+                  {verActual && (
+                    <p
+                      className="hint"
+                      style={{ whiteSpace: 'pre-wrap', marginTop: 6 }}
+                    >
+                      {candidate.target.currentContent}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           <button type="button" className="secondary" onClick={() => setShowRaw((v) => !v)}>
             {showRaw ? 'Ocultar' : 'Ver'} respuesta cruda

@@ -10,13 +10,12 @@ import {
 import KnowledgeUpload from './KnowledgeUpload';
 import KnowledgeDetail from './KnowledgeDetail';
 import KnowledgeHygiene from './KnowledgeHygiene';
-import KnowledgeCoverage from './KnowledgeCoverage';
 import { motivoDeBloqueo, puedeEscribirEn } from '../areas';
 
 const AGENT_TYPES = ['ORCHESTRATOR', 'SALES', 'COLLECTIONS', 'LOGISTICS', 'DEPOSITS', 'ADMIN'];
 const PAGE_SIZE = 15;
 
-export default function KnowledgeIngest({ token, me, onOpenInterview }) {
+export default function KnowledgeIngest({ token, me }) {
   const [view, setView] = useState('lista'); // lista | subir | alta | buscar
   const [selectedId, setSelectedId] = useState(null);
 
@@ -68,7 +67,6 @@ export default function KnowledgeIngest({ token, me, onOpenInterview }) {
           ['alta', 'Cargar texto'],
           ['buscar', 'Probar búsqueda'],
           ['higiene', 'Limpiar base de conocimiento'],
-          ['cobertura', '¿Qué me falta?'],
         ].map(([id, label]) => (
           <button
             key={id}
@@ -84,15 +82,6 @@ export default function KnowledgeIngest({ token, me, onOpenInterview }) {
         <KnowledgeList token={token} alcance={alcance} onSelect={setSelectedId} />
       )}
       {view === 'higiene' && <KnowledgeHygiene token={token} />}
-      {view === 'cobertura' && (
-        <KnowledgeCoverage
-          token={token}
-          onOpenDocument={setSelectedId}
-          onOpenHygiene={() => setView('higiene')}
-          onOpenAlta={() => setView('alta')}
-          onOpenInterview={onOpenInterview}
-        />
-      )}
       {view === 'subir' && <KnowledgeUpload token={token} alcance={alcance} />}
       {view === 'alta' && <TextIngestForm token={token} alcance={alcance} />}
       {view === 'buscar' && <SearchForm token={token} />}

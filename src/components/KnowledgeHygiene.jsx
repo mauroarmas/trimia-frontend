@@ -48,7 +48,13 @@ export default function KnowledgeHygiene({ token }) {
   }
 
   useEffect(() => {
-    loadLatest();
+    // ⚠️ Si al entrar YA hay un barrido corriendo (lo lanzó otra persona, o
+    // esta misma antes de irse), hay que encuestar igual. Sin esto la pantalla
+    // se queda congelada en "Analizando…" hasta que alguien recargue: se
+    // pintaba el estado una vez y nadie volvía a preguntar.
+    loadLatest().then((data) => {
+      if (data?.status === 'RUNNING') pollUntilDone();
+    });
     return () => clearInterval(pollRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

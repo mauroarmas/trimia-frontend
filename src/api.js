@@ -765,47 +765,62 @@ export function getContactTimeline(token, externalId) {
 // --- Qué falta para responder mejor (spec 009) ---
 
 /**
- * Dispara una corrida de cobertura. Encola y responde; no espera (Principio
- * IV). `window` es opcional: `{ windowFrom, windowTo }` en ISO — sin eso, el
- * backend usa `COVERAGE_WINDOW_DAYS`. 409 con el `scanId` en curso si ya hay
- * una corrida corriendo.
+ * Spec 011 — la pantalla única para mejorar el conocimiento.
+ *
+ * Reemplaza a `startCoverageScan`, `getLatestCoverageScan`, `markThemeHandled`
+ * y `unmarkThemeHandled`: sus cuatro endpoints se retiraron con la pestaña
+ * "¿Qué me falta?". El servicio de cobertura sigue vivo del lado del backend —
+ * es la primera de las tres fuentes de esta lista.
  */
-export function startCoverageScan(token, window) {
-  return request('/knowledge/coverage/scan', {
+
+/**
+ * La lista de qué mejorar en un área, ya unificada, ordenada y filtrada.
+ *
+ * ⚠️ `notice.code` tiene tres valores que NO son intercambiables aunque
+ * `items` venga vacío en los tres: `SIN_REVISAR` (nunca se actualizó esta
+ * área), `TODO_CUBIERTO` (se revisó y no quedó nada) y `SIN_DOCUMENTOS` (el
+ * área no tiene ninguno, así que ofrecer revisar es mentir).
+ *
+ * Ya **no** hay aviso de "muestra insuficiente": con tres fuentes, que el
+ * tráfico no alcance dejó de significar "no hay nada que mejorar".
+ */
+export function getImprovements(token, sectorId) {
+  return request(`/improvements?sectorId=${encodeURIComponent(sectorId)}`, { token });
+}
+
+/**
+ * Una sola acción actualiza las dos cosas: el barrido de consultas (que es
+ * global) y la revisión de documentos del área.
+ *
+ * `coverage.reused` / `documents.reused` vienen en `true` cuando ya había un
+ * análisis corriendo y se enganchó al que estaba. **No es un error**: dos
+ * personas actualizando a la vez comparten la corrida.
+ *
+ * ⚠️ La primera revisión de un área grande tarda minutos (son ~37 documentos
+ * entre propios y transversales). Las siguientes son casi instantáneas porque
+ * solo se reanaliza lo que cambió.
+ */
+export function refreshImprovements(token, sectorId) {
+  return request('/improvements/refresh', {
     method: 'POST',
     token,
-    body: window ?? {},
+    body: { sectorId },
   });
 }
 
 /**
- * La última corrida, con sus temas. `notice.code` tiene tres valores que NO
- * son intercambiables aunque `themes` esté vacío en los tres: `SIN_CORRIDA`
- * (nunca se corrió), `SIN_MUESTRA_SUFICIENTE` (corrió, no alcanza — trae
- * `queriesInWindow`/`minimumSample` para decir cuánto falta) y
- * `TODO_CUBIERTO` (corrió y no encontró temas).
+ * "Ya lo miré, está bien así" — sirve para las tres fuentes; el backend deduce
+ * cuál por el prefijo del `itemId` (`tema:` / `esc:` / `doc:`).
+ *
+ * Para un documento el descarte queda atado a su **versión**: si alguien lo
+ * edita después, el ítem puede volver a aparecer. 403 si quien descarta no es
+ * responsable del área del ítem.
  */
-export function getLatestCoverageScan(token) {
-  return request('/knowledge/coverage/latest', { token });
-}
-
-/**
- * Marca un tema como atendido. 403 si quien pide no es responsable del área
- * del tema (el body trae de cuáles sí lo es); 409 si ya estaba marcado.
- */
-export function markThemeHandled(token, themeId, note) {
-  return request(`/knowledge/coverage/themes/${themeId}/handled`, {
+export function dismissImprovement(token, itemId, note) {
+  return request('/improvements/dismiss', {
     method: 'POST',
     token,
-    body: { note },
-  });
-}
-
-/** Revierte una marca puesta por error. Mismo criterio de autorización que marcar. */
-export function unmarkThemeHandled(token, themeId) {
-  return request(`/knowledge/coverage/themes/${themeId}/handled`, {
-    method: 'DELETE',
-    token,
+    body: { itemId, note },
   });
 }
 
@@ -820,8 +835,12 @@ export function unmarkThemeHandled(token, themeId) {
  * / `TODO_CUBIERTO`) si no hay ni temas de cobertura ni escalados de
  * respaldo — los tres NO son intercambiables.
  */
-export function openInterview(token, sectorId) {
-  return request('/interviews', { method: 'POST', token, body: { sectorId } });
+export function openInterview(token, sectorId, itemId) {
+  return request('/interviews', {
+    method: 'POST',
+    token,
+    body: itemId ? { sectorId, itemId } : { sectorId },
+  });
 }
 
 /**
@@ -882,9 +901,14 @@ export function getInterviewCandidates(token, id) {
 }
 
 /**
- * Edita un candidato antes de aprobarlo. Mandar `targetDocumentId` lo
- * convierte en corrección de ese documento (desde el aviso de parecido);
- * en `null` lo devuelve a nuevo.
+ * Edita una ficha antes de aprobarla. Campos: `title`, `content`, `audience`,
+ * `targetDocumentId` (convierte nuevo ↔ corrección) y `applyMode`.
+ *
+ * ⚠️ **`applyMode`** solo aplica a una corrección: `AGREGAR` (default) suma el
+ * texto al documento, `REEMPLAZAR` lo pisa entero. El default no es un
+ * capricho — la pregunta que originó la ficha fue "¿qué le FALTA a este
+ * documento?" y quien la redactó no vio el documento original, así que
+ * aprobarla como reemplazo borra lo que ya decía.
  */
 export function patchInterviewCandidate(token, candidateId, patch) {
   return request(`/interviews/candidates/${candidateId}`, {

@@ -1,11 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   openInterview,
   getInterview,
   answerInterview,
   skipInterviewQuestion,
   finishInterview,
-  getEmployee,
   listSectors,
 } from '../api';
 import InterviewReview from './InterviewReview';
@@ -29,22 +28,29 @@ const KIND_LABEL = {
  * el poll de `GET /interviews/:id` solo hace falta mientras `PREPARANDO` o
  * `CERRANDO`.
  */
-export default function Interview({ token, me, initialAgentType, onConsumedInitial }) {
-  const [misAreas, setMisAreas] = useState(null);
-  const [sectors, setSectors] = useState([]);
+export default function Interview({ token, me, start, onSalir }) {
+  // Spec 011: ya no hace falta saber de qué áreas es responsable — el área
+  // viene elegida desde la lista y el backend la verifica igual. Los sectores
+  // se traen solo para poner el nombre del área en el título.
+  const [sectors, setSectors] = useState(null);
   const [sessionId, setSessionId] = useState(null);
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState(null); // 422: SIN_CORRIDA / SIN_MUESTRA_SUFICIENTE / TODO_CUBIERTO
+  // 422: TODO_CUBIERTO / YA_ENTREVISTADO. Spec 011: SIN_CORRIDA y
+  // SIN_MUESTRA_SUFICIENTE dejaron de ser motivos — las otras dos fuentes de
+  // la lista no dependen del barrido de cobertura.
+  const [notice, setNotice] = useState(null);
+  // Spec 011: se retomó una sesión que ya estaba abierta en vez de abrir una
+  // sobre el ítem elegido. Hay que DECIRLO — ver `handleOpen`.
+  const [retomada, setRetomada] = useState(false);
 
   useEffect(() => {
     if (!me) return undefined;
     let vigente = true;
-    Promise.all([getEmployee(token, me.id), listSectors(token)])
-      .then(([empleado, secs]) => {
+    listSectors(token)
+      .then((secs) => {
         if (!vigente) return;
-        setMisAreas(empleado.areasSupervisadas ?? []);
         setSectors(secs);
       })
       .catch((err) => setError(err.message));
@@ -71,30 +77,40 @@ export default function Interview({ token, me, initialAgentType, onConsumedIniti
     return () => clearInterval(id);
   }, [token, sessionId, session]);
 
-  // Llegada desde "¿Qué me falta?": el panel manda el agentType del tema y
-  // acá se resuelve a sector — la entrevista se abre por área, y el tema de
-  // cobertura solo conoce su agente. Se consume una sola vez: si no, volver
-  // atrás con "Elegir otra área" la reabriría sola en un bucle.
+  // Spec 011: llegada desde la lista de mejoras con el ÍTEM elegido. Ya no
+  // hace falta resolver agentType→sector: el sector viene dado, y el `itemId`
+  // hace que la entrevista sea sobre ESE ítem y no sobre "algo del área".
+  //
+  // ⚠️ El "una sola vez" se marca con un ref, NO limpiando el valor en el
+  // padre: allá es lo que decide qué pantalla se monta, así que limpiarlo
+  // desmontaba esta antes de que la sesión llegara a abrirse.
+  const yaAbierto = useRef(false);
   useEffect(() => {
-    if (!initialAgentType || sectors.length === 0 || sessionId) return;
-    const sector = sectors.find((s) => s.agentType === initialAgentType);
-    onConsumedInitial?.();
-    if (sector) handleOpen(sector.id);
+    if (!start || sessionId || yaAbierto.current) return;
+    yaAbierto.current = true;
+    handleOpen(start.sectorId, start.itemId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialAgentType, sectors, sessionId]);
+  }, [start, sessionId]);
 
-  async function handleOpen(sectorId) {
+  async function handleOpen(sectorId, itemId) {
     setError('');
     setNotice(null);
     setLoading(true);
     try {
-      const opened = await openInterview(token, sectorId);
+      const opened = await openInterview(token, sectorId, itemId);
       setSessionId(opened.id);
       setSession(opened);
     } catch (err) {
       // 409: ya hay una sesión sin cerrar para esta área — se retoma, no es
       // un error (FR-003, "se le devuelve la que ya tenía").
+      //
+      // ⚠️ Spec 011: acá SÍ hay que avisar. Antes se llegaba eligiendo un
+      // área, y retomar "tu entrevista de Ventas" se entendía solo. Ahora se
+      // llega apretando un ítem concreto, así que quien esperaba hablar de
+      // "Horarios de atención" se encuentra preguntas de otra cosa. Retomar
+      // sigue siendo lo correcto; callarlo, no.
       if (err.status === 409 && err.body?.session?.id) {
+        setRetomada(Boolean(itemId));
         setSessionId(err.body.session.id);
         try {
           const s = await getInterview(token, err.body.session.id);
@@ -126,40 +142,29 @@ export default function Interview({ token, me, initialAgentType, onConsumedIniti
     setSession(null);
     setNotice(null);
     setError('');
+    setRetomada(false);
+    // Spec 011: volver es volver a la LISTA, no a un selector de área. No se
+    // entra a una entrevista en abstracto; se entra desde un ítem concreto.
+    onSalir?.();
   }
 
-  if (misAreas === null) return <p className="hint">Cargando…</p>;
+  if (sectors === null) return <p className="hint">Cargando…</p>;
 
+  // Spec 011: acá ya no se elige área — se llega siempre desde un ítem de la
+  // lista de mejoras. Lo único que puede pasar sin sesión es que el backend
+  // haya dicho que no hay con qué preguntar (422).
   if (!sessionId) {
-    // FR-036: rol y área son dos gates distintos — acá se elige entre las
-    // áreas de las que la persona es responsable, el resto lo verifica el
-    // backend igual.
-    const misSectores = sectors.filter(
-      (s) => s.agentType && misAreas.some((a) => a.id === s.id),
-    );
-
     return (
       <div className="card">
-        <h3>Entrevista desde el tráfico real</h3>
-        <p className="hint" style={{ margin: 0, marginBottom: 12 }}>
-          Las preguntas salen de lo que el agente realmente no pudo contestar
-          — no es un cuestionario a ciegas. Elegí un área para empezar.
-        </p>
-
+        <h3>Entrevista</h3>
+        {loading && <p className="hint">Abriendo…</p>}
         {error && <p className="error">{error}</p>}
         {notice && <NoticeCard notice={notice} />}
-
-        {misSectores.length === 0 && (
-          <p className="hint">No sos responsable de ningún área con agente asociado.</p>
+        {!loading && (
+          <button className="secondary" onClick={handleReset}>
+            Volver a la lista
+          </button>
         )}
-
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {misSectores.map((s) => (
-            <button key={s.id} onClick={() => handleOpen(s.id)} disabled={loading}>
-              {loading ? 'Abriendo…' : `Entrevistar ${s.name}`}
-            </button>
-          ))}
-        </div>
       </div>
     );
   }
@@ -168,8 +173,15 @@ export default function Interview({ token, me, initialAgentType, onConsumedIniti
     <div className="card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
         <h3 style={{ margin: 0 }}>Entrevista — {session?.sector?.id ? sectorName(sectors, session.sector.id) : '…'}</h3>
-        <button className="secondary" onClick={handleReset}>Elegir otra área</button>
+        <button className="secondary" onClick={handleReset}>Volver a la lista</button>
       </div>
+
+      {retomada && (
+        <p className="hint" style={{ marginTop: 8 }}>
+          Ya tenías una entrevista sin cerrar de esta área, así que seguimos con
+          esa. Terminala o dejala, y después volvé por el ítem que elegiste.
+        </p>
+      )}
 
       {error && <p className="error">{error}</p>}
 
@@ -232,8 +244,10 @@ function sectorName(sectors, id) {
 }
 
 function NoticeCard({ notice }) {
-  // Los tres reason NO son intercambiables aunque los tres impidan abrir la
-  // sesión (FR-016) — mismo criterio que KnowledgeCoverage.jsx.
+  // Spec 011: quedan DOS reason y siguen sin ser intercambiables —
+  // `TODO_CUBIERTO` (no hay nada que mejorar) y `YA_ENTREVISTADO` (había, y ya
+  // se preguntó todo). El backend manda el mensaje ya redactado; el panel no
+  // lo arma, para que las dos se lean distinto sin duplicar el criterio acá.
   return <p className="hint">{notice.message}</p>;
 }
 

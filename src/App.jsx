@@ -4,6 +4,7 @@ import SupervisorPanel from './components/SupervisorPanel';
 import ChatSimulator from './components/ChatSimulator';
 import KnowledgeIngest from './components/KnowledgeIngest';
 import Interview from './components/Interview';
+import Improvements from './components/Improvements';
 import WebChat from './components/WebChat';
 import EscalationsQueue from './components/EscalationsQueue';
 import CollectionsPanel from './components/CollectionsPanel';
@@ -15,7 +16,7 @@ const SUPERVISOR_TABS = [
   { id: 'supervisor', label: 'Panel del Supervisor' },
   { id: 'chat', label: 'Simulador de Chat' },
   { id: 'knowledge', label: 'Base de Conocimiento' },
-  { id: 'interview', label: 'Entrevista' },
+  { id: 'improvements', label: 'Mejorar el conocimiento' },
   { id: 'employees', label: 'Empleados y Áreas' },
 ];
 
@@ -37,11 +38,15 @@ export default function App() {
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
   const [tab, setTab] = useState('escalations');
-  // Salto desde "¿Qué me falta?" a la entrevista de ESE área. Se guarda el
-  // agentType (que es lo que conoce un tema de cobertura) y la entrevista lo
-  // resuelve a sector; se limpia al consumirlo, si no volver atrás la
-  // reabriría sola.
-  const [interviewAgentType, setInterviewAgentType] = useState(null);
+  // Spec 011: el salto a la entrevista lleva el ÍTEM elegido, no solo el área
+  // — la entrevista es sobre lo que la persona apretó, no sobre "algo de
+  // Ventas". La pestaña "Entrevista" ya no está en la barra: no se entra a una
+  // entrevista en abstracto, se entra desde un ítem concreto.
+  //
+  // ⚠️ El valor NO se limpia al consumirlo, que fue el primer intento: como es
+  // lo que decide cuál de las dos pantallas se monta, limpiarlo desmontaba la
+  // entrevista **antes de que llegara a abrir la sesión**. Se limpia al salir.
+  const [interviewStart, setInterviewStart] = useState(null);
 
   if (!token) {
     return <Login onLogin={(t, u) => { setToken(t); setUser(u); }} />;
@@ -110,22 +115,27 @@ export default function App() {
       {isSupervisor && currentTab === 'supervisor' && <SupervisorPanel token={token} me={user} />}
       {isSupervisor && currentTab === 'chat' && <ChatSimulator token={token} />}
       {isSupervisor && currentTab === 'knowledge' && (
-        <KnowledgeIngest
-          token={token}
-          me={user}
-          onOpenInterview={(agentType) => {
-            setInterviewAgentType(agentType);
-            setTab('interview');
-          }}
-        />
+        <KnowledgeIngest token={token} me={user} />
       )}
-      {isSupervisor && currentTab === 'interview' && (
-        <Interview
-          token={token}
-          me={user}
-          initialAgentType={interviewAgentType}
-          onConsumedInitial={() => setInterviewAgentType(null)}
-        />
+      {isSupervisor && currentTab === 'improvements' && (
+        interviewStart ? (
+          <Interview
+            token={token}
+            me={user}
+            start={interviewStart}
+            onSalir={() => setInterviewStart(null)}
+          />
+        ) : (
+          <Improvements
+            token={token}
+            me={user}
+            onEntrevistar={(sectorId, itemId) => setInterviewStart({ sectorId, itemId })}
+            // Retomar es entrar SIN itemId: la sesión ya existe y el backend
+            // la devuelve tal cual (409 → se retoma). Mandar un ítem acá
+            // prometería una entrevista sobre algo que esa sesión no cubre.
+            onRetomar={(sectorId) => setInterviewStart({ sectorId })}
+          />
+        )
       )}
       {isSupervisor && currentTab === 'employees' && <EmployeesPanel token={token} />}
     </div>
