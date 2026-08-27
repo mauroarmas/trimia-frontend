@@ -98,6 +98,8 @@ function KnowledgeList({ token, alcance, onSelect }) {
   const [agentType, setAgentType] = useState('');
   const [category, setCategory] = useState('');
   const [isActive, setIsActive] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -107,19 +109,36 @@ function KnowledgeList({ token, alcance, onSelect }) {
       if (agentType) params.agentType = agentType;
       if (category) params.category = category;
       if (isActive !== '') params.isActive = isActive;
+      if (search) params.search = search;
       setData(await listKnowledge(token, params));
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [token, page, agentType, category, isActive]);
+  }, [token, page, agentType, category, isActive, search]);
+
+  // Búsqueda con debounce: no dispara un pedido por cada tecla.
+  useEffect(() => {
+    const id = setTimeout(() => { setPage(1); setSearch(searchInput.trim()); }, 300);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput]);
 
   useEffect(() => { load(); }, [load]);
 
   return (
     <div className="card">
       <h3>Documentos de la base de conocimiento</h3>
+
+      <div className="field">
+        <label>Buscar</label>
+        <input
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="Por título o contenido…"
+        />
+      </div>
 
       <div className="field-row">
         <div className="field">
@@ -316,6 +335,92 @@ function TextIngestForm({ token, alcance }) {
   );
 }
 
+/**
+ * Cómo se pinta el estado del vector de un resultado.
+ *
+ * `DESFASADO` es el que motivó la columna: el documento cambió y el vector
+ * quedó atrás, así que el agente busca contra un texto viejo aunque el panel
+ * muestre el nuevo. Pasó de verdad —un renombre que no reindexaba— y no había
+ * forma de verlo desde ninguna pantalla.
+ *
+ * `SIN_VERSION` no es un problema: son chunks anteriores al Sprint 5A, que no
+ * guardaban versión. Se distingue de `AL_DIA` porque "no se sabe" no es "está
+ * bien", y aplastarlos daría por sano algo que nadie comprobó.
+ */
+const ESTADO_VECTOR = {
+  AL_DIA: { texto: 'al día', clase: 'status-active', title: 'El vector refleja lo que dice el documento hoy' },
+  DESFASADO: { texto: '⚠️ desfasado', clase: 'status-warning', title: 'El documento cambió y el vector quedó atrás: el agente busca contra el texto viejo. Reindexá el documento.' },
+  HUERFANO: { texto: '⚠️ huérfano', clase: 'status-warning', title: 'El vector existe pero el documento ya no está en la base: nadie puede corregirlo desde el panel' },
+  SIN_VERSION: { texto: 'sin versión', clase: 'status-idle', title: 'Fragmento anterior al Sprint 5A: no guarda versión, así que no se puede comparar' },
+};
+
+function ResultRow({ r, alcanza }) {
+  // El contenido arranca cortado: cinco resultados enteros no se leen. Pero
+  // "cortado" tiene que poder abrirse — sin el texto completo no se puede
+  // comprobar si el fragmento que recuperó el agente está actualizado, que es
+  // justo para lo que sirve esta pantalla.
+  const [abierto, setAbierto] = useState(false);
+  const largo = r.content.length > 140;
+  const estado = ESTADO_VECTOR[r.desincronizado];
+
+  return (
+    <tr>
+      <td style={alcanza === false ? { color: 'var(--text-muted)' } : undefined}>
+        {r.score.toFixed(3)}
+      </td>
+      <td>
+        {alcanza === null && <span className="hint">—</span>}
+        {alcanza === true && <span className="badge status-active">sí</span>}
+        {alcanza === false && (
+          // No es un error del sistema: es el corte funcionando. Por eso va en
+          // gris/aviso y no en rojo de error.
+          <span className="badge status-idle" title="Por debajo del umbral: en una conversación real esto habría derivado a una persona">
+            derivaría
+          </span>
+        )}
+      </td>
+      <td>
+        {/* El título CON EL QUE SE VECTORIZÓ, no el vigente. Cuando difieren,
+            se muestran los dos: ver solo el vigente taparía el desfase. */}
+        {r.title}
+        {r.desincronizado === 'DESFASADO' && r.vigente?.title !== r.title && (
+          <div className="hint" style={{ color: '#b45309' }}>
+            hoy se llama «{r.vigente.title}»
+          </div>
+        )}
+      </td>
+      <td>
+        {estado && (
+          <span className={`badge ${estado.clase}`} title={estado.title}>
+            {estado.texto}
+          </span>
+        )}
+        {r.version !== undefined && (
+          <div className="hint">
+            v{r.version}
+            {r.vigente && r.vigente.version !== r.version && ` · doc v${r.vigente.version}`}
+          </div>
+        )}
+      </td>
+      <td>
+        <div style={{ whiteSpace: 'pre-wrap' }}>
+          {abierto || !largo ? r.content : `${r.content.slice(0, 140)}…`}
+        </div>
+        {largo && (
+          <button
+            type="button"
+            className="secondary"
+            style={{ padding: '2px 8px', fontSize: 11, marginTop: 4 }}
+            onClick={() => setAbierto((v) => !v)}
+          >
+            {abierto ? 'Ver menos' : 'Ver el fragmento completo'}
+          </button>
+        )}
+      </td>
+    </tr>
+  );
+}
+
 function SearchForm({ token }) {
   const [query, setQuery] = useState('');
   const [audience, setAudience] = useState('PUBLICO');
@@ -373,6 +478,13 @@ function SearchForm({ token }) {
         por debajo deriva a una persona. Acá no se aplica ese corte a propósito,
         para poder ver lo crudo.
       </p>
+      <p className="hint">
+        La columna <strong>Vector</strong> dice si lo que el agente busca está al
+        día. <strong>Desfasado</strong> significa que el documento se editó y el
+        vector quedó atrás: la búsqueda sigue corriendo contra el texto viejo
+        aunque el panel muestre el nuevo. Se arregla reindexando el documento
+        desde su ficha.
+      </p>
       <form onSubmit={handleSearch}>
         <div className="field">
           <label>Consulta</label>
@@ -406,35 +518,17 @@ function SearchForm({ token }) {
               <th>Score</th>
               <th>¿Alcanza?</th>
               <th>Título</th>
+              <th>Vector</th>
               <th>Contenido</th>
             </tr>
           </thead>
           <tbody>
-            {results.length === 0 && <tr><td colSpan={4}>Sin resultados.</td></tr>}
+            {results.length === 0 && <tr><td colSpan={5}>Sin resultados.</td></tr>}
             {results.map((r) => {
               // `null` mientras no se conozca el umbral: sin dato no se opina.
               const alcanza = umbral === null ? null : r.score >= umbral;
               return (
-                <tr key={r.documentId + r.content.slice(0, 10)}>
-                  <td style={alcanza === false ? { color: 'var(--text-muted)' } : undefined}>
-                    {r.score.toFixed(3)}
-                  </td>
-                  <td>
-                    {alcanza === null && <span className="hint">—</span>}
-                    {alcanza === true && (
-                      <span className="badge status-active">sí</span>
-                    )}
-                    {alcanza === false && (
-                      // No es un error del sistema: es el corte funcionando.
-                      // Por eso va en gris/aviso y no en rojo de error.
-                      <span className="badge status-idle" title="Por debajo del umbral: en una conversación real esto habría derivado a una persona">
-                        derivaría
-                      </span>
-                    )}
-                  </td>
-                  <td>{r.title}</td>
-                  <td>{r.content.slice(0, 140)}{r.content.length > 140 ? '…' : ''}</td>
-                </tr>
+                <ResultRow key={r.documentId + r.content.slice(0, 10)} r={r} alcanza={alcanza} />
               );
             })}
           </tbody>

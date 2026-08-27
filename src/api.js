@@ -139,6 +139,13 @@ export function resolveEscalation(token, id, { message, teachAgent, title, categ
   }
   // Spec 007: corregir un documento existente en vez de crear uno nuevo.
   // Excluyente con teachAgent — el backend rechaza pedir las dos cosas.
+  //
+  // `correctKnowledge.applyMode` decide qué se hace con `content`:
+  //   AGREGAR    — se suma al final de lo que el documento ya dice
+  //   REEMPLAZAR — lo pisa entero (es el default si no se manda)
+  // La composición la hace el BACKEND leyendo el contenido vigente; acá se
+  // manda solo el texto nuevo. Concatenar del lado del panel duplicaría la
+  // regla y además usaría un contenido leído hace rato.
   if (correctKnowledge) body.correctKnowledge = correctKnowledge;
   return request(`/supervisor/escalations/${id}/resolve`, {
     method: 'POST',
@@ -865,6 +872,20 @@ export function openInterview(token, sectorId, itemId) {
  * (D4: no hay stream, hay que hacer poll). `current` es `null` sin
  * pendientes o si el estado no es `EN_CURSO` — una sesión cerrada
  * anticipadamente llega a `EN_REVISION` con preguntas sin contestar.
+ *
+ * `current.escalation` trae el caso del que salió la pregunta: `reason`,
+ * `status`, los últimos `messages` de la conversación hasta el escalado (con
+ * `role`: USER o ASSISTANT) e `internalNotes`.
+ *
+ * OJO con dos cosas:
+ *   - `escalation: null` es normal, no un error: las preguntas que salen de un
+ *     tema de cobertura no vienen de ningún caso. Y también llega `null` si el
+ *     contexto no se pudo traer — es información de más, nunca bloquea la
+ *     entrevista.
+ *   - en `internalNotes`, `authorAgentType` y `authorName` son EXCLUYENTES: con
+ *     agente la escribió la IA al escalar, con nombre la escribió una persona.
+ *     No son la misma clase de dato y mostrarlos igual haría leer como
+ *     automática una nota que alguien dejó a mano.
  */
 export function getInterview(token, id) {
   return request(`/interviews/${id}`, { token });

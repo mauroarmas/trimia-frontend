@@ -116,7 +116,13 @@ export default function KnowledgeHygiene({ token }) {
 
         {corriendo && (
           <p className="hint">
-            Analizando el corpus (~{scan?.documentsToScan ?? ''} documentos)…
+            {/*
+              Sin número, la frase entera se cae: «(~ documentos)» con el hueco
+              a la vista parece un dato que no cargó. Se dice lo que sí se sabe.
+            */}
+            {scan?.documentsToScan
+              ? `Analizando el corpus (~${scan.documentsToScan} documentos)… `
+              : 'Analizando el corpus… '}
             se actualiza solo cuando termina.
             {scan?.pairs?.length > 0 && ' Mientras tanto, se muestra el resultado de la corrida anterior.'}
           </p>

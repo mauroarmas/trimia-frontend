@@ -5,7 +5,7 @@ import {
   getConversation,
   resolveEscalation,
   getKnowledgeCandidates,
-  previewCorrection,
+  getKnowledgeDoc,
   getEscalationSuggestion,
   saveEscalationUnsent,
   discardEscalation,
@@ -37,7 +37,11 @@ import {
 const PERTENENCIA = {
   PROPIA: { texto: 'Mía', color: '#137333', title: 'De un área que supervisás, o derivado a vos' },
   SIN_AREA: { texto: 'Sin área', color: '#8a6d0b', title: 'El caso no llegó a rutearse: no le toca a nadie en particular' },
-  AJENA: { texto: 'Otra área', color: '#5f6368', title: 'De un área que no supervisás. Podés verlo, responderlo o derivarlo' },
+  // "Otra área" es el caso más común pero no el único: un caso de TU área
+  // derivado a otra persona también cae acá (FR-011). La columna «Derivado a»
+  // de al lado dice cuál de los dos es; el título lo aclara para que la
+  // etiqueta no se lea como una afirmación sobre el área.
+  AJENA: { texto: 'No es tuyo', color: '#5f6368', title: 'De un área que no supervisás, o derivado a otra persona. Podés verlo, responderlo o derivarlo' },
 };
 
 function EtiquetaPertenencia({ valor }) {
@@ -85,14 +89,30 @@ export default function EscalationsQueue({ token, me }) {
   const [misAreas, setMisAreas] = useState(null);
   const [totalAreas, setTotalAreas] = useState(0);
 
-  // Propuesta de respuesta (US3). `null` = todavía no se pidió.
-  // Spec 007: corregir el documento que quedó corto, en vez de crear otro que
-  // compita con él. `candidates` sale del caso; `correction` es la propuesta
-  // que todavía NO se guardó.
+  // Spec 007: los documentos que quedaron cortos en este caso. `null` = todavía
+  // no se cargó; `[]` es una respuesta normal (el caso escaló sin recuperar
+  // nada, así que no hay nada que corregir).
   const [candidates, setCandidates] = useState(null);
-  const [correctDocId, setCorrectDocId] = useState('');
-  const [correction, setCorrection] = useState(null);
-  const [correcting, setCorrecting] = useState(false);
+
+  /**
+   * Qué se hace con la respuesta al enseñarla: corregir un documento que ya
+   * existe, o crear uno nuevo.
+   *
+   * El default es MODIFICAR **cuando hay candidatos** (se decide al abrir el
+   * caso, no acá): si el caso escaló porque un documento quedó corto, crear
+   * otro sobre el mismo tema hace que los dos se repartan la señal y ninguno
+   * gane. El default correcto es el que evita eso; crear uno nuevo tiene que
+   * ser una elección, no lo que pasa por no mirar.
+   */
+  const [knowledgeMode, setKnowledgeMode] = useState('NUEVO');
+  const [targetDocId, setTargetDocId] = useState('');
+  // El documento elegido, ya traído: de acá salen `version` (para que un cambio
+  // ajeno no se pise en silencio) y `content` (para poder ver qué dice hoy
+  // antes de decidir si se le suma o se lo pisa).
+  const [targetDoc, setTargetDoc] = useState(null);
+  const [loadingDoc, setLoadingDoc] = useState(false);
+  const [applyMode, setApplyMode] = useState('AGREGAR');
+  const [verActual, setVerActual] = useState(false);
 
   // Spec 008 (US3): si los documentos consultados en ESTE caso compiten entre
   // sí. `null` = todavía no se cargó; `[]` es la respuesta normal (no hay
@@ -162,8 +182,11 @@ export default function EscalationsQueue({ token, me }) {
     setKnowledgeAgentType('');
     setDelegateTo('');
     setCandidates(null);
-    setCorrectDocId('');
-    setCorrection(null);
+    setKnowledgeMode('NUEVO');
+    setTargetDocId('');
+    setTargetDoc(null);
+    setApplyMode('AGREGAR');
+    setVerActual(false);
     setHygieneWarning(null);
     try {
       const [escDetail, conv] = await Promise.all([
@@ -175,7 +198,13 @@ export default function EscalationsQueue({ token, me }) {
       // Los candidatos se piden aparte: si fallan, el caso igual se puede
       // resolver como siempre. Es información de más, no un requisito.
       try {
-        setCandidates(await getKnowledgeCandidates(token, escalation.id));
+        const cands = await getKnowledgeCandidates(token, escalation.id);
+        setCandidates(cands);
+        // El default sale del caso, no de una preferencia fija: si hay algo que
+        // quedó corto, lo que conviene es corregir ESO. Solo se preselecciona
+        // si además se puede tocar — ofrecer un modo que va a dar 403 es peor
+        // que no ofrecerlo.
+        if (cands.some((c) => c.corregible)) setKnowledgeMode('MODIFICAR');
       } catch {
         setCandidates([]);
       }
@@ -203,29 +232,28 @@ export default function EscalationsQueue({ token, me }) {
   }
 
   /**
-   * Pide la propuesta de corrección. NO guarda nada: se aprueba recién al
-   * resolver, mandando el texto que quede en el editor.
+   * Trae el documento elegido para corregir.
+   *
+   * Hacen falta dos cosas que la lista de candidatos no trae: `version` —para
+   * que un cambio que otro guarde mientras tanto no se pise en silencio— y
+   * `content`, para poder mirar qué dice hoy antes de decidir si se le suma la
+   * respuesta o se lo pisa entero. Se pide al elegir y no al abrir el caso: son
+   * hasta cuatro documentos y casi siempre se toca uno.
    */
-  async function handleCorrectionPreview(documentId) {
-    if (!replyMessage.trim()) {
-      setActionError('Escribí primero la respuesta: de ahí sale la corrección.');
-      return;
-    }
-    setCorrecting(true);
+  async function handleSelectTargetDoc(documentId) {
+    setTargetDocId(documentId);
+    setTargetDoc(null);
+    setVerActual(false);
+    if (!documentId) return;
+    setLoadingDoc(true);
     setActionError('');
     try {
-      const prev = await previewCorrection(token, selected.id, {
-        documentId,
-        message: replyMessage,
-      });
-      setCorrectDocId(documentId);
-      setCorrection(prev);
-      // Corregir y crear son excluyentes: el backend rechaza pedir las dos.
-      setTeachAgent(false);
+      setTargetDoc(await getKnowledgeDoc(token, documentId));
     } catch (err) {
       setActionError(err.message);
+      setTargetDocId('');
     } finally {
-      setCorrecting(false);
+      setLoadingDoc(false);
     }
   }
 
@@ -236,7 +264,18 @@ export default function EscalationsQueue({ token, me }) {
 
   async function handleResolve(e) {
     e.preventDefault();
-    if (teachAgent && (!knowledgeTitle.trim() || !knowledgeCategory.trim())) {
+    // Las dos ramas piden datos distintos, así que se validan por separado. Un
+    // solo chequeo de "faltan campos" mandaría a completar título y categoría a
+    // quien eligió corregir un documento, donde no existen.
+    if (teachAgent && corrigiendo && !targetDoc) {
+      setActionError('Elegí qué documento corregir, o pasá a «documento nuevo».');
+      return;
+    }
+    if (
+      teachAgent &&
+      !corrigiendo &&
+      (!knowledgeTitle.trim() || !knowledgeCategory.trim())
+    ) {
       setActionError('Título y categoría del conocimiento son obligatorios.');
       return;
     }
@@ -245,21 +284,27 @@ export default function EscalationsQueue({ token, me }) {
     try {
       await resolveEscalation(token, selected.id, {
         message: replyMessage,
-        teachAgent,
+        // Corregir y crear son excluyentes: el backend rechaza pedir las dos.
+        // El checkbox dice "esto queda como conocimiento"; el selector de
+        // adentro decide CÓMO, y de ahí sale cuál de los dos campos viaja.
+        teachAgent: teachAgent && !corrigiendo,
         title: knowledgeTitle,
         category: knowledgeCategory,
         audience: knowledgeAudience || undefined,
         agentType: knowledgeAgentType || undefined,
-        // Se manda el texto del editor, que pudo corregirse a mano después de
-        // ver la propuesta: es lo que el supervisor aprueba, no lo que
-        // propuso el modelo.
-        correctKnowledge: correction
-          ? {
-              documentId: correctDocId,
-              baseVersion: correction.baseVersion,
-              content: correction.proposedContent,
-            }
-          : undefined,
+        // `content` es la respuesta que el supervisor escribió. Con AGREGAR el
+        // backend la suma a lo que el documento ya dice; con REEMPLAZAR la
+        // pone en lugar de todo. La unión se hace allá contra el contenido
+        // vigente, no acá contra el que se trajo hace un rato.
+        correctKnowledge:
+          teachAgent && corrigiendo && targetDoc
+            ? {
+                documentId: targetDoc.id,
+                baseVersion: targetDoc.version,
+                content: replyMessage,
+                applyMode,
+              }
+            : undefined,
       });
       setSelected(null);
       setConversation(null);
@@ -292,7 +337,11 @@ export default function EscalationsQueue({ token, me }) {
   /** Aprobar y guardar SIN enviar: no le llega nada al usuario. */
   async function handleSaveUnsent() {
     if (!knowledgeTitle.trim() || !knowledgeCategory.trim()) {
-      setActionError('Para guardar sin enviar hacen falta título y categoría: la respuesta se incorpora al conocimiento.');
+      setActionError(
+        corrigiendo
+          ? 'Guardar sin enviar siempre crea un documento nuevo, así que pide título y categoría. Pasá el selector a «Documento nuevo» para completarlos, o usá «Resolver y responder» si querés corregir el existente.'
+          : 'Para guardar sin enviar hacen falta título y categoría: la respuesta se incorpora al conocimiento.',
+      );
       return;
     }
     setActionBusy(true);
@@ -363,6 +412,24 @@ export default function EscalationsQueue({ token, me }) {
     misAreas === null
       ? ''
       : motivoDeBloqueo(misAreas, totalAreas, areaDelDocumento);
+
+  /**
+   * Corregir y crear se autorizan por áreas DISTINTAS, y aplastarlas en un solo
+   * permiso deja gente afuera de algo que sí puede hacer.
+   *
+   * `puedeEnsenar` mira el área donde iría un documento NUEVO —la del caso, o
+   * la que se elija a mano—. Corregir mira el área DEL DOCUMENTO que se toca,
+   * que la calculó el backend y viene en cada candidato como `corregible`. Un
+   * caso de Cobranzas que recuperó un documento de Ventas se le puede corregir
+   * a quien lleva Ventas, aunque no pueda crear nada en Cobranzas.
+   *
+   * Por eso el checkbox se habilita si se puede hacer CUALQUIERA de las dos, y
+   * cada opción del selector se deshabilita por su cuenta.
+   */
+  const corregibles = (candidates ?? []).filter((c) => c.corregible);
+  const hayCorregibles = corregibles.length > 0;
+  const corrigiendo = knowledgeMode === 'MODIFICAR';
+  const puedeEnsenarAlgo = puedeEnsenar || hayCorregibles;
 
   return (
     <div>
@@ -516,15 +583,37 @@ export default function EscalationsQueue({ token, me }) {
 
                   Solo para AJENA. Un caso SIN_AREA no le toca a nadie:
                   responderlo es lo esperado y avisar sería ruido.
+
+                  ⚠️ AJENA tiene DOS causas y no dicen lo mismo (defecto del
+                  2026-08-26): "no es tu área" y "está derivado a otra persona".
+                  El texto único decía "es de otra área" sobre un caso del área
+                  propia que el que estaba mirando había derivado él mismo — una
+                  afirmación falsa, y encima sobre su propia acción. La regla del
+                  backend está bien (FR-011: derivado a otro deja de ser tuyo);
+                  lo que faltaba era decir por cuál de las dos.
                 */}
                 {selected.pertenencia === 'AJENA' && (
                   <p
                     className="hint"
                     style={{ borderLeft: '3px solid #8a6d0b', paddingLeft: 8, marginBottom: 12 }}
                   >
-                    Este caso es de <strong>otra área</strong>. Podés responderlo
-                    igual —mejor eso que dejar al cliente esperando— y va a quedar
-                    registrado que lo respondió alguien de otra área.
+                    {selected.delegatedToId ? (
+                      <>
+                        Este caso está <strong>derivado a{' '}
+                        {employees.find((emp) => emp.id === selected.delegatedToId)?.name ??
+                          'otra persona'}</strong>
+                        {selected.delegatedById === me?.id && ' — lo derivaste vos'}.
+                        Podés responderlo igual —mejor eso que dejar al cliente
+                        esperando— y va a quedar registrado que lo respondió
+                        alguien que no era el destinatario.
+                      </>
+                    ) : (
+                      <>
+                        Este caso es de <strong>otra área</strong>. Podés responderlo
+                        igual —mejor eso que dejar al cliente esperando— y va a quedar
+                        registrado que lo respondió alguien de otra área.
+                      </>
+                    )}
                   </p>
                 )}
                 <div className="field">
@@ -537,127 +626,24 @@ export default function EscalationsQueue({ token, me }) {
                   />
                 </div>
                 {/*
-                  Spec 007 — corregir en vez de duplicar.
-
-                  Va ARRIBA de "enseñar al RAG" a propósito: cuando el caso
-                  escaló porque un documento quedó corto, crear otro sobre el
-                  mismo tema hace que los dos se repartan la señal y ninguno
-                  gane. El propio aviso de baja confianza ya se lo dice al
-                  supervisor; hasta esta spec no había forma de hacerlo.
+                  El checkbox dice QUÉ se quiere (que esto quede como
+                  conocimiento); el selector de adentro decide CÓMO. Antes el
+                  "cómo" estaba resuelto antes de llegar acá —había que elegir
+                  "Corregir este" en una tabla de arriba, y eso deshabilitaba el
+                  checkbox— así que las dos opciones nunca se veían juntas y
+                  crear un documento nuevo era lo que pasaba por no hacer nada.
                 */}
-                {candidates && candidates.length > 0 && (
-                  <div className="panel-section">
-                    <strong>Documentos que quedaron cortos en este caso</strong>
-                    <p className="hint">
-                      Si alguno es el tema y le faltó información, conviene
-                      <strong> corregir ese</strong> en vez de crear uno nuevo:
-                      dos documentos parecidos se compiten entre sí y las
-                      respuestas salen peor.
-                    </p>
-                    <table>
-                      <thead>
-                        <tr><th>Cercanía</th><th>Documento</th><th></th></tr>
-                      </thead>
-                      <tbody>
-                        {candidates.map((c) => (
-                          <tr key={c.id}>
-                            <td>{c.score.toFixed(1)}%</td>
-                            <td>
-                              {c.title}
-                              {/* Los de otras áreas se muestran igual: saber que
-                                  existe algo cercano es lo que evita duplicarlo.
-                                  Lo que se bloquea es corregirlo. */}
-                              {!c.corregible && (
-                                <div className="hint" title={c.motivoSiNo}>
-                                  solo lectura — {c.motivoSiNo}
-                                </div>
-                              )}
-                            </td>
-                            <td>
-                              <button
-                                type="button"
-                                className="secondary"
-                                disabled={!c.corregible || correcting}
-                                onClick={() => handleCorrectionPreview(c.id)}
-                              >
-                                {correctDocId === c.id && correction
-                                  ? 'Ver de nuevo'
-                                  : 'Corregir este'}
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-
-                    {correction && (
-                      <div style={{ marginTop: 12 }}>
-                        {/* `confident: false` = el modelo no pudo determinar qué
-                            tocar. No hay propuesta que aprobar: conviene crear
-                            un documento nuevo. */}
-                        {!correction.confident ? (
-                          <p className="error">{correction.summary}</p>
-                        ) : (
-                          <>
-                            <p className="hint">
-                              <strong>Propuesta:</strong> {correction.summary}
-                              {' · '}versión base {correction.baseVersion}
-                            </p>
-                            <div className="field">
-                              <label>
-                                Cómo quedaría el documento (editable — se guarda
-                                esto, no lo que propuso la IA)
-                              </label>
-                              <textarea
-                                rows={8}
-                                value={correction.proposedContent}
-                                onChange={(e) =>
-                                  setCorrection({
-                                    ...correction,
-                                    proposedContent: e.target.value,
-                                  })
-                                }
-                              />
-                            </div>
-                            <p className="hint">
-                              Al responder el caso se envía el mensaje al cliente
-                              <strong> y</strong> se guarda esta corrección.
-                              Todavía no se guardó nada.
-                            </p>
-                            <button
-                              type="button"
-                              className="secondary"
-                              onClick={() => {
-                                setCorrection(null);
-                                setCorrectDocId('');
-                              }}
-                            >
-                              Cancelar la corrección
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 <div className="field" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input
                     type="checkbox"
                     id="teachAgent"
-                    checked={teachAgent && puedeEnsenar && !correction}
+                    checked={teachAgent && puedeEnsenarAlgo}
                     onChange={(e) => setTeachAgent(e.target.checked)}
-                    disabled={!puedeEnsenar || !!correction}
+                    disabled={!puedeEnsenarAlgo}
                     style={{ width: 'auto' }}
                   />
                   <label htmlFor="teachAgent" style={{ margin: 0 }}>
                     Enseñar esta respuesta al RAG (queda como conocimiento reutilizable)
-                    {correction && (
-                      <span className="hint">
-                        {' '}— deshabilitado: ya elegiste corregir un documento
-                        existente. Son excluyentes.
-                      </span>
-                    )}
                   </label>
                 </div>
 
@@ -666,59 +652,120 @@ export default function EscalationsQueue({ token, me }) {
                     un caso de otra área puede contestarlo igual; lo único que no
                     puede es dejar el documento. Deshabilitar el caso entero sería
                     quitarle algo que sí puede hacer. */}
-                {!puedeEnsenar && (
+                {!puedeEnsenarAlgo && (
                   <p className="hint" style={{ marginTop: -4 }}>
                     {motivoNoEnsena} Podés responder el caso igual — lo único que no
                     podés es dejar la respuesta como conocimiento de esa área.
                   </p>
                 )}
 
-                {teachAgent && puedeEnsenar && (
+                {teachAgent && puedeEnsenarAlgo && (
                   <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, padding: 12, marginTop: 12 }}>
-                    <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 0 }}>
-                      Campos para ingestar como conocimiento en el RAG:
-                    </p>
+                    {/*
+                      La primera decisión, antes que cualquier campo: mejorar lo
+                      que hay o agregar algo nuevo. Va primero porque es la que
+                      cambia todo lo de abajo, y porque elegir mal acá es lo que
+                      llena el corpus de documentos que se compiten entre sí.
+                    */}
                     <div className="field">
-                      <label>Título del documento <span style={{ color: 'var(--error)' }}>*</span></label>
-                      <input
-                        value={knowledgeTitle}
-                        onChange={(e) => setKnowledgeTitle(e.target.value)}
-                        placeholder="ej. Financiación de heladeras exhibidoras en cuotas"
+                      <label>¿Qué querés hacer con esta respuesta?</label>
+                      <select
+                        value={knowledgeMode}
+                        onChange={(e) => {
+                          setKnowledgeMode(e.target.value);
+                          setActionError('');
+                        }}
+                      >
+                        <option value="MODIFICAR" disabled={!hayCorregibles}>
+                          Modificar un documento existente
+                          {!hayCorregibles && ' — no hay ninguno que puedas corregir en este caso'}
+                        </option>
+                        <option value="NUEVO" disabled={!puedeEnsenar}>
+                          Documento nuevo
+                          {!puedeEnsenar && ' — no podés crear en esta área'}
+                        </option>
+                      </select>
+                    </div>
+
+                    {corrigiendo ? (
+                      <ModificarDocumento
+                        candidates={candidates ?? []}
+                        targetDocId={targetDocId}
+                        targetDoc={targetDoc}
+                        loadingDoc={loadingDoc}
+                        applyMode={applyMode}
+                        verActual={verActual}
+                        onSelect={handleSelectTargetDoc}
+                        onApplyMode={setApplyMode}
+                        onToggleActual={() => setVerActual((v) => !v)}
                       />
-                    </div>
-                    <div className="field">
-                      <label>Categoría <span style={{ color: 'var(--error)' }}>*</span></label>
-                      <input
-                        value={knowledgeCategory}
-                        onChange={(e) => setKnowledgeCategory(e.target.value)}
-                        placeholder="ej. productos, financiación, politicas"
-                      />
-                    </div>
-                    <div className="field-row">
-                      <div className="field">
-                        <label>Audiencia (opcional)</label>
-                        <select value={knowledgeAudience} onChange={(e) => setKnowledgeAudience(e.target.value)}>
-                          <option value="">— sin especificar —</option>
-                          <option value="PUBLICO">Público (para clientes)</option>
-                          <option value="INTERNO">Interno (solo equipo)</option>
-                        </select>
-                      </div>
-                      <div className="field">
-                        <label>Área del documento</label>
-                        <select value={knowledgeAgentType} onChange={(e) => setKnowledgeAgentType(e.target.value)}>
-                          <option value="">
-                            {conversation?.currentAgent
-                              ? `— la del caso (${conversation.currentAgent}) —`
-                              : '— sin área (transversal) —'}
-                          </option>
-                          <option value="SALES">Ventas</option>
-                          <option value="COLLECTIONS">Cobranzas</option>
-                          <option value="LOGISTICS">Logística</option>
-                          <option value="DEPOSITS">Depósito</option>
-                          <option value="ADMIN">Administración</option>
-                        </select>
-                      </div>
-                    </div>
+                    ) : (
+                      <>
+                        {/*
+                          La línea que reemplaza a la tabla que estaba suelta
+                          arriba. Con la tabla fuera del camino, crear un
+                          documento nuevo sobre un tema que YA tiene uno corto
+                          vuelve a ser fácil de hacer sin querer — y es
+                          exactamente lo que hace que la próxima consulta igual
+                          escale, porque los dos se reparten la señal.
+                        */}
+                        {hayCorregibles && (
+                          <p className="hint" style={{ color: '#8a6d0b', marginTop: 0 }}>
+                            ⚠️ En este caso {corregibles.length === 1
+                              ? 'hay 1 documento que quedó corto'
+                              : `hay ${corregibles.length} documentos que quedaron cortos`}
+                            . Si el tema es alguno de ellos, conviene
+                            <strong> corregir ese</strong> en vez de crear otro:
+                            dos documentos parecidos se compiten entre sí y las
+                            respuestas salen peor.
+                          </p>
+                        )}
+                        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 0 }}>
+                          Campos para ingestar como conocimiento en el RAG:
+                        </p>
+                        <div className="field">
+                          <label>Título del documento <span style={{ color: 'var(--error)' }}>*</span></label>
+                          <input
+                            value={knowledgeTitle}
+                            onChange={(e) => setKnowledgeTitle(e.target.value)}
+                            placeholder="ej. Financiación de heladeras exhibidoras en cuotas"
+                          />
+                        </div>
+                        <div className="field">
+                          <label>Categoría <span style={{ color: 'var(--error)' }}>*</span></label>
+                          <input
+                            value={knowledgeCategory}
+                            onChange={(e) => setKnowledgeCategory(e.target.value)}
+                            placeholder="ej. productos, financiación, politicas"
+                          />
+                        </div>
+                        <div className="field-row">
+                          <div className="field">
+                            <label>Audiencia (opcional)</label>
+                            <select value={knowledgeAudience} onChange={(e) => setKnowledgeAudience(e.target.value)}>
+                              <option value="">— sin especificar —</option>
+                              <option value="PUBLICO">Público (para clientes)</option>
+                              <option value="INTERNO">Interno (solo equipo)</option>
+                            </select>
+                          </div>
+                          <div className="field">
+                            <label>Área del documento</label>
+                            <select value={knowledgeAgentType} onChange={(e) => setKnowledgeAgentType(e.target.value)}>
+                              <option value="">
+                                {conversation?.currentAgent
+                                  ? `— la del caso (${conversation.currentAgent}) —`
+                                  : '— sin área (transversal) —'}
+                              </option>
+                              <option value="SALES">Ventas</option>
+                              <option value="COLLECTIONS">Cobranzas</option>
+                              <option value="LOGISTICS">Logística</option>
+                              <option value="DEPOSITS">Depósito</option>
+                              <option value="ADMIN">Administración</option>
+                            </select>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -758,6 +805,21 @@ export default function EscalationsQueue({ token, me }) {
                 </button>
                 <span className="hint" style={{ marginLeft: 8 }}>
                   Usa el mismo texto y los campos de título/categoría de arriba.
+                  {/*
+                    Solo crea documentos: el endpoint de "guardar sin enviar" no
+                    tiene rama de corrección. Decirlo acá y no dejar que falle
+                    con "faltan título y categoría" —campos que en modo
+                    «Modificar documento» ni siquiera se ven— que es un error
+                    que no explica nada.
+                  */}
+                  {corrigiendo && (
+                    <>
+                      {' '}
+                      <strong>Ojo:</strong> siempre crea un documento nuevo, aunque
+                      arriba hayas elegido modificar uno. Para corregir, respondé
+                      el caso con «Resolver y responder».
+                    </>
+                  )}
                 </span>
 
                 <p className="hint" style={{ marginTop: 16 }}>
@@ -842,6 +904,94 @@ export default function EscalationsQueue({ token, me }) {
 }
 
 /**
+ * La rama "corregir un documento que ya existe" del panel de enseñanza.
+ *
+ * Dos decisiones, en este orden: **cuál** documento y **qué** hacerle. La
+ * segunda no se puede tomar bien sin ver la primera, por eso el modo aparece
+ * recién con un documento elegido y trae el "ver lo que dice hoy" al lado.
+ *
+ * Los candidatos que NO se pueden corregir se listan igual, deshabilitados y
+ * con el motivo: saber que existe algo cercano es lo que evita duplicarlo, y es
+ * distinto de que no haya nada. Esconderlos convertiría "es de otra área" en
+ * "no existe", que manda a crear justo el documento que competiría con él.
+ */
+function ModificarDocumento({
+  candidates,
+  targetDocId,
+  targetDoc,
+  loadingDoc,
+  applyMode,
+  verActual,
+  onSelect,
+  onApplyMode,
+  onToggleActual,
+}) {
+  return (
+    <>
+      <div className="field">
+        <label>¿Cuál documento?</label>
+        <select value={targetDocId} onChange={(e) => onSelect(e.target.value)}>
+          <option value="">— elegí uno —</option>
+          {candidates.map((c) => (
+            <option key={c.id} value={c.id} disabled={!c.corregible}>
+              {c.score.toFixed(1)}% · {c.title}
+              {!c.corregible && ` — solo lectura (${c.motivoSiNo})`}
+            </option>
+          ))}
+        </select>
+        <p className="hint" style={{ marginTop: 4 }}>
+          El porcentaje es cuánto se pareció a la consulta que escaló: el más
+          alto suele ser el que tendría que haber respondido y no le alcanzó.
+        </p>
+      </div>
+
+      {loadingDoc && <p className="hint">Trayendo el documento…</p>}
+
+      {targetDoc && (
+        <>
+          <div className="field">
+            <label>¿Qué hacer con el documento?</label>
+            <select value={applyMode} onChange={(e) => onApplyMode(e.target.value)}>
+              <option value="AGREGAR">Agregar la respuesta al contenido actual</option>
+              <option value="REEMPLAZAR">Reemplazar todo el contenido</option>
+            </select>
+            {/*
+              El aviso es el mismo que en la revisión de entrevistas, y por el
+              mismo motivo: el texto que se está por guardar se escribió para
+              contestar UNA consulta, no para ser el documento entero. Pisar con
+              él es casi siempre perder el resto.
+            */}
+            {applyMode === 'REEMPLAZAR' && (
+              <p className="hint" style={{ color: '#b45309', marginTop: 4 }}>
+                ⚠️ Se va a borrar todo lo que el documento dice hoy y va a quedar
+                solo la respuesta que escribiste arriba. Como esa respuesta
+                contesta una consulta puntual, es probable que no cubra el
+                documento entero.
+              </p>
+            )}
+          </div>
+
+          <button type="button" className="secondary" onClick={onToggleActual}>
+            {verActual ? 'Ocultar' : 'Ver'} lo que dice hoy
+          </button>
+          {verActual && (
+            <p className="hint" style={{ whiteSpace: 'pre-wrap', marginTop: 6 }}>
+              {targetDoc.content}
+            </p>
+          )}
+
+          <p className="hint" style={{ marginTop: 8 }}>
+            Al responder el caso se envía el mensaje al cliente <strong>y</strong>{' '}
+            se guarda el cambio sobre «{targetDoc.title}» (versión{' '}
+            {targetDoc.version}). Todavía no se guardó nada.
+          </p>
+        </>
+      )}
+    </>
+  );
+}
+
+/**
  * Resultado de la propuesta de respuesta (US3).
  *
  * Muestra tres cosas que no son decorativas:
@@ -853,6 +1003,11 @@ export default function EscalationsQueue({ token, me }) {
  *   de mandarla, en vez de confiar en el texto porque sí.
  * - **el motivo cuando no hay contexto**: el sistema no inventa una respuesta
  *   sin respaldo; dice por qué no puede y el supervisor la escribe.
+ * - **`respaldoDebil`**: la propuesta se redacta desde un umbral MÁS BAJO que
+ *   el del agente, así que puede venir apoyada en material que al agente no le
+ *   alcanzó para contestar solo. Eso tiene que verse. Si se mostrara igual que
+ *   una propuesta fundada, bajar el umbral habría sido cambiar "no redacta
+ *   nunca" por "redacta y no avisa", que es peor.
  */
 function SuggestionPanel({ suggestion }) {
   if (!suggestion.hasContext) {
@@ -864,16 +1019,49 @@ function SuggestionPanel({ suggestion }) {
           Se buscó con audiencia <strong>{suggestion.audienceUsed}</strong>, que
           es la que le corresponde a esta conversación.
         </p>
+        {/*
+          Qué quedó cerca, aunque no alcanzara. "No hay nada del tema" y "lo hay
+          al 48%" piden trabajo distinto: cargar de cero, o corregir el que ya
+          está para que gane. Sin esto las dos situaciones se ven iguales.
+        */}
+        {suggestion.sources?.length > 0 && (
+          <>
+            <p className="hint" style={{ marginBottom: 4 }}>
+              Lo más cercano que se encontró — el mejor quedó en{' '}
+              <strong>{suggestion.confidence}%</strong>, demasiado lejos como
+              para redactar con eso:
+            </p>
+            <ul className="hint" style={{ marginTop: 0 }}>
+              {suggestion.sources.map((s) => (
+                <li key={s.documentId}>{s.title} ({s.score}%)</li>
+              ))}
+            </ul>
+          </>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="success-msg" style={{ marginTop: 12 }}>
+    <div
+      className={suggestion.respaldoDebil ? 'error' : 'success-msg'}
+      style={{ marginTop: 12 }}
+    >
       <p>
         Propuesta cargada en el mensaje de abajo. <strong>Es editable</strong>:
         se envía lo que quede escrito ahí, no la propuesta original.
       </p>
+      {/*
+        El aviso va ARRIBA de las fuentes y con el mismo peso visual que un
+        error, no como una nota al pie: el texto ya está cargado en el textarea
+        y a un clic de enviarse. Quien no lo lea acá no lo lee más.
+      */}
+      {suggestion.respaldoDebil && (
+        <p style={{ marginTop: 8 }}>
+          <strong>⚠️ Respaldo débil ({suggestion.confidence}%).</strong>{' '}
+          {suggestion.reason}
+        </p>
+      )}
       <p className="hint">
         Redactada con conocimiento{' '}
         <span className={`badge ${suggestion.audienceUsed === 'INTERNO' ? 'status-warning' : 'status-idle'}`}>

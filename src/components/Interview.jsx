@@ -463,6 +463,112 @@ export function Options({ options, onPick, disabled }) {
 }
 
 /**
+ * El caso escalado del que salió la pregunta.
+ *
+ * `quotes` sola no alcanzaba. Una consulta suelta —«y qué documentación
+ * necesito?»— no dice de qué se venía hablando, y sin eso la respuesta sale
+ * genérica o directamente equivocada: ahí "documentación" quiere decir una cosa
+ * si el turno anterior fue sobre un crédito y otra si fue sobre una devolución.
+ * Como lo que se conteste se ingesta al RAG, contestar sin contexto no produce
+ * una respuesta floja: produce conocimiento malo.
+ *
+ * Arranca ABIERTO. Es lo que hay que leer antes de escribir, y detrás de un
+ * "ver más" se lo saltea justo quien más lo necesita — el que va rápido.
+ */
+function EscalationContext({ caso }) {
+  const [abierto, setAbierto] = useState(true);
+
+  return (
+    <div
+      style={{
+        border: '1px solid var(--border)',
+        borderRadius: 6,
+        padding: 10,
+        margin: '10px 0',
+        background: '#fafafa',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <strong style={{ fontSize: 13 }}>El caso que originó esta pregunta</strong>
+        <button
+          type="button"
+          className="secondary"
+          style={{ padding: '2px 8px', fontSize: 11 }}
+          onClick={() => setAbierto((v) => !v)}
+        >
+          {abierto ? 'Ocultar' : 'Ver'}
+        </button>
+      </div>
+      <p className="hint" style={{ margin: '4px 0 0' }}>
+        {caso.reason} · {caso.status}
+      </p>
+
+      {abierto && (
+        <>
+          {caso.messages?.length > 0 && (
+            <>
+              <p className="hint" style={{ marginBottom: 4, marginTop: 8 }}>
+                Cómo venía la conversación:
+              </p>
+              <ul className="msg-list">
+                {caso.messages.map((m) => (
+                  <li key={m.id}>
+                    {/* Quién habló, marcado: leer el ida y vuelta sin saber cuál
+                        es cuál es peor que no verlo, porque invita a atribuirle
+                        al cliente lo que dijo el agente. */}
+                    <strong style={{ color: m.role === 'USER' ? '#1a73e8' : '#5f6368' }}>
+                      {m.role === 'USER' ? 'Cliente' : 'Agente'}:
+                    </strong>{' '}
+                    {m.content}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          {caso.internalNotes?.length > 0 && (
+            <>
+              <p className="hint" style={{ marginBottom: 4, marginTop: 8 }}>
+                Notas internas ({caso.internalNotes.length}):
+              </p>
+              <ul className="notes-list">
+                {caso.internalNotes.map((n) => (
+                  <li key={n.id} className="note-item">
+                    <div
+                      className="note-avatar"
+                      style={{ background: n.authorAgentType ? '#5f6368' : '#1a73e8' }}
+                    >
+                      {n.authorAgentType ? '🤖' : '👤'}
+                    </div>
+                    <div className="note-bubble">
+                      {/* Agente y persona no dicen lo mismo: la del agente
+                          explica por qué no pudo seguir, la de una persona
+                          puede ser una decisión ya tomada sobre el caso. */}
+                      <div className="note-author">
+                        {n.authorAgentType
+                          ? `${n.authorAgentType} (IA)`
+                          : (n.authorName ?? 'Alguien del equipo')}
+                      </div>
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{n.content}</div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          {!caso.messages?.length && !caso.internalNotes?.length && (
+            <p className="hint" style={{ marginTop: 8 }}>
+              El caso no tiene mensajes ni notas guardadas.
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
  * Las cuatro formas son cuatro pantallas distintas (T074) — aplastarlas en
  * un textarea genérico pierde justo lo que hace útil a la pregunta: sin ver
  * el documento no se puede decir qué le falta, y sin ver la resolución no
@@ -472,6 +578,16 @@ function QuestionBody({ kind, current }) {
   return (
     <div className="panel-section" style={{ marginTop: 8 }}>
       <p style={{ marginTop: 0 }}>{current.text}</p>
+
+      {/*
+        El caso del que salió la pregunta, cuando salió de uno.
+
+        Va acá arriba y no al final: es lo que hay que leer ANTES de contestar.
+        Y va fuera de las ramas por `kind` a propósito — un escalado puede
+        llegar como PEDIR_NUEVO, ABIERTA o GENERALIZAR, y en las tres el
+        contexto sirve igual.
+      */}
+      {current.escalation && <EscalationContext caso={current.escalation} />}
 
       {(kind === 'PEDIR_NUEVO' || kind === 'ABIERTA') && current.quotes?.length > 0 && (
         <>
