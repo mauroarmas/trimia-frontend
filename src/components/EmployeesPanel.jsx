@@ -100,18 +100,21 @@ export default function EmployeesPanel({ token }) {
                       <strong style={{ marginLeft: 4 }}>← responsable de TODAS (gerente)</strong>
                     )}
                   </td>
-                  <td>
-                    {/* Solo un SUPERVISOR puede ser responsable de un área: el
-                        backend devuelve 409 si se intenta con otro rol, así que
-                        acá directamente no se ofrece. */}
+                  <td style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
+                    <button
+                      className="secondary"
+                      style={{ fontSize: 12, padding: '4px 8px' }}
+                      onClick={() => setDiagnosticEmployee({ id: e.id, name: e.name })}
+                      title="Ver y gestionar evaluación diagnóstica"
+                    >
+                      🎯 Diagnóstico
+                    </button>
                     {e.role === 'SUPERVISOR' ? (
-                      <button className="secondary" onClick={() => setEditando(e)}>
+                      <button className="secondary" style={{ fontSize: 12, padding: '4px 8px' }} onClick={() => setEditando(e)}>
                         Cambiar áreas
                       </button>
                     ) : (
-                      <span className="hint" title="Solo un SUPERVISOR puede ser responsable de un área">
-                        —
-                      </span>
+                      <span style={{ width: 85 }} />
                     )}
                   </td>
                 </tr>

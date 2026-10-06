@@ -24,6 +24,7 @@ const SUPERVISOR_TABS = [
 // El chat web solo exige JWT: cualquier empleado autenticado puede usarlo.
 // Por eso no vive en SUPERVISOR_TABS.
 const COMMON_TABS = [
+  { id: 'training', label: 'Capacitación y Diagnóstico' },
   { id: 'webchat', label: 'Chat con el Asistente' },
 ];
 
