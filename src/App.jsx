@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import Login from './components/Login';
 import SupervisorPanel from './components/SupervisorPanel';
 import ChatSimulator from './components/ChatSimulator';
@@ -10,6 +10,7 @@ import EscalationsQueue from './components/EscalationsQueue';
 import CollectionsPanel from './components/CollectionsPanel';
 import SalesClientForm from './components/SalesClientForm';
 import EmployeesPanel from './components/EmployeesPanel';
+import TrainingPanel from './components/TrainingPanel';
 
 const SUPERVISOR_TABS = [
   { id: 'escalations', label: 'Casos Escalados' },
@@ -108,6 +109,7 @@ export default function App() {
         ))}
       </div>
 
+      {currentTab === 'training' && <TrainingPanel token={token} me={user} />}
       {currentTab === 'webchat' && <WebChat token={token} me={user} />}
       {currentTab === 'collections' && <CollectionsPanel token={token} me={user} isCollector={isCollector} />}
       {currentTab === 'sales' && <SalesClientForm token={token} />}
@@ -141,3 +143,4 @@ export default function App() {
     </div>
   );
 }
+

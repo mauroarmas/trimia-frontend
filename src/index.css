@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --bg: #f4f5f7;
   --surface: #ffffff;
   --border: #e2e4e9;
@@ -246,7 +246,7 @@ tr:hover td {
   margin-bottom: 2px;
 }
 
-.modal-backdrop {
+.modal-overlay, .modal-backdrop {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
@@ -361,3 +361,4 @@ tr:hover td {
   color: var(--text-muted);
   font-size: 11px;
 }
+

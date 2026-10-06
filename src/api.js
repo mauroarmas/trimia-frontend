@@ -979,3 +979,102 @@ export function discardInterviewCandidate(token, candidateId) {
     token,
   });
 }
+
+// ============================================================================
+// Capacitación y Diagnóstico Inicial (Specs 014 y 015)
+// ============================================================================
+
+/** Lista los módulos y píldoras disponibles para el empleado con candados y progreso. */
+export function getEmployeeModules(token) {
+  return request('/training/modules', { token });
+}
+
+/** Obtiene una píldora específica con contenido y quiz sanitizado si está desbloqueada. */
+export function getEmployeePill(token, id) {
+  return request(`/training/pills/${id}`, { token });
+}
+
+/** Verifica las respuestas del quiz de una píldora. */
+export function verifyPillQuiz(token, pillId, answers) {
+  return request(`/training/pills/${pillId}/verify`, {
+    method: 'POST',
+    token,
+    body: { answers },
+  });
+}
+
+/** Obtiene el cuestionario diagnóstico inicial sanitizado (5-8 preguntas). */
+export function getDiagnosticQuiz(token) {
+  return request('/training/diagnostic', { token });
+}
+
+/** Envía las respuestas del diagnóstico inicial para calificar y calcular exenciones. */
+export function submitDiagnostic(token, answers) {
+  return request('/training/diagnostic/submit', {
+    method: 'POST',
+    token,
+    body: { answers },
+  });
+}
+
+/** Lista módulos del sector para el supervisor. */
+export function getSupervisorModules(token, sectorId) {
+  const query = sectorId ? `?sectorId=${sectorId}` : '';
+  return request(`/training/supervisor/modules${query}`, { token });
+}
+
+/** Crea un nuevo módulo formativo (supervisor). */
+export function createTrainingModule(token, data) {
+  return request('/training/modules', {
+    method: 'POST',
+    token,
+    body: data,
+  });
+}
+
+/** Genera una píldora en borrador utilizando IA (supervisor). */
+export function generatePill(token, data) {
+  return request('/training/pills/generate', {
+    method: 'POST',
+    token,
+    body: data,
+  });
+}
+
+/** Actualiza contenido o quiz de una píldora (supervisor). */
+export function updatePill(token, id, data) {
+  return request(`/training/pills/${id}`, {
+    method: 'PUT',
+    token,
+    body: data,
+  });
+}
+
+/** Publica una píldora en borrador (supervisor). */
+export function publishPill(token, id) {
+  return request(`/training/pills/${id}/publish`, {
+    method: 'POST',
+    token,
+  });
+}
+
+/** Archiva una píldora (supervisor). */
+export function archivePill(token, id) {
+  return request(`/training/pills/${id}/archive`, {
+    method: 'POST',
+    token,
+  });
+}
+
+/** Consulta el estado del diagnóstico de un empleado (supervisor). */
+export function getSupervisorEmployeeDiagnostic(token, employeeId) {
+  return request(`/training/supervisor/diagnostic/${employeeId}`, { token });
+}
+
+/** Reinicia el diagnóstico de un empleado (supervisor). */
+export function resetEmployeeDiagnostic(token, employeeId) {
+  return request(`/training/supervisor/diagnostic/${employeeId}/reset`, {
+    method: 'POST',
+    token,
+  });
+}

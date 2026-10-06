@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useState } from 'react';
 import { listEmployees, listSectors, setSupervisedAreas } from '../api';
 import { esGerente } from '../areas';
+import SupervisorDiagnosticModal from './SupervisorDiagnosticModal';
 
 /**
  * Pantalla de empleados (spec 005, US3).
@@ -17,6 +18,7 @@ export default function EmployeesPanel({ token }) {
   const [employees, setEmployees] = useState([]);
   const [sectors, setSectors] = useState([]);
   const [editando, setEditando] = useState(null);
+  const [diagnosticEmployee, setDiagnosticEmployee] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -119,6 +121,14 @@ export default function EmployeesPanel({ token }) {
         </table>
       </div>
 
+      {diagnosticEmployee && (
+        <SupervisorDiagnosticModal
+          token={token}
+          employeeId={diagnosticEmployee.id}
+          employeeName={diagnosticEmployee.name}
+          onClose={() => setDiagnosticEmployee(null)}
+        />
+      )}
       {editando && (
         <AsignarAreas
           token={token}
@@ -210,3 +220,4 @@ function AsignarAreas({ token, empleado, sectors, onClose, onSaved }) {
     </div>
   );
 }
+
