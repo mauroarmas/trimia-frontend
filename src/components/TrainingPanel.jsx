@@ -94,7 +94,7 @@ export default function TrainingPanel({ token, me }) {
     try {
       const pill = await generatePill(token, {
         moduleId: genModuleId,
-        pedagogicalObjective: genObjective.trim(),
+        topic: genObjective.trim(),
       });
       setGenObjective('');
       setGenNotice(`Píldora "${pill.title}" generada en borrador.`);
