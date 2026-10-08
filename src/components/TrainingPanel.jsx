@@ -1,11 +1,14 @@
-﻿import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   createTrainingModule,
+  enqueueAudioGeneration,
   generatePill,
   getEmployeeModules,
+  getPillAudioStatus,
   getSupervisorModules,
   publishPill,
 } from '../api';
+import AudioScriptModal from './AudioScriptModal';
 import DiagnosticQuizModal from './DiagnosticQuizModal';
 import PillStudyModal from './PillStudyModal';
 
@@ -17,6 +20,7 @@ export default function TrainingPanel({ token, me }) {
   // Modales
   const [showDiagnostic, setShowDiagnostic] = useState(false);
   const [activePillId, setActivePillId] = useState(null);
+  const [scriptModalPill, setScriptModalPill] = useState(null);
 
   // Sección Supervisor
   const isSupervisor = me?.role === 'SUPERVISOR';
@@ -25,6 +29,7 @@ export default function TrainingPanel({ token, me }) {
   const [newModuleTitle, setNewModuleTitle] = useState('');
   const [newModuleDesc, setNewModuleDesc] = useState('');
   const [creatingModule, setCreatingModule] = useState(false);
+  const [retryingAudioPillId, setRetryingAudioPillId] = useState(null);
 
   // Generador de Píldora con IA
   const [genModuleId, setGenModuleId] = useState('');
@@ -115,6 +120,35 @@ export default function TrainingPanel({ token, me }) {
       alert(err.message || 'Error al publicar píldora');
     }
   };
+
+  const handleRetryAudio = async (pillId) => {
+    setRetryingAudioPillId(pillId);
+    try {
+      await enqueueAudioGeneration(token, pillId);
+      await loadSupervisorView();
+    } catch (err) {
+      alert(err.message || 'Error al reintentar síntesis de audio');
+    } finally {
+      setRetryingAudioPillId(null);
+    }
+  };
+
+  // Polling automático cuando hay píldoras con síntesis en progreso
+  useEffect(() => {
+    if (!isSupervisor || !supervisorTab) return;
+
+    const hasProcessingAudio = supervisorModules.some((m) =>
+      m.pills?.some((p) => p.audioStatus === 'AUDIO_PENDING' || p.audioStatus === 'AUDIO_GENERATING')
+    );
+
+    if (!hasProcessingAudio) return;
+
+    const interval = setInterval(() => {
+      loadSupervisorView();
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [isSupervisor, supervisorTab, supervisorModules, loadSupervisorView]);
 
   // Cálculo de estadísticas de avance del empleado
   const totalPills = modules.reduce((acc, m) => acc + (m.pills?.length || 0), 0);
@@ -413,27 +447,89 @@ export default function TrainingPanel({ token, me }) {
                           borderRadius: 4,
                         }}
                       >
-                        <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span>{p.title}</span>
                           <span
                             className="badge"
                             style={{
-                              marginLeft: 8,
+                              marginLeft: 6,
                               backgroundColor: p.status === 'PUBLISHED' ? 'var(--success)' : 'var(--text-muted)',
                               color: '#fff',
                             }}
                           >
                             {p.status}
                           </span>
+
+                          {/* Audio Status Badge */}
+                          {p.audioStatus && p.audioStatus !== 'NOT_REQUESTED' && (
+                            <span
+                              className="badge"
+                              title={p.audioError || undefined}
+                              style={{
+                                fontSize: 10,
+                                backgroundColor:
+                                  p.audioStatus === 'AUDIO_READY'
+                                    ? '#059669'
+                                    : p.audioStatus === 'AUDIO_FAILED'
+                                    ? '#dc2626'
+                                    : p.audioStatus === 'AUDIO_GENERATING' || p.audioStatus === 'AUDIO_PENDING'
+                                    ? '#d97706'
+                                    : '#4b5563',
+                                color: '#fff',
+                              }}
+                            >
+                              {p.audioStatus === 'AUDIO_READY' && '🎧 Audio Listo'}
+                              {p.audioStatus === 'AUDIO_GENERATING' && '⏳ Sintetizando...'}
+                              {p.audioStatus === 'AUDIO_PENDING' && '⏱️ En Cola'}
+                              {p.audioStatus === 'AUDIO_FAILED' && '⚠️ Audio Falló'}
+                              {p.audioStatus === 'SCRIPT_GENERATED' && '📝 Guion Creado'}
+                            </span>
+                          )}
                         </div>
-                        {p.status === 'DRAFT' && (
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {/* Botón Reintentar si falló la síntesis */}
+                          {p.audioStatus === 'AUDIO_FAILED' && (
+                            <button
+                              onClick={() => handleRetryAudio(p.id)}
+                              disabled={retryingAudioPillId === p.id}
+                              style={{
+                                padding: '3px 8px',
+                                fontSize: 11,
+                                backgroundColor: '#dc2626',
+                                borderColor: '#dc2626',
+                                color: '#fff',
+                              }}
+                              title="Reintentar síntesis de voz en BullMQ"
+                            >
+                              {retryingAudioPillId === p.id ? 'Reintentando...' : '🔄 Reintentar Audio'}
+                            </button>
+                          )}
+
+                          {/* Botón Abrir Guion / Síntesis */}
                           <button
-                            onClick={() => handlePublishPill(p.id)}
-                            style={{ padding: '3px 8px', fontSize: 11, backgroundColor: 'var(--success)', borderColor: 'var(--success)' }}
+                            onClick={() => setScriptModalPill(p)}
+                            className="secondary"
+                            style={{ padding: '3px 8px', fontSize: 11 }}
+                            title="Ver o editar guion a 2 voces y sintetizar audio"
                           >
-                            Publicar
+                            🎙️ Guion & Audio
                           </button>
-                        )}
+
+                          {p.status === 'DRAFT' && (
+                            <button
+                              onClick={() => handlePublishPill(p.id)}
+                              style={{
+                                padding: '3px 8px',
+                                fontSize: 11,
+                                backgroundColor: 'var(--success)',
+                                borderColor: 'var(--success)',
+                              }}
+                            >
+                              Publicar
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -445,6 +541,17 @@ export default function TrainingPanel({ token, me }) {
       )}
 
       {/* Modales */}
+      {scriptModalPill && (
+        <AudioScriptModal
+          token={token}
+          pill={scriptModalPill}
+          onClose={() => setScriptModalPill(null)}
+          onScriptUpdated={() => {
+            loadSupervisorView();
+            loadEmployeePath();
+          }}
+        />
+      )}
       {showDiagnostic && (
         <DiagnosticQuizModal
           token={token}

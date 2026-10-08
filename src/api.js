@@ -1078,3 +1078,57 @@ export function resetEmployeeDiagnostic(token, employeeId) {
     token,
   });
 }
+
+
+// ========================================================================
+// Spec 016 — Pipeline de Audio, Guion a 2 Voces y Síntesis TTS
+// ========================================================================
+
+/** Obtiene el guion a 2 voces de una píldora. */
+export function getPillAudioScript(token, pillId) {
+  return request(`/training/pills/${pillId}/script`, { token });
+}
+
+/** Genera con IA el guion a 2 voces para una példora (supervisor). */
+export function generatePillAudioScript(token, pillId) {
+  return request(`/training/pills/${pillId}/script`, {
+    method: 'POST',
+    token,
+  });
+}
+
+/** Actualiza el guion a 2 voces de una píldora (supervisor). */
+export function updatePillAudioScript(token, pillId, data) {
+  return request(`/training/pills/${pillId}/script`, {
+    method: 'PUT',
+    token,
+    body: data,
+  });
+}
+
+/** Encola la séntesis de audio en BullMQ (supervisor). */
+export function enqueueAudioGeneration(token, pillId) {
+  return request(`/training/pills/${pillId}/audio/generate`, {
+    method: 'POST',
+    token,
+  });
+}
+
+/** Consulta el estado del procesamiento de audio de una píldora. */
+export function getPillAudioStatus(token, pillId) {
+  return request(`/training/pills/${pillId}/audio/status`, { token });
+}
+
+/** Reporta el avance de reproducción de audio del empleado (antifraude y 80%). */
+export function reportPlaybackProgress(token, pillId, currentSeconds) {
+  return request(`/training/pills/${pillId}/playback-progress`, {
+    method: 'POST',
+    token,
+    body: { currentSeconds },
+  });
+}
+
+/** Retorna la URL completa para el streaming de audio en reproductores HTML5. */
+export function getAudioStreamUrl(pillId) {
+  return `${API_BASE}/training/pills/${pillId}/audio`;
+}
