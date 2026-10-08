@@ -285,7 +285,7 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
                     ref={audioRef}
                     controls
                     preload="metadata"
-                    src={getAudioStreamUrl(pill.id)}
+                    src={getAudioStreamUrl(pill.id, token)}
                     onTimeUpdate={handleTimeUpdate}
                     onEnded={handleAudioEnded}
                     style={{ width: '100%', height: 42, borderRadius: 6 }}

@@ -1129,6 +1129,7 @@ export function reportPlaybackProgress(token, pillId, currentSeconds) {
 }
 
 /** Retorna la URL completa para el streaming de audio en reproductores HTML5. */
-export function getAudioStreamUrl(pillId) {
-  return `${API_BASE}/training/pills/${pillId}/audio`;
+export function getAudioStreamUrl(pillId, token) {
+  const qs = token ? `?token=${encodeURIComponent(token)}` : '';
+  return `${API_BASE}/training/pills/${pillId}/audio${qs}`;
 }
