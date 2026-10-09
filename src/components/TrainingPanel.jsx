@@ -164,6 +164,13 @@ export default function TrainingPanel({ token, me }) {
 
   return (
     <div>
+      <div className="page-header">
+        <div>
+          <h2 className="page-title">Capacitación y Diagnóstico</h2>
+          <p className="page-subtitle">Ruta pedagógica, lecciones operativas, podcast formativo y evaluación continua.</p>
+        </div>
+      </div>
+
       {/* Top Banner de Diagnóstico Inicial */}
       <div
         className="card"
@@ -172,7 +179,7 @@ export default function TrainingPanel({ token, me }) {
           color: '#ffffff',
           padding: '20px 24px',
           marginBottom: 20,
-          borderRadius: 10,
+          borderRadius: 12,
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
@@ -194,7 +201,7 @@ export default function TrainingPanel({ token, me }) {
                 border: 'none',
                 fontWeight: 700,
                 padding: '10px 18px',
-                borderRadius: 6,
+                borderRadius: 8,
                 boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
               }}
             >
@@ -206,15 +213,17 @@ export default function TrainingPanel({ token, me }) {
 
       {/* Subnavegación si es Supervisor */}
       {isSupervisor && (
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <div className="submenu-tabs" style={{ marginBottom: 20 }}>
           <button
-            className={!supervisorTab ? '' : 'secondary'}
+            type="button"
+            className={`submenu-tab${!supervisorTab ? ' active' : ''}`}
             onClick={() => setSupervisorTab(false)}
           >
             Mi Ruta de Aprendizaje (Empleado)
           </button>
           <button
-            className={supervisorTab ? '' : 'secondary'}
+            type="button"
+            className={`submenu-tab${supervisorTab ? ' active' : ''}`}
             onClick={() => setSupervisorTab(true)}
           >
             Gestión y Generación de Píldoras (Supervisor)

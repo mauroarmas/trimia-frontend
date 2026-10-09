@@ -60,7 +60,14 @@ export default function KnowledgeIngest({ token, me }) {
 
   return (
     <div>
-      <div className="tabs" style={{ marginBottom: 16 }}>
+      <div className="page-header">
+        <div>
+          <h2 className="page-title">Base de Conocimiento</h2>
+          <p className="page-subtitle">Gestión de documentos corporativos, ingesta y búsqueda semántica.</p>
+        </div>
+      </div>
+
+      <div className="tabs" style={{ marginBottom: 18 }}>
         {[
           ['lista', 'Documentos'],
           ['subir', 'Subir archivo'],

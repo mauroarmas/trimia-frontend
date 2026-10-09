@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { listEmployees, listSectors, setSupervisedAreas } from '../api';
 import { esGerente } from '../areas';
 import SupervisorDiagnosticModal from './SupervisorDiagnosticModal';
@@ -42,6 +42,18 @@ export default function EmployeesPanel({ token }) {
 
   return (
     <div>
+      <div className="page-header">
+        <div>
+          <h2 className="page-title">Empleados y Áreas</h2>
+          <p className="page-subtitle">Configuración del personal, roles, sectores y responsabilidades de supervisión.</p>
+        </div>
+        <div className="page-actions">
+          <button className="btn-refresh" onClick={load} disabled={loading}>
+            <span>🔄</span>
+            <span>{loading ? 'Cargando…' : 'Refrescar'}</span>
+          </button>
+        </div>
+      </div>
       <div className="card">
         <h3>Empleados y áreas</h3>
         <p className="hint">

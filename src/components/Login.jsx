@@ -36,10 +36,15 @@ export default function Login({ onLogin }) {
   }
 
   return (
-    <div className="container" style={{ maxWidth: 340, paddingTop: 80 }}>
-      <div className="card">
-        <h2>TrimIA — Login de prueba</h2>
-        <form onSubmit={handleSubmit}>
+    <div className="container" style={{ maxWidth: 380, paddingTop: 60 }}>
+      <div className="card" style={{ padding: '28px 24px', textAlign: 'center' }}>
+        <img
+          src="/logo.png"
+          alt="TrimIA"
+          style={{ height: 48, objectFit: 'contain', marginBottom: 16 }}
+        />
+        <h2 style={{ fontSize: 18, marginBottom: 18, fontWeight: 700 }}>Iniciar Sesión</h2>
+        <form onSubmit={handleSubmit} style={{ textAlign: 'left' }}>
           <div className="field">
             <label>Email</label>
             <input value={email} onChange={(e) => setEmail(e.target.value)} />

@@ -45,11 +45,16 @@ const PERTENENCIA = {
 };
 
 function EtiquetaPertenencia({ valor }) {
-  // Sin `pertenencia` (backend viejo o consulta interna) no se inventa nada.
   const p = PERTENENCIA[valor];
   if (!p) return <span>—</span>;
+  const badgeClass =
+    valor === 'PROPIA'
+      ? 'belonging-badge belonging-mine'
+      : valor === 'SIN_AREA'
+      ? 'belonging-badge belonging-unassigned'
+      : 'belonging-badge';
   return (
-    <span title={p.title} style={{ color: p.color, fontWeight: valor === 'PROPIA' ? 600 : 400 }}>
+    <span className={badgeClass} title={p.title}>
       {p.texto}
     </span>
   );
@@ -57,10 +62,11 @@ function EtiquetaPertenencia({ valor }) {
 
 export default function EscalationsQueue({ token, me }) {
   const [status, setStatus] = useState('PENDING');
-  // Spec 013 — apagado por defecto: el defecto es la cola completa, priorizada
-  // pero sin filtrar. Ocultar lo ajeno dejaría sin cobertura las áreas que no
-  // tienen responsable activo.
   const [soloMios, setSoloMios] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [areaFilter, setAreaFilter] = useState('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [escalations, setEscalations] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -431,77 +437,186 @@ export default function EscalationsQueue({ token, me }) {
   const corrigiendo = knowledgeMode === 'MODIFICAR';
   const puedeEnsenarAlgo = puedeEnsenar || hayCorregibles;
 
+  const filteredEscalations = escalations.filter((e) => {
+    if (areaFilter && areaFilter !== 'ALL') {
+      const agent = e.conversation?.currentAgent;
+      if (agent !== areaFilter && e.pertenencia !== areaFilter) return false;
+    }
+    if (searchTerm) {
+      const q = searchTerm.toLowerCase();
+      const matchReason = (e.reason || '').toLowerCase().includes(q);
+      const matchClient = (e.conversation?.externalId || '').toLowerCase().includes(q);
+      const matchChannel = (e.conversation?.channel || '').toLowerCase().includes(q);
+      const matchAgent = (e.conversation?.currentAgent || '').toLowerCase().includes(q);
+      if (!matchReason && !matchClient && !matchChannel && !matchAgent) return false;
+    }
+    return true;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredEscalations.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const startIndex = (safePage - 1) * pageSize;
+  const paginatedEscalations = filteredEscalations.slice(startIndex, startIndex + pageSize);
+
   return (
     <div>
-      <div className="tabs" style={{ marginBottom: 12 }}>
-        <button
-          className={`tab${status === 'PENDING' ? ' active' : ''}`}
-          onClick={() => setStatus('PENDING')}
-        >
-          Pendientes
-        </button>
-        <button
-          className={`tab${status === 'RESOLVED' ? ' active' : ''}`}
-          onClick={() => setStatus('RESOLVED')}
-        >
-          Resueltos
+      {/* Encabezado del módulo */}
+      <div className="page-header">
+        <div>
+          <h2 className="page-title">Casos escalados</h2>
+          <p className="page-subtitle">Conversaciones que el asistente derivó a una persona.</p>
+        </div>
+        <div className="page-actions">
+          <button className="btn-icon-subtle" title="Más opciones">•••</button>
+        </div>
+      </div>
+
+      {/* Submenú de pestañas con pills y filtros */}
+      <div className="submenu-tabs-container">
+        <div className="submenu-left-group">
+          <div className="submenu-tabs">
+            <button
+              className={`submenu-tab${status === 'PENDING' ? ' active' : ''}`}
+              onClick={() => { setStatus('PENDING'); setCurrentPage(1); }}
+            >
+              Pendientes
+            </button>
+            <button
+              className={`submenu-tab${status === 'RESOLVED' ? ' active' : ''}`}
+              onClick={() => { setStatus('RESOLVED'); setCurrentPage(1); }}
+            >
+              Resueltos
+            </button>
+          </div>
+
+          <label className="checkbox-filter">
+            <input
+              type="checkbox"
+              checked={soloMios}
+              onChange={(ev) => setSoloMios(ev.target.checked)}
+            />
+            <span>Ver solo lo mío</span>
+          </label>
+        </div>
+
+        <button className="btn-refresh" onClick={loadQueue} disabled={loading}>
+          <span style={{ fontSize: 13 }}>🔄</span>
+          <span>{loading ? 'Cargando...' : 'Refrescar'}</span>
         </button>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-        <button className="secondary" onClick={loadQueue} disabled={loading}>
-          {loading ? 'Cargando...' : 'Refrescar'}
-        </button>
-        {/*
-          Spec 013 — apagado por defecto y a la vista. Que se vea que existe y
-          que no está puesto: el defecto es la cola completa priorizada.
-        */}
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+      {soloMios && (
+        <p className="hint" style={{ marginTop: -8, marginBottom: 14 }}>
+          Se ocultan los casos de otras áreas. Los que no tienen área siguen apareciendo: no le tocan a nadie en particular.
+        </p>
+      )}
+
+      {/* Barra de búsqueda y selector de área */}
+      <div className="filter-search-bar">
+        <div className="search-input-wrapper">
+          <span className="search-icon">🔍</span>
           <input
-            type="checkbox"
-            checked={soloMios}
-            onChange={(ev) => setSoloMios(ev.target.checked)}
+            type="text"
+            placeholder="Buscar por motivo, cliente, canal, área..."
+            value={searchTerm}
+            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
           />
-          <span>Ver solo lo mío</span>
-        </label>
-        {soloMios && (
-          <span className="hint" style={{ margin: 0 }}>
-            Se ocultan los casos de otras áreas. Los que no tienen área siguen
-            apareciendo: no le tocan a nadie en particular.
-          </span>
-        )}
+        </div>
+        <div className="area-select-wrapper">
+          <select value={areaFilter} onChange={(e) => { setAreaFilter(e.target.value); setCurrentPage(1); }}>
+            <option value="ALL">Todas las áreas</option>
+            <option value="ADMIN">ADMIN</option>
+            <option value="SALES">SALES</option>
+            <option value="COLLECTIONS">COLLECTIONS</option>
+            <option value="FINANCING">FINANCING</option>
+            <option value="CUSTOMER_SERVICE">CUSTOMER_SERVICE</option>
+          </select>
+        </div>
       </div>
+
       {error && <p className="error">{error}</p>}
 
-      <div className="card">
+      {/* Tarjeta de tabla moderna */}
+      <div className="data-table-card">
         <table>
           <thead>
             <tr>
-              <th>Motivo</th><th>Cliente</th><th>Canal</th><th>Agente</th><th>Área</th><th>Creado</th>
-              {status === 'PENDING' && <th>Delegado a</th>}
-              <th></th>
+              <th>MOTIVO</th>
+              <th>CLIENTE</th>
+              <th>CANAL</th>
+              <th>ÁREA</th>
+              <th>CREADO ▾</th>
+              {status === 'PENDING' && <th>DELEGADO A</th>}
+              <th style={{ textAlign: 'right' }}>ACCIONES</th>
             </tr>
           </thead>
           <tbody>
-            {escalations.length === 0 && (
-              <tr><td colSpan={7}>Sin casos {status === 'PENDING' ? 'pendientes' : 'resueltos'}{soloMios ? ' que sean tuyos' : ''}.</td></tr>
+            {filteredEscalations.length === 0 && (
+              <tr>
+                <td colSpan={status === 'PENDING' ? 7 : 6} style={{ textAlign: 'center', padding: '36px 16px', color: 'var(--text-muted)' }}>
+                  Sin casos {status === 'PENDING' ? 'pendientes' : 'resueltos'}{soloMios ? ' que sean tuyos' : ''}.
+                </td>
+              </tr>
             )}
-            {escalations.map((e) => (
+            {paginatedEscalations.map((e) => (
               <tr key={e.id}>
-                <td>{e.reason}</td>
-                <td>{e.conversation?.externalId}</td>
-                <td>{e.conversation?.channel}</td>
-                <td>{e.conversation?.currentAgent ?? '—'}</td>
+                <td>
+                  <div>
+                    <strong style={{ display: 'block', color: 'var(--text)' }}>{e.reason}</strong>
+                    {e.conversation?.currentAgent && (
+                      <span className="agent-tag">{e.conversation.currentAgent}</span>
+                    )}
+                  </div>
+                </td>
+                <td style={{ fontWeight: 500, color: 'var(--text-body)' }}>{e.conversation?.externalId || '—'}</td>
+                <td><span className="channel-tag">{e.conversation?.channel || 'WEB'}</span></td>
                 <td><EtiquetaPertenencia valor={e.pertenencia} /></td>
-                <td>{new Date(e.createdAt).toLocaleString()}</td>
+                <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{new Date(e.createdAt).toLocaleString()}</td>
                 {status === 'PENDING' && (
-                  <td>{e.delegatedToId ? employees.find((emp) => emp.id === e.delegatedToId)?.name ?? e.delegatedToId : '—'}</td>
+                  <td style={{ color: 'var(--text-muted)' }}>
+                    {e.delegatedToId ? (employees.find((emp) => emp.id === e.delegatedToId)?.name ?? e.delegatedToId) : '—'}
+                  </td>
                 )}
-                <td><button className="secondary" onClick={() => openCase(e)}>Ver</button></td>
+                <td style={{ textAlign: 'right' }}>
+                  <button className="btn-table-action" onClick={() => openCase(e)}>
+                    Ver detalle →
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
+
+        {/* Paginación al pie de la tabla */}
+        <div className="table-pagination-footer">
+          <span>
+            Mostrando {filteredEscalations.length > 0 ? startIndex + 1 : 0} a {Math.min(startIndex + pageSize, filteredEscalations.length)} de {filteredEscalations.length} casos
+          </span>
+          <div className="pagination-controls">
+            <button
+              className="btn-page-nav"
+              disabled={safePage <= 1}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            >
+              ‹
+            </button>
+            <span className="page-number-active">{safePage}</span>
+            <button
+              className="btn-page-nav"
+              disabled={safePage >= totalPages}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            >
+              ›
+            </button>
+          </div>
+          <div className="page-size-selector">
+            <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}>
+              <option value={10}>10 por página</option>
+              <option value={20}>20 por página</option>
+              <option value={50}>50 por página</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       {selected && (
