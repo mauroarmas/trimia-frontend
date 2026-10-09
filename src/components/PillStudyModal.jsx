@@ -24,7 +24,9 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
   const [showScript, setShowScript] = useState(false);
   const [scriptDialogue, setScriptDialogue] = useState(null);
   const [loadingScript, setLoadingScript] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  // Sincronización de narración de voz a 2 voces con los eventos de play/pause del reproductor
+  const isPlayingAudioRef = useRef(false);
+  const currentUtteranceIndexRef = useRef(0);
 
   // Detener la síntesis de voz del navegador si se cierra el modal
   useEffect(() => {
@@ -35,76 +37,80 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
     };
   }, []);
 
-  const handleSpeakDialogue = async () => {
-    if (!('speechSynthesis' in window)) {
-      alert('Tu navegador no soporta síntesis de voz nativa.');
-      return;
-    }
+  const startVoiceNarration = async (startIndex = 0) => {
+    if (!('speechSynthesis' in window)) return;
 
-    if (isSpeaking) {
-      window.speechSynthesis.cancel();
-      setIsSpeaking(false);
-      return;
-    }
-
-    let dialogueLines = scriptDialogue;
-    if (!dialogueLines || dialogueLines.length === 0) {
-      setLoadingScript(true);
+    let lines = scriptDialogue;
+    if (!lines || lines.length === 0) {
       try {
         const res = await getPillAudioScript(token, pillId);
-        dialogueLines = res?.dialogue || [];
-        setScriptDialogue(dialogueLines);
+        lines = res?.dialogue || [];
+        setScriptDialogue(lines);
       } catch {
-        dialogueLines = [];
-      } finally {
-        setLoadingScript(false);
+        lines = [];
       }
     }
 
-    if (!dialogueLines || dialogueLines.length === 0) {
-      alert('Esta píldora no tiene diálogo para narrar.');
-      return;
-    }
+    if (!lines || lines.length === 0) return;
 
     window.speechSynthesis.cancel();
-    setIsSpeaking(true);
+    isPlayingAudioRef.current = true;
 
     const voices = window.speechSynthesis.getVoices();
     const esVoices = voices.filter((v) => v.lang && v.lang.toLowerCase().startsWith('es'));
-    // Si la máquina no tiene paquete de idioma español instalado, usar las voces del sistema
     const voice1 = esVoices[0] || voices[0] || null;
     const voice2 = esVoices.length > 1 ? esVoices[1] : (voices.length > 1 ? voices[1] : (esVoices[0] || voices[0] || null));
 
-    let currentIndex = 0;
+    currentUtteranceIndexRef.current = startIndex;
 
-    const speakNext = () => {
-      if (currentIndex >= dialogueLines.length) {
-        setIsSpeaking(false);
+    const speakLine = () => {
+      if (!isPlayingAudioRef.current || currentUtteranceIndexRef.current >= lines.length) {
         return;
       }
 
-      const item = dialogueLines[currentIndex];
+      const item = lines[currentUtteranceIndexRef.current];
       const isSpk1 = item.speaker === 'SPEAKER_1';
       const utterance = new SpeechSynthesisUtterance(item.text);
       utterance.lang = 'es-ES';
       utterance.rate = 1.05;
-      utterance.pitch = isSpk1 ? 1.0 : 1.25; // Tono diferente para cada locutor
+      utterance.pitch = isSpk1 ? 1.0 : 1.25;
       if (isSpk1 && voice1) utterance.voice = voice1;
       if (!isSpk1 && voice2) utterance.voice = voice2;
 
       utterance.onend = () => {
-        currentIndex++;
-        speakNext();
+        if (!isPlayingAudioRef.current) return;
+        currentUtteranceIndexRef.current++;
+        speakLine();
       };
 
       utterance.onerror = () => {
-        setIsSpeaking(false);
+        if (!isPlayingAudioRef.current) return;
+        currentUtteranceIndexRef.current++;
+        speakLine();
       };
 
       window.speechSynthesis.speak(utterance);
     };
 
-    speakNext();
+    speakLine();
+  };
+
+  const handleAudioPlay = () => {
+    isPlayingAudioRef.current = true;
+    const lines = scriptDialogue || [];
+    let startIdx = 0;
+    if (lines.length > 0 && totalDuration > 0 && audioRef.current) {
+      const frac = audioRef.current.currentTime / totalDuration;
+      startIdx = Math.min(lines.length - 1, Math.floor(frac * lines.length));
+    }
+    startVoiceNarration(startIdx);
+  };
+
+  const handleAudioPause = () => {
+    isPlayingAudioRef.current = false;
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
   };
 
   useEffect(() => {
@@ -351,31 +357,14 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
                       </div>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <button
-                      type="button"
-                      onClick={handleSpeakDialogue}
-                      style={{
-                        fontSize: 11,
-                        padding: '5px 12px',
-                        backgroundColor: isSpeaking ? '#dc2626' : '#4f46e5',
-                        borderColor: isSpeaking ? '#dc2626' : '#4f46e5',
-                        color: '#fff',
-                        fontWeight: 600,
-                      }}
-                      title="Sintetizar el diálogo a 2 voces utilizando las voces nativas del navegador"
-                    >
-                      {isSpeaking ? '⏹️ Detener Voces' : '🗣️ Narrar a 2 Voces'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleToggleScript}
-                      className="secondary"
-                      style={{ fontSize: 11, padding: '5px 10px' }}
-                    >
-                      {showScript ? 'Ocultar Transcripción' : '📜 Ver Transcripción'}
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleToggleScript}
+                    className="secondary"
+                    style={{ fontSize: 11, padding: '5px 10px' }}
+                  >
+                    {showScript ? 'Ocultar Transcripción' : '📜 Ver Transcripción'}
+                  </button>
                 </div>
 
                 {/* HTML5 Audio Player */}
@@ -385,6 +374,8 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
                     controls
                     preload="metadata"
                     src={getAudioStreamUrl(pill.id, token)}
+                    onPlay={handleAudioPlay}
+                    onPause={handleAudioPause}
                     onTimeUpdate={handleTimeUpdate}
                     onEnded={handleAudioEnded}
                     style={{ width: '100%', height: 42, borderRadius: 6 }}
