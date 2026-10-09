@@ -168,27 +168,20 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
     speakLineAt(idx, lines);
   };
 
-  const togglePlayPause = () => {
-    if (isPlaying) {
-      stopNarration();
-      if (audioRef.current && !audioRef.current.paused) {
-        audioRef.current.pause();
-      }
-    } else {
-      if (audioRef.current) {
-        audioRef.current.volume = 0;
-        audioRef.current.play().catch(() => {});
-      }
-      startNarration();
-    }
-  };
-
   const handleAudioPlay = () => {
     if (!isPlayingRef.current) {
       if (audioRef.current) {
         audioRef.current.volume = 0;
+        if (totalDuration > 0 && scriptDialogue?.length) {
+          const frac = audioRef.current.currentTime / totalDuration;
+          const targetIdx = Math.min(
+            scriptDialogue.length - 1,
+            Math.floor(frac * scriptDialogue.length),
+          );
+          currentLineIndexRef.current = targetIdx;
+        }
       }
-      startNarration();
+      startNarration(currentLineIndexRef.current);
     }
   };
 
@@ -447,13 +440,15 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
                   marginBottom: 20,
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 20 }}>🎙️</span>
                     <div>
                       <strong style={{ fontSize: 14, color: '#312e81' }}>Episodio de Podcast Formativo</strong>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                        Conversación guiada a 2 voces sobre los conceptos clave de esta píldora.
+                      <div style={{ fontSize: 11, color: isPlaying ? '#4338ca' : 'var(--text-muted)', fontWeight: isPlaying ? 600 : 400 }}>
+                        {isPlaying
+                          ? '🔊 Narrando a 2 voces (Locutor 1 y Locutor 2)...'
+                          : 'Conversación guiada a 2 voces sobre los conceptos clave de esta píldora.'}
                       </div>
                     </div>
                   </div>
@@ -466,47 +461,6 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
                     >
                       {showScript ? 'Ocultar Transcripción' : '📜 Ver Transcripción'}
                     </button>
-                  </div>
-                </div>
-
-                {/* Control Unificado de Reproducción a 2 Voces */}
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    marginBottom: 10,
-                    padding: '8px 12px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.7)',
-                    borderRadius: 8,
-                    border: '1px solid #e0e7ff',
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={togglePlayPause}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      padding: '7px 16px',
-                      backgroundColor: isPlaying ? '#dc2626' : '#4f46e5',
-                      borderColor: isPlaying ? '#dc2626' : '#4f46e5',
-                      color: '#fff',
-                      borderRadius: 6,
-                      fontSize: 13,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
-                    title={isPlaying ? 'Pausar el audio a 2 voces' : 'Reproducir el diálogo a 2 voces'}
-                  >
-                    <span>{isPlaying ? '⏸ Pausar Audio' : '▶ Reproducir Audio'}</span>
-                  </button>
-                  <div style={{ fontSize: 12, color: isPlaying ? '#4338ca' : 'var(--text-muted)', fontWeight: 500 }}>
-                    {isPlaying
-                      ? '🔊 Narrando a 2 voces (Locutor 1 y Locutor 2)...'
-                      : '🎙️ Diálogo a 2 voces sobre los conceptos clave de esta píldora.'}
                   </div>
                 </div>
 
@@ -616,49 +570,13 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
               className="card"
               style={{
                 backgroundColor: 'var(--bg)',
+                whiteSpace: 'pre-wrap',
                 lineHeight: 1.6,
                 fontSize: 14,
                 marginBottom: 20,
               }}
             >
-              {(pill.content || '').split('\n\n').map((block, bIdx) => {
-                const trimmed = block.trim();
-                if (trimmed.startsWith('### ')) {
-                  return (
-                    <h4
-                      key={bIdx}
-                      style={{
-                        margin: bIdx === 0 ? '0 0 8px' : '16px 0 8px',
-                        color: 'var(--text)',
-                        fontSize: 15,
-                        fontWeight: 700,
-                      }}
-                    >
-                      {trimmed.replace(/^###\s+/, '')}
-                    </h4>
-                  );
-                }
-                if (trimmed.startsWith('## ')) {
-                  return (
-                    <h3
-                      key={bIdx}
-                      style={{
-                        margin: bIdx === 0 ? '0 0 8px' : '18px 0 8px',
-                        color: 'var(--text)',
-                        fontSize: 16,
-                        fontWeight: 700,
-                      }}
-                    >
-                      {trimmed.replace(/^##\s+/, '')}
-                    </h3>
-                  );
-                }
-                return (
-                  <p key={bIdx} style={{ margin: '0 0 10px', whiteSpace: 'pre-line' }}>
-                    {trimmed}
-                  </p>
-                );
-              })}
+              {pill.content}
             </div>
 
             {/* Cuestionario de Verificación */}
