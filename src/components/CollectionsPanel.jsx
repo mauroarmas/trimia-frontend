@@ -214,15 +214,12 @@ export default function CollectionsPanel({ token, me, isCollector }) {
     <div>
       <div className="page-header">
         <div>
-          <h2 className="page-title">{isController ? 'Panel de Cobranzas (Controlador)' : 'Mi Panel de Cobranzas'}</h2>
-          <p className="page-subtitle">Gestión de cuotas, verificación de comprobantes e impacto bancario.</p>
+          <h2 className="page-title">Panel de Cobranzas</h2>
+          <p className="page-subtitle">Gestión de cartera, validación de comprobantes y seguimiento de cuotas.</p>
         </div>
-        <div className="page-actions">
-          <button className="btn-refresh" onClick={loadAll} disabled={loading}>
-            <span>🔄</span>
-            <span>{loading ? 'Cargando...' : 'Refrescar'}</span>
-          </button>
-        </div>
+        <button className="btn-pill-action" onClick={loadAll} disabled={loading}>
+          <span>🔄</span> {loading ? 'Cargando...' : 'Refrescar'}
+        </button>
       </div>
       {error && <p className="error">{error}</p>}
       {successMsg && <p className="success-msg">{successMsg}</p>}

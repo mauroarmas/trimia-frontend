@@ -45,27 +45,27 @@ const PERTENENCIA = {
 };
 
 function EtiquetaPertenencia({ valor }) {
-  const p = PERTENENCIA[valor];
-  if (!p) return <span>—</span>;
-  const badgeClass =
-    valor === 'PROPIA'
-      ? 'belonging-badge belonging-mine'
-      : valor === 'SIN_AREA'
-      ? 'belonging-badge belonging-unassigned'
-      : 'belonging-badge';
-  return (
-    <span className={badgeClass} title={p.title}>
-      {p.texto}
-    </span>
-  );
+  if (valor === 'PROPIA') {
+    return <span className="badge-belonging-mia" title="De un área que supervisás, o derivado a vos">Mía</span>;
+  }
+  if (valor === 'SIN_AREA') {
+    return <span className="badge-belonging-sin-area" title="El caso no llegó a rutearse: no le toca a nadie en particular">Sin área</span>;
+  }
+  if (valor === 'AJENA') {
+    return <span className="badge-belonging-ajena" title="De un área que no supervisás, o derivado a otra persona">No es tuyo</span>;
+  }
+  return <span>—</span>;
 }
 
 export default function EscalationsQueue({ token, me }) {
   const [status, setStatus] = useState('PENDING');
+  // Spec 013 — apagado por defecto: el defecto es la cola completa, priorizada
+  // pero sin filtrar. Ocultar lo ajeno dejaría sin cobertura las áreas que no
+  // tienen responsable activo.
   const [soloMios, setSoloMios] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [areaFilter, setAreaFilter] = useState('ALL');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedAreaFilter, setSelectedAreaFilter] = useState('');
+  const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [escalations, setEscalations] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -438,58 +438,55 @@ export default function EscalationsQueue({ token, me }) {
   const puedeEnsenarAlgo = puedeEnsenar || hayCorregibles;
 
   const filteredEscalations = escalations.filter((e) => {
-    if (areaFilter && areaFilter !== 'ALL') {
-      const agent = e.conversation?.currentAgent;
-      if (agent !== areaFilter && e.pertenencia !== areaFilter) return false;
+    if (selectedAreaFilter) {
+      const matchArea = (e.pertenencia === selectedAreaFilter) || (e.conversation?.currentAgent === selectedAreaFilter);
+      if (!matchArea) return false;
     }
-    if (searchTerm) {
-      const q = searchTerm.toLowerCase();
-      const matchReason = (e.reason || '').toLowerCase().includes(q);
-      const matchClient = (e.conversation?.externalId || '').toLowerCase().includes(q);
-      const matchChannel = (e.conversation?.channel || '').toLowerCase().includes(q);
-      const matchAgent = (e.conversation?.currentAgent || '').toLowerCase().includes(q);
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      const matchReason = e.reason?.toLowerCase().includes(term);
+      const matchClient = e.conversation?.externalId?.toLowerCase().includes(term);
+      const matchChannel = e.conversation?.channel?.toLowerCase().includes(term);
+      const matchAgent = e.conversation?.currentAgent?.toLowerCase().includes(term);
       if (!matchReason && !matchClient && !matchChannel && !matchAgent) return false;
     }
     return true;
   });
 
-  const totalPages = Math.max(1, Math.ceil(filteredEscalations.length / pageSize));
-  const safePage = Math.min(currentPage, totalPages);
-  const startIndex = (safePage - 1) * pageSize;
-  const paginatedEscalations = filteredEscalations.slice(startIndex, startIndex + pageSize);
+  const totalCount = filteredEscalations.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const startIdx = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const endIdx = Math.min(currentPage * pageSize, totalCount);
+  const paginatedEscalations = filteredEscalations.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <div>
-      {/* Encabezado del módulo */}
       <div className="page-header">
         <div>
           <h2 className="page-title">Casos escalados</h2>
           <p className="page-subtitle">Conversaciones que el asistente derivó a una persona.</p>
         </div>
-        <div className="page-actions">
-          <button className="btn-icon-subtle" title="Más opciones">•••</button>
-        </div>
       </div>
 
-      {/* Submenú de pestañas con pills y filtros */}
-      <div className="submenu-tabs-container">
+      <div className="submenu-bar">
         <div className="submenu-left-group">
-          <div className="submenu-tabs">
+          <div className="submenu-pills">
             <button
-              className={`submenu-tab${status === 'PENDING' ? ' active' : ''}`}
-              onClick={() => { setStatus('PENDING'); setCurrentPage(1); }}
+              className={`submenu-pill${status === 'PENDING' ? ' active' : ''}`}
+              onClick={() => { setStatus('PENDING'); setPage(1); }}
             >
               Pendientes
             </button>
             <button
-              className={`submenu-tab${status === 'RESOLVED' ? ' active' : ''}`}
-              onClick={() => { setStatus('RESOLVED'); setCurrentPage(1); }}
+              className={`submenu-pill${status === 'RESOLVED' ? ' active' : ''}`}
+              onClick={() => { setStatus('RESOLVED'); setPage(1); }}
             >
               Resueltos
             </button>
           </div>
 
-          <label className="checkbox-filter">
+          <label className="filter-checkbox-label">
             <input
               type="checkbox"
               checked={soloMios}
@@ -499,61 +496,62 @@ export default function EscalationsQueue({ token, me }) {
           </label>
         </div>
 
-        <button className="btn-refresh" onClick={loadQueue} disabled={loading}>
-          <span style={{ fontSize: 13 }}>🔄</span>
+        <button className="btn-pill-action" onClick={loadQueue} disabled={loading}>
+          <span style={{ fontSize: 14 }}>🔄</span>
           <span>{loading ? 'Cargando...' : 'Refrescar'}</span>
         </button>
       </div>
 
       {soloMios && (
-        <p className="hint" style={{ marginTop: -8, marginBottom: 14 }}>
-          Se ocultan los casos de otras áreas. Los que no tienen área siguen apareciendo: no le tocan a nadie en particular.
-        </p>
+        <div className="hint" style={{ marginBottom: 16 }}>
+          Se ocultan los casos de otras áreas. Los que no tienen área siguen
+          apareciendo: no le tocan a nadie en particular.
+        </div>
       )}
-
-      {/* Barra de búsqueda y selector de área */}
-      <div className="filter-search-bar">
-        <div className="search-input-wrapper">
-          <span className="search-icon">🔍</span>
-          <input
-            type="text"
-            placeholder="Buscar por motivo, cliente, canal, área..."
-            value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-          />
-        </div>
-        <div className="area-select-wrapper">
-          <select value={areaFilter} onChange={(e) => { setAreaFilter(e.target.value); setCurrentPage(1); }}>
-            <option value="ALL">Todas las áreas</option>
-            <option value="ADMIN">ADMIN</option>
-            <option value="SALES">SALES</option>
-            <option value="COLLECTIONS">COLLECTIONS</option>
-            <option value="FINANCING">FINANCING</option>
-            <option value="CUSTOMER_SERVICE">CUSTOMER_SERVICE</option>
-          </select>
-        </div>
-      </div>
 
       {error && <p className="error">{error}</p>}
 
-      {/* Tarjeta de tabla moderna */}
+      <div className="search-filter-card">
+        <div className="search-input-box">
+          <span className="search-icon">🔍</span>
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Buscar por motivo, cliente, canal, área..."
+            value={searchTerm}
+            onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
+          />
+        </div>
+        <div className="search-divider" />
+        <select
+          className="area-select"
+          value={selectedAreaFilter}
+          onChange={(e) => { setSelectedAreaFilter(e.target.value); setPage(1); }}
+        >
+          <option value="">Todas las áreas</option>
+          <option value="PROPIA">Áreas mías</option>
+          <option value="SIN_AREA">Sin área</option>
+          <option value="AJENA">Otras áreas</option>
+        </select>
+      </div>
+
       <div className="data-table-card">
-        <table>
+        <table className="custom-data-table">
           <thead>
             <tr>
               <th>MOTIVO</th>
               <th>CLIENTE</th>
               <th>CANAL</th>
               <th>ÁREA</th>
-              <th>CREADO ▾</th>
-              {status === 'PENDING' && <th>DELEGADO A</th>}
-              <th style={{ textAlign: 'right' }}>ACCIONES</th>
+              <th>CREADO ⌄</th>
+              <th>DELEGADO A</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
-            {filteredEscalations.length === 0 && (
+            {paginatedEscalations.length === 0 && (
               <tr>
-                <td colSpan={status === 'PENDING' ? 7 : 6} style={{ textAlign: 'center', padding: '36px 16px', color: 'var(--text-muted)' }}>
+                <td colSpan={7} style={{ textAlign: 'center', padding: '32px 16px', color: '#64748b' }}>
                   Sin casos {status === 'PENDING' ? 'pendientes' : 'resueltos'}{soloMios ? ' que sean tuyos' : ''}.
                 </td>
               </tr>
@@ -561,22 +559,23 @@ export default function EscalationsQueue({ token, me }) {
             {paginatedEscalations.map((e) => (
               <tr key={e.id}>
                 <td>
-                  <div>
-                    <strong style={{ display: 'block', color: 'var(--text)' }}>{e.reason}</strong>
-                    {e.conversation?.currentAgent && (
-                      <span className="agent-tag">{e.conversation.currentAgent}</span>
-                    )}
-                  </div>
+                  <div style={{ fontWeight: 600, color: '#0f172a' }}>{e.reason}</div>
+                  {e.conversation?.currentAgent && (
+                    <span className="badge-role-tag">{e.conversation.currentAgent}</span>
+                  )}
                 </td>
-                <td style={{ fontWeight: 500, color: 'var(--text-body)' }}>{e.conversation?.externalId || '—'}</td>
-                <td><span className="channel-tag">{e.conversation?.channel || 'WEB'}</span></td>
+                <td>{e.conversation?.externalId}</td>
+                <td>{e.conversation?.channel || 'WEB'}</td>
                 <td><EtiquetaPertenencia valor={e.pertenencia} /></td>
-                <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{new Date(e.createdAt).toLocaleString()}</td>
-                {status === 'PENDING' && (
-                  <td style={{ color: 'var(--text-muted)' }}>
-                    {e.delegatedToId ? (employees.find((emp) => emp.id === e.delegatedToId)?.name ?? e.delegatedToId) : '—'}
-                  </td>
-                )}
+                <td>{new Date(e.createdAt).toLocaleString()}</td>
+                <td>
+                  {status === 'PENDING' && (
+                    e.delegatedToId
+                      ? (employees.find((emp) => emp.id === e.delegatedToId)?.name ?? e.delegatedToId)
+                      : '—'
+                  )}
+                  {status === 'RESOLVED' && '—'}
+                </td>
                 <td style={{ textAlign: 'right' }}>
                   <button className="btn-table-action" onClick={() => openCase(e)}>
                     Ver detalle →
@@ -587,32 +586,35 @@ export default function EscalationsQueue({ token, me }) {
           </tbody>
         </table>
 
-        {/* Paginación al pie de la tabla */}
         <div className="table-pagination-footer">
-          <span>
-            Mostrando {filteredEscalations.length > 0 ? startIndex + 1 : 0} a {Math.min(startIndex + pageSize, filteredEscalations.length)} de {filteredEscalations.length} casos
+          <span className="pagination-text">
+            Mostrando {startIdx} a {endIdx} de {totalCount} casos
           </span>
           <div className="pagination-controls">
-            <button
-              className="btn-page-nav"
-              disabled={safePage <= 1}
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            <div className="page-btn-group">
+              <button
+                className="page-nav-btn"
+                disabled={currentPage <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                ‹
+              </button>
+              <div className="page-num-active">{currentPage}</div>
+              <button
+                className="page-nav-btn"
+                disabled={currentPage >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                ›
+              </button>
+            </div>
+            <select
+              className="page-size-select"
+              value={pageSize}
+              onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
             >
-              ‹
-            </button>
-            <span className="page-number-active">{safePage}</span>
-            <button
-              className="btn-page-nav"
-              disabled={safePage >= totalPages}
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            >
-              ›
-            </button>
-          </div>
-          <div className="page-size-selector">
-            <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}>
               <option value={10}>10 por página</option>
-              <option value={20}>20 por página</option>
+              <option value={25}>25 por página</option>
               <option value={50}>50 por página</option>
             </select>
           </div>

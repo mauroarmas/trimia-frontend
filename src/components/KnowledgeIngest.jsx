@@ -63,26 +63,28 @@ export default function KnowledgeIngest({ token, me }) {
       <div className="page-header">
         <div>
           <h2 className="page-title">Base de Conocimiento</h2>
-          <p className="page-subtitle">Gestión de documentos corporativos, ingesta y búsqueda semántica.</p>
+          <p className="page-subtitle">Gestión de documentos, ingesta de información y control de calidad RAG.</p>
         </div>
       </div>
 
-      <div className="tabs" style={{ marginBottom: 18 }}>
-        {[
-          ['lista', 'Documentos'],
-          ['subir', 'Subir archivo'],
-          ['alta', 'Cargar texto'],
-          ['buscar', 'Probar búsqueda'],
-          ['higiene', 'Limpiar base de conocimiento'],
-        ].map(([id, label]) => (
-          <button
-            key={id}
-            className={`tab ${view === id ? 'active' : ''}`}
-            onClick={() => setView(id)}
-          >
-            {label}
-          </button>
-        ))}
+      <div className="submenu-bar" style={{ marginBottom: 20 }}>
+        <div className="submenu-pills">
+          {[
+            ['lista', 'Documentos'],
+            ['subir', 'Subir archivo'],
+            ['alta', 'Cargar texto'],
+            ['buscar', 'Probar búsqueda'],
+            ['higiene', 'Limpiar base de conocimiento'],
+          ].map(([id, label]) => (
+            <button
+              key={id}
+              className={`submenu-pill${view === id ? ' active' : ''}`}
+              onClick={() => setView(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {view === 'lista' && (

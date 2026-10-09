@@ -74,18 +74,12 @@ export default function SalesClientForm({ token }) {
   const total = quotas.reduce((sum, q) => sum + (Number(q.amount) || 0), 0);
 
   return (
-    <div>
-      <div className="page-header">
-        <div>
-          <h2 className="page-title">Alta de Cliente</h2>
-          <p className="page-subtitle">Registro de clientes para ventas financiadas y programación de planes de cuotas.</p>
-        </div>
-      </div>
-
-      <div className="card">
-        <p style={{ margin: '0 0 16px 0', color: '#64748b', fontSize: '0.9rem' }}>
-          Si no se le asigna cobrador, queda en la cola del Cobrador Controlador.
-        </p>
+    <div className="card" style={{ marginTop: 12 }}>
+      <h3>Alta de cliente</h3>
+      <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+        Al cerrar una venta financiada, se da de alta el cliente con su plan de cuotas.
+        Si no se le asigna cobrador, queda en la cola del Cobrador Controlador.
+      </p>
 
       {error && <p className="error">{error}</p>}
 
@@ -173,7 +167,6 @@ export default function SalesClientForm({ token }) {
           {busy ? 'Dando de alta...' : 'Dar de alta cliente'}
         </button>
       </form>
-      </div>
     </div>
   );
 }

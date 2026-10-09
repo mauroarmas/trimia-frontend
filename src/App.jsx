@@ -12,149 +12,99 @@ import SalesClientForm from './components/SalesClientForm';
 import EmployeesPanel from './components/EmployeesPanel';
 import TrainingPanel from './components/TrainingPanel';
 
-function IconHome() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-      <polyline points="9 22 9 12 15 12 15 22" />
-    </svg>
-  );
-}
-
-function IconEscalations() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-    </svg>
-  );
-}
-
-function IconKnowledge() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-    </svg>
-  );
-}
-
-function IconImprovements() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
-      <polyline points="17 6 23 6 23 12" />
-    </svg>
-  );
-}
-
-function IconEmployees() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
-  );
-}
-
-function IconChatSim() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="11" width="18" height="10" rx="2" />
-      <circle cx="12" cy="5" r="2" />
-      <path d="M12 7v4" />
-      <line x1="8" y1="16" x2="8" y2="16" />
-      <line x1="16" y1="16" x2="16" y2="16" />
-    </svg>
-  );
-}
-
-function IconTraining() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
-      <path d="M6 12v5c3 3 9 3 12 0v-5" />
-    </svg>
-  );
-}
-
-function IconWebChat() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-    </svg>
-  );
-}
-
-function IconCollections() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
-      <line x1="1" y1="10" x2="23" y2="10" />
-    </svg>
-  );
-}
-
-function IconSales() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-      <circle cx="8.5" cy="7" r="4" />
-      <line x1="20" y1="8" x2="20" y2="14" />
-      <line x1="23" y1="11" x2="17" y2="11" />
-    </svg>
-  );
-}
-
-function IconUser() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
-  );
-}
-
-function IconChevronRight() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="9 18 15 12 9 6" />
-    </svg>
-  );
+// Iconos SVG limpios y consistentes para cada módulo
+function NavIcon({ type, className = 'sidebar-nav-icon' }) {
+  switch (type) {
+    case 'supervisor':
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+        </svg>
+      );
+    case 'escalations':
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        </svg>
+      );
+    case 'knowledge':
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+        </svg>
+      );
+    case 'improvements':
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+        </svg>
+      );
+    case 'employees':
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+      );
+    case 'training':
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5" />
+        </svg>
+      );
+    case 'webchat':
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+        </svg>
+      );
+    case 'collections':
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+        </svg>
+      );
+    case 'sales':
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+        </svg>
+      );
+    case 'chat':
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+      );
+    default:
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      );
+  }
 }
 
 const SUPERVISOR_TABS = [
-  { id: 'supervisor', label: 'Panel del Supervisor', icon: <IconHome /> },
-  { id: 'escalations', label: 'Casos escalados', icon: <IconEscalations /> },
-  { id: 'knowledge', label: 'Base de Conocimiento', icon: <IconKnowledge /> },
-  { id: 'improvements', label: 'Mejorar el conocimiento', icon: <IconImprovements /> },
-  { id: 'employees', label: 'Empleados y Áreas', icon: <IconEmployees /> },
-  { id: 'chat', label: 'Simulador de Chat', icon: <IconChatSim /> },
+  { id: 'supervisor', label: 'Panel del Supervisor', icon: 'supervisor' },
+  { id: 'escalations', label: 'Casos escalados', icon: 'escalations' },
+  { id: 'knowledge', label: 'Base de Conocimiento', icon: 'knowledge' },
+  { id: 'improvements', label: 'Mejorar el conocimiento', icon: 'improvements' },
+  { id: 'employees', label: 'Empleados y Áreas', icon: 'employees' },
+  { id: 'chat', label: 'Simulador de Chat', icon: 'chat' },
 ];
 
 const COMMON_TABS = [
-  { id: 'training', label: 'Capacitación y Diagnóstico', icon: <IconTraining /> },
-  { id: 'webchat', label: 'Chat con el Asistente', icon: <IconWebChat /> },
+  { id: 'training', label: 'Capacitación y Diagnóstico', icon: 'training' },
+  { id: 'webchat', label: 'Chat con el Asistente', icon: 'webchat' },
 ];
 
 const COLLECTOR_TABS = [
-  { id: 'collections', label: 'Mi Panel de Cobranzas', icon: <IconCollections /> },
+  { id: 'collections', label: 'Mi Panel de Cobranzas', icon: 'collections' },
 ];
 
 const SALES_TABS = [
-  { id: 'sales', label: 'Alta de Cliente', icon: <IconSales /> },
+  { id: 'sales', label: 'Alta de Cliente', icon: 'sales' },
 ];
-
-function formatUserName(user) {
-  if (user?.name) return user.name;
-  if (!user?.email) return 'Usuario';
-  const prefix = user.email.split('@')[0];
-  return prefix
-    .split('.')
-    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-    .join(' ');
-}
 
 export default function App() {
   const [token, setToken] = useState(null);
@@ -172,7 +122,7 @@ export default function App() {
 
   if (!isSupervisor && !isCollector && !isSales) {
     return (
-      <div className="container" style={{ maxWidth: 420, paddingTop: 60 }}>
+      <div className="container" style={{ maxWidth: 420, margin: '80px auto' }}>
         <div className="card">
           <p>Logueado como {user.email} ({user.role}).</p>
           <p>El acceso requiere rol SUPERVISOR, o sector Cobranzas o Ventas.</p>
@@ -182,6 +132,7 @@ export default function App() {
     );
   }
 
+  // Lista visible de pestañas según los permisos y rol del usuario
   const visibleTabs = [
     ...(isSupervisor ? SUPERVISOR_TABS : []),
     ...COMMON_TABS,
@@ -193,7 +144,7 @@ export default function App() {
 
   return (
     <div className="app-layout">
-      {/* Sidebar de navegación corporativa */}
+      {/* Sidebar Fija Lateral */}
       <aside className="app-sidebar">
         <div className="sidebar-header">
           <img src="/logo.png" alt="TrimIA" className="sidebar-logo" />
@@ -203,40 +154,45 @@ export default function App() {
           {visibleTabs.map((t) => (
             <button
               key={t.id}
-              className={`nav-item${currentTab === t.id ? ' active' : ''}`}
+              className={`sidebar-nav-item${currentTab === t.id ? ' active' : ''}`}
               onClick={() => setTab(t.id)}
             >
-              <span className="nav-icon">{t.icon}</span>
-              <span className="nav-label">{t.label}</span>
+              <NavIcon type={t.icon} />
+              <span>{t.label}</span>
             </button>
           ))}
         </nav>
 
-        {/* Perfil del usuario en la parte inferior */}
-        <div className="sidebar-footer">
-          <div className="user-profile-card">
+        {/* Perfil de Usuario Inferior */}
+        <div className="sidebar-user-card">
+          <div className="user-profile-pill">
             <div className="user-avatar">
-              <IconUser />
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
             </div>
             <div className="user-info">
-              <div className="user-name">{formatUserName(user)}</div>
-              <div className="user-role">
-                {user.role}
-                {user.sectorName && ` (${user.sectorName})`}
+              <div className="user-name" title={user.email}>
+                {user.name || (user.email.includes('@') ? user.email.split('@')[0] : user.email)}
+              </div>
+              <div className="user-role-badge">
+                {user.role} {user.sectorName ? `(${user.sectorName})` : ''}
               </div>
             </div>
             <button
-              className="user-logout-btn"
+              className="btn-logout-icon"
               title="Cerrar sesión"
               onClick={() => { setToken(null); setUser(null); }}
             >
-              <IconChevronRight />
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
             </button>
           </div>
         </div>
       </aside>
 
-      {/* Área principal del contenido */}
+      {/* Área Principal de Contenido */}
       <main className="app-main">
         {currentTab === 'training' && <TrainingPanel token={token} me={user} />}
         {currentTab === 'webchat' && <WebChat token={token} me={user} />}

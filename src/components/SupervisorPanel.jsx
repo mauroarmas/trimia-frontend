@@ -56,14 +56,11 @@ export default function SupervisorPanel({ token, me }) {
       <div className="page-header">
         <div>
           <h2 className="page-title">Panel del Supervisor</h2>
-          <p className="page-subtitle">Métricas en tiempo real, estado de agentes y supervisión de conversaciones.</p>
+          <p className="page-subtitle">Monitoreo en tiempo real de agentes, métricas globales y auditoría de conversaciones.</p>
         </div>
-        <div className="page-actions">
-          <button className="btn-refresh" onClick={loadAll} disabled={loading}>
-            <span>🔄</span>
-            <span>{loading ? 'Cargando...' : 'Refrescar'}</span>
-          </button>
-        </div>
+        <button className="btn-pill-action" onClick={loadAll} disabled={loading}>
+          <span>🔄</span> {loading ? 'Cargando...' : 'Refrescar'}
+        </button>
       </div>
       {error && <p className="error" style={{ marginTop: 12 }}>{error}</p>}
 

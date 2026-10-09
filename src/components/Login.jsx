@@ -36,15 +36,14 @@ export default function Login({ onLogin }) {
   }
 
   return (
-    <div className="container" style={{ maxWidth: 380, paddingTop: 60 }}>
-      <div className="card" style={{ padding: '28px 24px', textAlign: 'center' }}>
-        <img
-          src="/logo.png"
-          alt="TrimIA"
-          style={{ height: 48, objectFit: 'contain', marginBottom: 16 }}
-        />
-        <h2 style={{ fontSize: 18, marginBottom: 18, fontWeight: 700 }}>Iniciar Sesión</h2>
-        <form onSubmit={handleSubmit} style={{ textAlign: 'left' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', padding: 20 }}>
+      <div className="card" style={{ maxWidth: 380, width: '100%', padding: 32, borderRadius: 14 }}>
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <img src="/logo.png" alt="TrimIA" style={{ height: 42, objectFit: 'contain' }} />
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: '#0f172a', marginTop: 12, marginBottom: 4 }}>Iniciar Sesión</h2>
+          <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Portal de Gestión y Asistencia IA</p>
+        </div>
+        <form onSubmit={handleSubmit}>
           <div className="field">
             <label>Email</label>
             <input value={email} onChange={(e) => setEmail(e.target.value)} />
