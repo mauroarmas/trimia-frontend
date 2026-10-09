@@ -24,21 +24,125 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
   const [showScript, setShowScript] = useState(false);
   const [scriptDialogue, setScriptDialogue] = useState(null);
   const [loadingScript, setLoadingScript] = useState(false);
-  // Sincronización de narración de voz a 2 voces con los eventos de play/pause del reproductor
-  const isPlayingAudioRef = useRef(false);
-  const currentUtteranceIndexRef = useRef(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [activeLineIndex, setActiveLineIndex] = useState(-1);
+  const [voices, setVoices] = useState([]);
+  const isPlayingRef = useRef(false);
+  const currentLineIndexRef = useRef(0);
 
-  // Detener la síntesis de voz del navegador si se cierra el modal
+  // Pre-cargar voces nativas del navegador
+  useEffect(() => {
+    if (!('speechSynthesis' in window)) return;
+    const updateVoices = () => {
+      const v = window.speechSynthesis.getVoices();
+      if (v && v.length > 0) setVoices(v);
+    };
+    updateVoices();
+    window.speechSynthesis.onvoiceschanged = updateVoices;
+    return () => {
+      window.speechSynthesis.onvoiceschanged = null;
+    };
+  }, []);
+
+  // Pre-cargar el guión de diálogo en cuanto se abre el modal para que esté listo al pulsar Play
+  useEffect(() => {
+    let active = true;
+    if (pillId && token) {
+      getPillAudioScript(token, pillId)
+        .then((res) => {
+          if (active && res && res.dialogue) {
+            setScriptDialogue(res.dialogue);
+          }
+        })
+        .catch(() => {});
+    }
+    return () => {
+      active = false;
+    };
+  }, [token, pillId]);
+
+  // Detener la síntesis de voz del navegador si se desmonta o cierra el modal
   useEffect(() => {
     return () => {
+      isPlayingRef.current = false;
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
     };
   }, []);
 
-  const startVoiceNarration = async (startIndex = 0) => {
+  const getSpeakerVoices = () => {
+    const list =
+      voices.length > 0
+        ? voices
+        : 'speechSynthesis' in window
+        ? window.speechSynthesis.getVoices()
+        : [];
+    const es = list.filter((v) => v.lang && v.lang.toLowerCase().startsWith('es'));
+    let v1 = es[0] || list[0] || null;
+    let v2 = es.length > 1 ? es[1] : list.length > 1 ? list[1] : v1;
+    if (v1 && v2 && v1.name === v2.name && list.length > 1) {
+      const other = list.find((v) => v.name !== v1.name);
+      if (other) v2 = other;
+    }
+    return { voice1: v1, voice2: v2 };
+  };
+
+  const stopNarration = () => {
+    isPlayingRef.current = false;
+    setIsPlaying(false);
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+  };
+
+  const speakLineAt = (index, lines) => {
     if (!('speechSynthesis' in window)) return;
+    if (!isPlayingRef.current) return;
+    if (!lines || lines.length === 0) return;
+
+    if (index >= lines.length) {
+      currentLineIndexRef.current = 0;
+      setActiveLineIndex(-1);
+      return;
+    }
+
+    currentLineIndexRef.current = index;
+    setActiveLineIndex(index);
+
+    const item = lines[index];
+    const isSpk1 = item.speaker === 'SPEAKER_1';
+    const { voice1, voice2 } = getSpeakerVoices();
+
+    const utterance = new SpeechSynthesisUtterance(item.text);
+    utterance.lang = 'es-ES';
+    utterance.rate = 1.0;
+    utterance.pitch = isSpk1 ? 0.95 : 1.25; // Tono diferenciado para cada locutor
+    if (isSpk1 && voice1) utterance.voice = voice1;
+    if (!isSpk1 && voice2) utterance.voice = voice2;
+
+    utterance.onend = () => {
+      if (!isPlayingRef.current) return;
+      speakLineAt(index + 1, lines);
+    };
+
+    utterance.onerror = () => {
+      if (!isPlayingRef.current) return;
+      speakLineAt(index + 1, lines);
+    };
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const startNarration = async (fromIndex = null) => {
+    if (!('speechSynthesis' in window)) {
+      alert('Tu navegador no soporta síntesis de voz nativa.');
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    isPlayingRef.current = true;
+    setIsPlaying(true);
 
     let lines = scriptDialogue;
     if (!lines || lines.length === 0) {
@@ -51,65 +155,61 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
       }
     }
 
-    if (!lines || lines.length === 0) return;
+    if (!lines || lines.length === 0) {
+      stopNarration();
+      return;
+    }
 
-    window.speechSynthesis.cancel();
-    isPlayingAudioRef.current = true;
+    let idx = fromIndex !== null ? fromIndex : currentLineIndexRef.current;
+    if (idx < 0 || idx >= lines.length) {
+      idx = 0;
+    }
 
-    const voices = window.speechSynthesis.getVoices();
-    const esVoices = voices.filter((v) => v.lang && v.lang.toLowerCase().startsWith('es'));
-    const voice1 = esVoices[0] || voices[0] || null;
-    const voice2 = esVoices.length > 1 ? esVoices[1] : (voices.length > 1 ? voices[1] : (esVoices[0] || voices[0] || null));
+    speakLineAt(idx, lines);
+  };
 
-    currentUtteranceIndexRef.current = startIndex;
-
-    const speakLine = () => {
-      if (!isPlayingAudioRef.current || currentUtteranceIndexRef.current >= lines.length) {
-        return;
+  const togglePlayPause = () => {
+    if (isPlaying) {
+      stopNarration();
+      if (audioRef.current && !audioRef.current.paused) {
+        audioRef.current.pause();
       }
-
-      const item = lines[currentUtteranceIndexRef.current];
-      const isSpk1 = item.speaker === 'SPEAKER_1';
-      const utterance = new SpeechSynthesisUtterance(item.text);
-      utterance.lang = 'es-ES';
-      utterance.rate = 1.05;
-      utterance.pitch = isSpk1 ? 1.0 : 1.25;
-      if (isSpk1 && voice1) utterance.voice = voice1;
-      if (!isSpk1 && voice2) utterance.voice = voice2;
-
-      utterance.onend = () => {
-        if (!isPlayingAudioRef.current) return;
-        currentUtteranceIndexRef.current++;
-        speakLine();
-      };
-
-      utterance.onerror = () => {
-        if (!isPlayingAudioRef.current) return;
-        currentUtteranceIndexRef.current++;
-        speakLine();
-      };
-
-      window.speechSynthesis.speak(utterance);
-    };
-
-    speakLine();
+    } else {
+      if (audioRef.current) {
+        audioRef.current.volume = 0;
+        audioRef.current.play().catch(() => {});
+      }
+      startNarration();
+    }
   };
 
   const handleAudioPlay = () => {
-    isPlayingAudioRef.current = true;
-    const lines = scriptDialogue || [];
-    let startIdx = 0;
-    if (lines.length > 0 && totalDuration > 0 && audioRef.current) {
-      const frac = audioRef.current.currentTime / totalDuration;
-      startIdx = Math.min(lines.length - 1, Math.floor(frac * lines.length));
+    if (!isPlayingRef.current) {
+      if (audioRef.current) {
+        audioRef.current.volume = 0;
+      }
+      startNarration();
     }
-    startVoiceNarration(startIdx);
   };
 
   const handleAudioPause = () => {
-    isPlayingAudioRef.current = false;
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
+    if (isPlayingRef.current) {
+      stopNarration();
+    }
+  };
+
+  const handleAudioSeeked = () => {
+    if (audioRef.current && totalDuration > 0 && scriptDialogue?.length) {
+      const frac = audioRef.current.currentTime / totalDuration;
+      const targetIdx = Math.min(
+        scriptDialogue.length - 1,
+        Math.floor(frac * scriptDialogue.length),
+      );
+      currentLineIndexRef.current = targetIdx;
+      if (isPlayingRef.current) {
+        window.speechSynthesis.cancel();
+        speakLineAt(targetIdx, scriptDialogue);
+      }
     }
   };
 
@@ -357,14 +457,57 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
                       </div>
                     </div>
                   </div>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={handleToggleScript}
+                      className="secondary"
+                      style={{ fontSize: 11, padding: '5px 10px' }}
+                    >
+                      {showScript ? 'Ocultar Transcripción' : '📜 Ver Transcripción'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Control Unificado de Reproducción a 2 Voces */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    marginBottom: 10,
+                    padding: '8px 12px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                    borderRadius: 8,
+                    border: '1px solid #e0e7ff',
+                  }}
+                >
                   <button
                     type="button"
-                    onClick={handleToggleScript}
-                    className="secondary"
-                    style={{ fontSize: 11, padding: '5px 10px' }}
+                    onClick={togglePlayPause}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '7px 16px',
+                      backgroundColor: isPlaying ? '#dc2626' : '#4f46e5',
+                      borderColor: isPlaying ? '#dc2626' : '#4f46e5',
+                      color: '#fff',
+                      borderRadius: 6,
+                      fontSize: 13,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                    title={isPlaying ? 'Pausar el audio a 2 voces' : 'Reproducir el diálogo a 2 voces'}
                   >
-                    {showScript ? 'Ocultar Transcripción' : '📜 Ver Transcripción'}
+                    <span>{isPlaying ? '⏸ Pausar Audio' : '▶ Reproducir Audio'}</span>
                   </button>
+                  <div style={{ fontSize: 12, color: isPlaying ? '#4338ca' : 'var(--text-muted)', fontWeight: 500 }}>
+                    {isPlaying
+                      ? '🔊 Narrando a 2 voces (Locutor 1 y Locutor 2)...'
+                      : '🎙️ Diálogo a 2 voces sobre los conceptos clave de esta píldora.'}
+                  </div>
                 </div>
 
                 {/* HTML5 Audio Player */}
@@ -376,6 +519,7 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
                     src={getAudioStreamUrl(pill.id, token)}
                     onPlay={handleAudioPlay}
                     onPause={handleAudioPause}
+                    onSeeked={handleAudioSeeked}
                     onTimeUpdate={handleTimeUpdate}
                     onEnded={handleAudioEnded}
                     style={{ width: '100%', height: 42, borderRadius: 6 }}
@@ -428,19 +572,28 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto' }}>
                         {scriptDialogue.map((item, idx) => {
                           const isSpk1 = item.speaker === 'SPEAKER_1';
+                          const isCurrentActive = idx === activeLineIndex;
                           return (
                             <div
                               key={idx}
                               style={{
                                 padding: '6px 10px',
                                 borderRadius: 6,
-                                backgroundColor: isSpk1 ? 'rgba(79, 70, 229, 0.05)' : 'rgba(16, 185, 129, 0.05)',
-                                borderLeft: `3px solid ${isSpk1 ? '#4f46e5' : '#10b981'}`,
+                                backgroundColor: isCurrentActive
+                                  ? 'rgba(79, 70, 229, 0.15)'
+                                  : isSpk1
+                                  ? 'rgba(79, 70, 229, 0.05)'
+                                  : 'rgba(16, 185, 129, 0.05)',
+                                borderLeft: `3px solid ${
+                                  isCurrentActive ? '#6366f1' : isSpk1 ? '#4f46e5' : '#10b981'
+                                }`,
                                 fontSize: 12,
                                 lineHeight: 1.4,
+                                transition: 'all 0.2s ease',
                               }}
                             >
                               <strong style={{ color: isSpk1 ? '#4338ca' : '#047857', marginRight: 6 }}>
+                                {isCurrentActive && '🔊 '}
                                 {isSpk1 ? 'Locutor 1:' : 'Locutor 2:'}
                               </strong>
                               <span>{item.text}</span>
