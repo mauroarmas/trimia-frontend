@@ -104,6 +104,7 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
     if (index >= lines.length) {
       currentLineIndexRef.current = 0;
       setActiveLineIndex(-1);
+      stopNarration();
       return;
     }
 
@@ -115,22 +116,29 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
     const { voice1, voice2 } = getSpeakerVoices();
 
     const utterance = new SpeechSynthesisUtterance(item.text);
-    utterance.lang = 'es-ES';
+    const selectedVoice = isSpk1 ? voice1 : voice2;
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+      utterance.lang = selectedVoice.lang || 'es-AR';
+    } else {
+      utterance.lang = 'es-AR';
+    }
     utterance.rate = 1.0;
-    utterance.pitch = isSpk1 ? 0.95 : 1.25; // Tono diferenciado para cada locutor
-    if (isSpk1 && voice1) utterance.voice = voice1;
-    if (!isSpk1 && voice2) utterance.voice = voice2;
+    utterance.pitch = isSpk1 ? 1.0 : 1.15; // Tono diferenciado para cada locutor
 
     utterance.onend = () => {
       if (!isPlayingRef.current) return;
       speakLineAt(index + 1, lines);
     };
 
-    utterance.onerror = () => {
+    utterance.onerror = (e) => {
       if (!isPlayingRef.current) return;
-      speakLineAt(index + 1, lines);
+      if (e.error !== 'canceled' && e.error !== 'interrupted') {
+        speakLineAt(index + 1, lines);
+      }
     };
 
+    window.speechSynthesis.resume();
     window.speechSynthesis.speak(utterance);
   };
 
@@ -141,6 +149,7 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
     }
 
     window.speechSynthesis.cancel();
+    window.speechSynthesis.resume();
     isPlayingRef.current = true;
     setIsPlaying(true);
 
@@ -156,6 +165,7 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
     }
 
     if (!lines || lines.length === 0) {
+      alert('Esta píldora aún no tiene un guion de diálogo generado.');
       stopNarration();
       return;
     }
@@ -168,43 +178,60 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
     speakLineAt(idx, lines);
   };
 
-  const handleAudioPlay = () => {
-    if (!isPlayingRef.current) {
-      if (audioRef.current) {
-        audioRef.current.volume = 0;
-        if (totalDuration > 0 && scriptDialogue?.length) {
-          const frac = audioRef.current.currentTime / totalDuration;
-          const targetIdx = Math.min(
-            scriptDialogue.length - 1,
-            Math.floor(frac * scriptDialogue.length),
-          );
-          currentLineIndexRef.current = targetIdx;
-        }
-      }
+  const togglePlayPause = () => {
+    if (isPlaying) {
+      stopNarration();
+    } else {
       startNarration(currentLineIndexRef.current);
     }
   };
 
-  const handleAudioPause = () => {
-    if (isPlayingRef.current) {
-      stopNarration();
-    }
-  };
+  const handleSeek = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const width = rect.width;
+    const ratio = Math.max(0, Math.min(1, clickX / width));
+    const dur = totalDuration > 0 ? totalDuration : (scriptDialogue?.length ? scriptDialogue.length * 8 : 60);
+    const targetSeconds = Math.round(ratio * dur);
+    setPlaybackSeconds(targetSeconds);
 
-  const handleAudioSeeked = () => {
-    if (audioRef.current && totalDuration > 0 && scriptDialogue?.length) {
-      const frac = audioRef.current.currentTime / totalDuration;
-      const targetIdx = Math.min(
+    if (scriptDialogue && scriptDialogue.length > 0) {
+      const targetLine = Math.min(
         scriptDialogue.length - 1,
-        Math.floor(frac * scriptDialogue.length),
+        Math.floor(ratio * scriptDialogue.length),
       );
-      currentLineIndexRef.current = targetIdx;
+      currentLineIndexRef.current = targetLine;
       if (isPlayingRef.current) {
         window.speechSynthesis.cancel();
-        speakLineAt(targetIdx, scriptDialogue);
+        speakLineAt(targetLine, scriptDialogue);
       }
     }
   };
+
+  // Timer para avanzar segundos y progreso de escucha mientras se narra
+  useEffect(() => {
+    let interval = null;
+    if (isPlaying) {
+      interval = setInterval(() => {
+        setPlaybackSeconds((prev) => {
+          const next = prev + 1;
+          const dur = totalDuration > 0 ? totalDuration : (scriptDialogue?.length ? scriptDialogue.length * 8 : 60);
+          if (dur > 0 && (next / dur) >= 0.8 && !isAudioCompleted) {
+            setIsAudioCompleted(true);
+            reportPlaybackProgress(token, pillId, next).then((res) => {
+              if (res?.isAudioCompleted && onProgressUpdated) {
+                onProgressUpdated();
+              }
+            }).catch(() => {});
+          }
+          return next;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isPlaying, totalDuration, scriptDialogue, isAudioCompleted, token, pillId]);
 
   useEffect(() => {
     let mounted = true;
@@ -324,9 +351,18 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  const hasAudio = pill?.hasAudio || pill?.audioStatus === 'AUDIO_READY';
-  const progressPercent = totalDuration > 0
-    ? Math.min(100, Math.round((playbackSeconds / totalDuration) * 100))
+  const effectiveDuration = totalDuration > 0
+    ? totalDuration
+    : scriptDialogue && scriptDialogue.length > 0
+    ? scriptDialogue.length * 8
+    : 60;
+  const hasAudio =
+    Boolean(pill?.hasAudio) ||
+    pill?.audioStatus === 'AUDIO_READY' ||
+    pill?.audioStatus === 'SCRIPT_GENERATED' ||
+    Boolean(scriptDialogue && scriptDialogue.length > 0);
+  const progressPercent = effectiveDuration > 0
+    ? Math.min(100, Math.round((playbackSeconds / effectiveDuration) * 100))
     : 0;
 
   return (
@@ -429,72 +465,123 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
               )}
             </div>
 
-            {/* SECCIÓN PODCAST / REPRODUCTOR DE AUDIO (US2 / US3) */}
+            {/* SECCIÓN PODCAST / REPRODUCTOR UNIFICADO DE AUDIO A 2 VOCES */}
             {hasAudio && (
               <div
                 style={{
                   background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(99, 102, 241, 0.03) 100%)',
                   border: '1px solid #c7d2fe',
-                  borderRadius: 10,
-                  padding: '16px 18px',
+                  borderRadius: 12,
+                  padding: '16px 20px',
                   marginBottom: 20,
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 20 }}>🎙️</span>
+                    <span style={{ fontSize: 22 }}>🎙️</span>
                     <div>
-                      <strong style={{ fontSize: 14, color: '#312e81' }}>Episodio de Podcast Formativo</strong>
-                      <div style={{ fontSize: 11, color: isPlaying ? '#4338ca' : 'var(--text-muted)', fontWeight: isPlaying ? 600 : 400 }}>
+                      <strong style={{ fontSize: 14, color: '#312e81' }}>Episodio de Podcast Formativo (2 Voces)</strong>
+                      <div style={{ fontSize: 12, color: isPlaying ? '#4338ca' : 'var(--text-muted)', fontWeight: isPlaying ? 600 : 400 }}>
                         {isPlaying
-                          ? '🔊 Narrando a 2 voces (Locutor 1 y Locutor 2)...'
+                          ? `🔊 Reproduciendo locución a 2 voces... ${activeLineIndex >= 0 && scriptDialogue?.[activeLineIndex] ? `(${scriptDialogue[activeLineIndex].speaker === 'SPEAKER_1' ? 'Locutor 1' : 'Locutor 2'})` : ''}`
                           : 'Conversación guiada a 2 voces sobre los conceptos clave de esta píldora.'}
                       </div>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <button
-                      type="button"
-                      onClick={handleToggleScript}
-                      className="secondary"
-                      style={{ fontSize: 11, padding: '5px 10px' }}
-                    >
-                      {showScript ? 'Ocultar Transcripción' : '📜 Ver Transcripción'}
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleToggleScript}
+                    className="secondary"
+                    style={{ fontSize: 11, padding: '5px 10px' }}
+                  >
+                    {showScript ? 'Ocultar Transcripción' : '📜 Ver Transcripción'}
+                  </button>
                 </div>
 
-                {/* HTML5 Audio Player */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <audio
-                    ref={audioRef}
-                    controls
-                    preload="metadata"
-                    src={getAudioStreamUrl(pill.id, token)}
-                    onPlay={handleAudioPlay}
-                    onPause={handleAudioPause}
-                    onSeeked={handleAudioSeeked}
-                    onTimeUpdate={handleTimeUpdate}
-                    onEnded={handleAudioEnded}
-                    style={{ width: '100%', height: 42, borderRadius: 6 }}
-                  />
+                {/* Reproductor Unificado Único */}
+                <div
+                  style={{
+                    backgroundColor: '#fff',
+                    border: '1px solid #e0e7ff',
+                    borderRadius: 8,
+                    padding: '12px 16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 10,
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <button
+                      type="button"
+                      onClick={togglePlayPause}
+                      style={{
+                        backgroundColor: isPlaying ? '#dc2626' : '#4f46e5',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: 24,
+                        padding: '8px 18px',
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        boxShadow: '0 2px 4px rgba(79, 70, 229, 0.25)',
+                        transition: 'background-color 0.2s ease',
+                      }}
+                    >
+                      <span>{isPlaying ? '⏸ Pausar' : '▶ Reproducir'}</span>
+                    </button>
 
-                  {/* Barra de Progreso de Escucha */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
-                    <div style={{ flex: 1, height: 6, backgroundColor: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
+                    {/* Timeline interactiva */}
+                    <div
+                      onClick={handleSeek}
+                      style={{
+                        flex: 1,
+                        height: 8,
+                        backgroundColor: '#e2e8f0',
+                        borderRadius: 4,
+                        cursor: 'pointer',
+                        position: 'relative',
+                        overflow: 'hidden',
+                      }}
+                      title="Clic para avanzar o retroceder"
+                    >
                       <div
                         style={{
                           width: `${progressPercent}%`,
                           height: '100%',
                           backgroundColor: isAudioCompleted ? 'var(--success)' : '#4f46e5',
-                          transition: 'width 0.3s ease',
+                          borderRadius: 4,
+                          transition: 'width 0.2s linear',
                         }}
                       />
                     </div>
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 90, textAlign: 'right' }}>
-                      {formatSeconds(playbackSeconds)} / {formatSeconds(totalDuration)} ({progressPercent}%)
+
+                    {/* Contador de tiempo */}
+                    <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)', minWidth: 85, textAlign: 'right' }}>
+                      {formatSeconds(playbackSeconds)} / {formatSeconds(effectiveDuration)}
                     </span>
                   </div>
+
+                  {/* Frase actual en reproducción */}
+                  {isPlaying && activeLineIndex >= 0 && scriptDialogue?.[activeLineIndex] && (
+                    <div
+                      style={{
+                        backgroundColor: scriptDialogue[activeLineIndex].speaker === 'SPEAKER_1' ? 'rgba(79, 70, 229, 0.08)' : 'rgba(16, 185, 129, 0.08)',
+                        borderLeft: `4px solid ${scriptDialogue[activeLineIndex].speaker === 'SPEAKER_1' ? '#4f46e5' : '#10b981'}`,
+                        padding: '6px 10px',
+                        borderRadius: 4,
+                        fontSize: 12,
+                        color: '#1f2937',
+                        fontStyle: 'italic',
+                      }}
+                    >
+                      <strong>{scriptDialogue[activeLineIndex].speaker === 'SPEAKER_1' ? 'Locutor 1 (Guía): ' : 'Locutor 2 (Colega): '}</strong>
+                      "{scriptDialogue[activeLineIndex].text}"
+                    </div>
+                  )}
 
                   {/* Meta de 80% */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)' }}>
@@ -503,7 +590,7 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
                         ? '✅ Requisito de escucha cumplido (80% alcanzado).'
                         : '💡 Escucha al menos el 80% para registrar el aprendizaje completo.'}
                     </span>
-                    <span>Umbral requerido: 80%</span>
+                    <span>Progreso: {progressPercent}% (mínimo 80%)</span>
                   </div>
                 </div>
 
