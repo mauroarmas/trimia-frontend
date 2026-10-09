@@ -51,10 +51,13 @@ export default function AudioScriptModal({ token, pill, onClose, onScriptUpdated
     setError(null);
     setNotice(null);
     try {
-      const result = await generatePillAudioScript(token, pill.id);
+      const targetSec = Number(estimatedDurationSeconds) || 90;
+      const result = await generatePillAudioScript(token, pill.id, targetSec);
       setDialogue(result.dialogue || []);
-      setEstimatedDurationSeconds(result.estimatedDurationSeconds || 180);
-      setNotice('Guion a 2 voces generado exitosamente con IA.');
+      setEstimatedDurationSeconds(result.estimatedDurationSeconds || targetSec);
+      setNotice(
+        `✓ Guion a 2 voces generado exitosamente con IA en base a la base de conocimiento (${result.dialogue?.length || 0} intervenciones, ~${result.estimatedDurationSeconds || targetSec}s).`,
+      );
       if (onScriptUpdated) onScriptUpdated();
     } catch (err) {
       setError(err.message || 'Error al generar guion con IA');
@@ -190,15 +193,15 @@ export default function AudioScriptModal({ token, pill, onClose, onScriptUpdated
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 flexWrap: 'wrap',
-                gap: 10,
-                padding: '12px 14px',
+                gap: 12,
+                padding: '12px 16px',
                 backgroundColor: 'var(--bg)',
                 borderRadius: 8,
                 marginBottom: 18,
                 border: '1px solid var(--border)',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
                 <button
                   type="button"
                   onClick={handleGenerateAIScript}
@@ -211,27 +214,53 @@ export default function AudioScriptModal({ token, pill, onClose, onScriptUpdated
                     display: 'flex',
                     alignItems: 'center',
                     gap: 6,
+                    fontWeight: 600,
                   }}
+                  title="Consulta la base de conocimiento de Credimisión y redacta un diálogo pedagógico a 2 voces calibrado para el tiempo seleccionado"
                 >
-                  {generating ? '✨ Generando Guion...' : '✨ Generar Guion con IA'}
+                  {generating ? '✨ Generando Guion con IA...' : '✨ Generar Guion con IA'}
                 </button>
-                <span className="hint" style={{ fontSize: 12 }}>
-                  {dialogue.length} intervenciones registradas
-                </span>
-              </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span>Duración estimada (seg):</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Tiempo objetivo:</span>
                   <input
                     type="number"
                     min="30"
                     max="600"
+                    step="15"
                     value={estimatedDurationSeconds}
                     onChange={(e) => setEstimatedDurationSeconds(e.target.value)}
-                    style={{ width: 75, padding: '4px 6px', fontSize: 12 }}
+                    style={{ width: 68, padding: '4px 6px', fontSize: 12, textAlign: 'center' }}
                   />
-                </label>
+                  <span style={{ color: 'var(--text-muted)' }}>seg ({Math.round((estimatedDurationSeconds / 60) * 10) / 10} min)</span>
+                </div>
+
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {[60, 90, 120, 180].map((sec) => (
+                    <button
+                      key={sec}
+                      type="button"
+                      onClick={() => setEstimatedDurationSeconds(sec)}
+                      className="secondary"
+                      style={{
+                        padding: '3px 8px',
+                        fontSize: 11,
+                        backgroundColor: Number(estimatedDurationSeconds) === sec ? '#e0e7ff' : undefined,
+                        borderColor: Number(estimatedDurationSeconds) === sec ? '#6366f1' : undefined,
+                        color: Number(estimatedDurationSeconds) === sec ? '#4338ca' : undefined,
+                        fontWeight: Number(estimatedDurationSeconds) === sec ? 700 : 400,
+                      }}
+                    >
+                      {sec >= 60 ? `${sec / 60}m` : `${sec}s`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span className="hint" style={{ fontSize: 12 }}>
+                  {dialogue.length} turnos
+                </span>
                 <button
                   type="button"
                   onClick={handleSave}
@@ -263,22 +292,44 @@ export default function AudioScriptModal({ token, pill, onClose, onScriptUpdated
               <div
                 style={{
                   textAlign: 'center',
-                  padding: '40px 20px',
+                  padding: '36px 20px',
                   backgroundColor: 'var(--bg)',
                   borderRadius: 8,
                   border: '1px dashed var(--border)',
                 }}
               >
-                <p style={{ margin: '0 0 10px', color: 'var(--text-muted)' }}>
+                <p style={{ margin: '0 0 12px', color: 'var(--text-muted)', fontSize: 14 }}>
                   Esta píldora aún no tiene un guion de podcast generado.
                 </p>
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                  <span style={{ fontSize: 13 }}>Duración solicitada para el audio:</span>
+                  {[60, 90, 120, 180].map((sec) => (
+                    <button
+                      key={sec}
+                      type="button"
+                      onClick={() => setEstimatedDurationSeconds(sec)}
+                      style={{
+                        padding: '5px 12px',
+                        fontSize: 12,
+                        backgroundColor: Number(estimatedDurationSeconds) === sec ? '#4f46e5' : '#f3f4f6',
+                        color: Number(estimatedDurationSeconds) === sec ? '#fff' : '#374151',
+                        border: '1px solid #d1d5db',
+                        borderRadius: 6,
+                        fontWeight: Number(estimatedDurationSeconds) === sec ? 700 : 500,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {sec / 60} min ({sec}s)
+                    </button>
+                  ))}
+                </div>
                 <button
                   type="button"
                   onClick={handleGenerateAIScript}
                   disabled={generating}
-                  style={{ backgroundColor: '#4f46e5', color: '#fff' }}
+                  style={{ backgroundColor: '#4f46e5', color: '#fff', padding: '10px 20px', fontSize: 14, fontWeight: 600 }}
                 >
-                  {generating ? 'Generando...' : '✨ Generar Guion Automático con IA'}
+                  {generating ? '✨ Consultando Base de Conocimiento y Generando...' : `✨ Generar Guion con IA (~${estimatedDurationSeconds} seg)`}
                 </button>
               </div>
             ) : (

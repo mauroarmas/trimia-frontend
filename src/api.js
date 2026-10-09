@@ -1089,11 +1089,12 @@ export function getPillAudioScript(token, pillId) {
   return request(`/training/pills/${pillId}/script`, { token });
 }
 
-/** Genera con IA el guion a 2 voces para una példora (supervisor). */
-export function generatePillAudioScript(token, pillId) {
+/** Genera con IA el guion a 2 voces para una píldora (supervisor). */
+export function generatePillAudioScript(token, pillId, targetDurationSeconds) {
   return request(`/training/pills/${pillId}/script`, {
     method: 'POST',
     token,
+    body: targetDurationSeconds ? { targetDurationSeconds: Number(targetDurationSeconds) } : {},
   });
 }
 
