@@ -70,9 +70,10 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
     setIsSpeaking(true);
 
     const voices = window.speechSynthesis.getVoices();
-    const esVoices = voices.filter((v) => v.lang.startsWith('es'));
+    const esVoices = voices.filter((v) => v.lang && v.lang.toLowerCase().startsWith('es'));
+    // Si la máquina no tiene paquete de idioma español instalado, usar las voces del sistema
     const voice1 = esVoices[0] || voices[0] || null;
-    const voice2 = esVoices.length > 1 ? esVoices[1] : (esVoices[0] || voices[0] || null);
+    const voice2 = esVoices.length > 1 ? esVoices[1] : (voices.length > 1 ? voices[1] : (esVoices[0] || voices[0] || null));
 
     let currentIndex = 0;
 
