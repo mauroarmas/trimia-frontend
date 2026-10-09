@@ -616,13 +616,49 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
               className="card"
               style={{
                 backgroundColor: 'var(--bg)',
-                whiteSpace: 'pre-wrap',
                 lineHeight: 1.6,
                 fontSize: 14,
                 marginBottom: 20,
               }}
             >
-              {pill.content}
+              {(pill.content || '').split('\n\n').map((block, bIdx) => {
+                const trimmed = block.trim();
+                if (trimmed.startsWith('### ')) {
+                  return (
+                    <h4
+                      key={bIdx}
+                      style={{
+                        margin: bIdx === 0 ? '0 0 8px' : '16px 0 8px',
+                        color: 'var(--text)',
+                        fontSize: 15,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {trimmed.replace(/^###\s+/, '')}
+                    </h4>
+                  );
+                }
+                if (trimmed.startsWith('## ')) {
+                  return (
+                    <h3
+                      key={bIdx}
+                      style={{
+                        margin: bIdx === 0 ? '0 0 8px' : '18px 0 8px',
+                        color: 'var(--text)',
+                        fontSize: 16,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {trimmed.replace(/^##\s+/, '')}
+                    </h3>
+                  );
+                }
+                return (
+                  <p key={bIdx} style={{ margin: '0 0 10px', whiteSpace: 'pre-line' }}>
+                    {trimmed}
+                  </p>
+                );
+              })}
             </div>
 
             {/* Cuestionario de Verificación */}
