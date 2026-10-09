@@ -24,6 +24,87 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
   const [showScript, setShowScript] = useState(false);
   const [scriptDialogue, setScriptDialogue] = useState(null);
   const [loadingScript, setLoadingScript] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  // Detener la síntesis de voz del navegador si se cierra el modal
+  useEffect(() => {
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const handleSpeakDialogue = async () => {
+    if (!('speechSynthesis' in window)) {
+      alert('Tu navegador no soporta síntesis de voz nativa.');
+      return;
+    }
+
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+
+    let dialogueLines = scriptDialogue;
+    if (!dialogueLines || dialogueLines.length === 0) {
+      setLoadingScript(true);
+      try {
+        const res = await getPillAudioScript(token, pillId);
+        dialogueLines = res?.dialogue || [];
+        setScriptDialogue(dialogueLines);
+      } catch {
+        dialogueLines = [];
+      } finally {
+        setLoadingScript(false);
+      }
+    }
+
+    if (!dialogueLines || dialogueLines.length === 0) {
+      alert('Esta píldora no tiene diálogo para narrar.');
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    setIsSpeaking(true);
+
+    const voices = window.speechSynthesis.getVoices();
+    const esVoices = voices.filter((v) => v.lang.startsWith('es'));
+    const voice1 = esVoices[0] || voices[0] || null;
+    const voice2 = esVoices.length > 1 ? esVoices[1] : (esVoices[0] || voices[0] || null);
+
+    let currentIndex = 0;
+
+    const speakNext = () => {
+      if (currentIndex >= dialogueLines.length) {
+        setIsSpeaking(false);
+        return;
+      }
+
+      const item = dialogueLines[currentIndex];
+      const isSpk1 = item.speaker === 'SPEAKER_1';
+      const utterance = new SpeechSynthesisUtterance(item.text);
+      utterance.lang = 'es-ES';
+      utterance.rate = 1.05;
+      utterance.pitch = isSpk1 ? 1.0 : 1.25; // Tono diferente para cada locutor
+      if (isSpk1 && voice1) utterance.voice = voice1;
+      if (!isSpk1 && voice2) utterance.voice = voice2;
+
+      utterance.onend = () => {
+        currentIndex++;
+        speakNext();
+      };
+
+      utterance.onerror = () => {
+        setIsSpeaking(false);
+      };
+
+      window.speechSynthesis.speak(utterance);
+    };
+
+    speakNext();
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -269,14 +350,31 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
                       </div>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleToggleScript}
-                    className="secondary"
-                    style={{ fontSize: 11, padding: '4px 10px' }}
-                  >
-                    {showScript ? 'Ocultar Transcripción' : '📜 Ver Transcripción'}
-                  </button>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={handleSpeakDialogue}
+                      style={{
+                        fontSize: 11,
+                        padding: '5px 12px',
+                        backgroundColor: isSpeaking ? '#dc2626' : '#4f46e5',
+                        borderColor: isSpeaking ? '#dc2626' : '#4f46e5',
+                        color: '#fff',
+                        fontWeight: 600,
+                      }}
+                      title="Sintetizar el diálogo a 2 voces utilizando las voces nativas del navegador"
+                    >
+                      {isSpeaking ? '⏹️ Detener Voces' : '🗣️ Narrar a 2 Voces'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleToggleScript}
+                      className="secondary"
+                      style={{ fontSize: 11, padding: '5px 10px' }}
+                    >
+                      {showScript ? 'Ocultar Transcripción' : '📜 Ver Transcripción'}
+                    </button>
+                  </div>
                 </div>
 
                 {/* HTML5 Audio Player */}
