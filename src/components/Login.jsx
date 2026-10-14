@@ -9,11 +9,26 @@ const TEST_USERS = [
   { label: 'Cobradora Controladora — Marisa Paz', email: 'marisa.paz@credimision.com' },
 ];
 
-export default function Login({ onLogin }) {
+function TrimiaBrand({ className }) {
+  return (
+    <div className={className} aria-hidden="true">
+      <svg className="login-brand-symbol" viewBox="0 0 300 300">
+        <path className="login-logo-piece login-logo-piece-orange" d="M18 47 82 12a17 17 0 0 1 21 3l42 42-55 53a17 17 0 0 1-22 1L15 75a17 17 0 0 1 3-28Z" />
+        <path className="login-logo-piece login-logo-piece-top" d="M126 12h151a12 12 0 0 1 9 20l-81 91a17 17 0 0 1-25 0l-64-73a23 23 0 0 1 10-38Z" />
+        <path className="login-logo-piece login-logo-piece-left" d="M93 136a16 16 0 0 1 27-12l20 20v119a13 13 0 0 1-22 9l-28-30a25 25 0 0 1-7-18v-71a25 25 0 0 1 10-17Z" />
+        <path className="login-logo-piece login-logo-piece-right" d="M157 150l22-22a16 16 0 0 1 27 12v92a25 25 0 0 1-8 18l-27 25a13 13 0 0 1-22-10V150Z" />
+      </svg>
+      <p className="login-brand-name"><span>Trim</span><span>IA</span></p>
+    </div>
+  );
+}
+
+export default function Login({ onLogin, showIntro = false }) {
   const [email, setEmail] = useState('diego.bazan@credimision.com');
   const [password, setPassword] = useState('trimia2026');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showEntryAnimation, setShowEntryAnimation] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -22,6 +37,10 @@ export default function Login({ onLogin }) {
     try {
       const { accessToken } = await login(email, password);
       const user = await getMe(accessToken);
+      setShowEntryAnimation(true);
+      if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1800));
+      }
       onLogin(accessToken, user);
     } catch (err) {
       setError(err.message);
@@ -36,30 +55,18 @@ export default function Login({ onLogin }) {
   }
 
   return (
-    <main className="login-page">
-      <div className="login-background-orb login-background-orb-primary" aria-hidden="true" />
-      <div className="login-background-orb login-background-orb-secondary" aria-hidden="true" />
-      <section className="login-card">
-        <div className="login-brand-panel">
-          <img src="/logo.png" alt="TrimIA" className="login-logo" />
-          <div>
-            <p className="login-eyebrow">Portal de Gestión</p>
-            <h1>Todo tu equipo, en un solo lugar.</h1>
-            <p className="login-brand-description">
-              Asistencia inteligente para la operación diaria de Credimisión.
-            </p>
-          </div>
-          <div className="login-brand-decoration" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </div>
+    <main className={`login-page${showIntro ? ' login-page-with-intro' : ''}`}>
+      {showIntro && <TrimiaBrand className="login-intro-brand" />}
+      {showEntryAnimation && (
+        <div className="login-entry-overlay" role="status" aria-label="Ingresando a TrimIA">
+          <TrimiaBrand className="login-entry-brand" />
         </div>
-
+      )}
+      <section className="login-card">
         <div className="login-form-panel">
+          <img src="/logo.png" alt="TrimIA" className="login-logo" />
           <div className="login-heading">
             <h2>Iniciar sesión</h2>
-            <p>Ingresá con tu cuenta para continuar.</p>
           </div>
           <form onSubmit={handleSubmit}>
             <div className="field">
@@ -88,8 +95,8 @@ export default function Login({ onLogin }) {
           </form>
           {error && <p className="error login-error">{error}</p>}
 
-          <div className="login-test-users">
-            <div className="login-test-users-heading">Acceso rápido de prueba</div>
+          <details className="login-test-users">
+            <summary>Accesos de prueba</summary>
             <div className="login-test-users-grid">
               {TEST_USERS.map((u) => (
                 <button
@@ -105,7 +112,7 @@ export default function Login({ onLogin }) {
             <p className="login-test-users-hint">
               Seleccioná un perfil para completar el email. Contraseña: <b>trimia2026</b>
             </p>
-          </div>
+          </details>
         </div>
       </section>
     </main>

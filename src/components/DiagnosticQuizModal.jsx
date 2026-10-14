@@ -90,8 +90,8 @@ export default function DiagnosticQuizModal({ token, onClose, onComplete }) {
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content" style={{ maxWidth: 640 }}>
+    <div className="modal-overlay diagnostic-quiz-overlay">
+      <div className="modal-content diagnostic-quiz-modal">
         {loading && (
           <div style={{ textAlign: 'center', padding: '30px 0' }}>
             <p>Cargando evaluación diagnóstica inicial...</p>
@@ -132,28 +132,21 @@ export default function DiagnosticQuizModal({ token, onClose, onComplete }) {
                 </div>
               </div>
             ) : (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div className="diagnostic-quiz-content">
+                <div className="diagnostic-quiz-header">
                   <div>
-                    <h3 style={{ margin: 0 }}>Evaluación Diagnóstica Inicial</h3>
-                    <span className="msg-time">Pregunta {currentIndex + 1} de {questions.length}</span>
+                    <h3>Evaluación Diagnóstica Inicial</h3>
+                    <span className="diagnostic-quiz-counter">Pregunta {currentIndex + 1} de {questions.length}</span>
                   </div>
                   <div
-                    style={{
-                      fontWeight: 'bold',
-                      fontSize: 16,
-                      color: secondsRemaining < 60 ? 'var(--danger)' : 'var(--text)',
-                      backgroundColor: 'var(--bg)',
-                      padding: '4px 10px',
-                      borderRadius: 6,
-                    }}
+                    className={`diagnostic-quiz-timer${secondsRemaining < 60 ? ' is-warning' : ''}`}
                   >
                     ⏱ {formatTimer(secondsRemaining)}
                   </div>
                 </div>
 
                 {/* Barra de progreso */}
-                <div style={{ width: '100%', height: 6, backgroundColor: 'var(--border)', borderRadius: 3, marginBottom: 18 }}>
+                <div className="diagnostic-quiz-progress">
                   <div
                     style={{
                       width: `${((currentIndex + 1) / questions.length) * 100}%`,
@@ -166,36 +159,26 @@ export default function DiagnosticQuizModal({ token, onClose, onComplete }) {
                 </div>
 
                 {/* Pregunta Actual */}
-                <div className="card" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--border)' }}>
-                  <div style={{ marginBottom: 8 }}>
-                    <span className="badge" style={{ marginRight: 6 }}>{currentQ.moduleTitle}</span>
-                    <span className="msg-time">{currentQ.pillTitle}</span>
+                <div className="card diagnostic-question-card">
+                  <div className="diagnostic-question-meta">
+                    <span className="badge">{currentQ.moduleTitle}</span>
+                    <span className="diagnostic-question-pill">{currentQ.pillTitle}</span>
                   </div>
-                  <h4 style={{ fontSize: 16, marginBottom: 16 }}>{currentQ.question}</h4>
+                  <h4 className="diagnostic-question-title">{currentQ.question}</h4>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div className="diagnostic-options">
                     {currentQ.options.map((option, idx) => {
                       const isSelected = selectedAnswers[currentQ.questionId] === idx;
                       return (
                         <label
                           key={idx}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '10px 14px',
-                            borderRadius: 6,
-                            backgroundColor: isSelected ? 'var(--surface)' : 'var(--surface)',
-                            border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border)',
-                            cursor: 'pointer',
-                            fontWeight: isSelected ? 600 : 'normal',
-                          }}
+                          className={`diagnostic-option${isSelected ? ' is-selected' : ''}`}
                         >
                           <input
                             type="radio"
                             name={`q_${currentQ.questionId}`}
                             checked={isSelected}
                             onChange={() => handleSelectOption(currentQ.questionId, idx)}
-                            style={{ width: 'auto', marginRight: 12 }}
                           />
                           <span>{option}</span>
                         </label>
@@ -205,7 +188,7 @@ export default function DiagnosticQuizModal({ token, onClose, onComplete }) {
                 </div>
 
                 {/* Navegación y Finalización */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 18 }}>
+                <div className="diagnostic-quiz-navigation">
                   <button
                     className="secondary"
                     disabled={currentIndex === 0}
@@ -214,7 +197,7 @@ export default function DiagnosticQuizModal({ token, onClose, onComplete }) {
                     ← Anterior
                   </button>
 
-                  <div style={{ display: 'flex', gap: 8 }}>
+                  <div>
                     {currentIndex < questions.length - 1 ? (
                       <button
                         onClick={() => setCurrentIndex((prev) => prev + 1)}

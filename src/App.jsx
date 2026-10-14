@@ -109,12 +109,28 @@ const SALES_TABS = [
 export default function App() {
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
+  const [showLogoutIntro, setShowLogoutIntro] = useState(false);
   const [tab, setTab] = useState('escalations');
   const [interviewStart, setInterviewStart] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
+  function handleLogout() {
+    setShowLogoutIntro(true);
+    setToken(null);
+    setUser(null);
+  }
+
   if (!token) {
-    return <Login onLogin={(t, u) => { setToken(t); setUser(u); }} />;
+    return (
+      <Login
+        showIntro={showLogoutIntro}
+        onLogin={(t, u) => {
+          setShowLogoutIntro(false);
+          setToken(t);
+          setUser(u);
+        }}
+      />
+    );
   }
 
   const isSupervisor = user.role === 'SUPERVISOR';
@@ -127,7 +143,7 @@ export default function App() {
         <div className="card">
           <p>Logueado como {user.email} ({user.role}).</p>
           <p>El acceso requiere rol SUPERVISOR, o sector Cobranzas o Ventas.</p>
-          <button onClick={() => { setToken(null); setUser(null); }}>Salir</button>
+          <button onClick={handleLogout}>Salir</button>
         </div>
       </div>
     );
@@ -176,6 +192,11 @@ export default function App() {
             <path
               className="sidebar-toggle-outline"
               d="M1 1L25 31L1 61Z"
+              stroke="none"
+            />
+            <path
+              className="sidebar-toggle-outline-edge"
+              d="M1 1L25 31L1 61"
             />
             <path
               className="sidebar-toggle-arrow"
@@ -205,7 +226,7 @@ export default function App() {
             <button
               className="btn-logout-icon"
               title="Cerrar sesión"
-              onClick={() => { setToken(null); setUser(null); }}
+              onClick={handleLogout}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

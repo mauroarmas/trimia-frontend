@@ -163,26 +163,21 @@ export default function TrainingPanel({ token, me }) {
   const anyExempted = modules.some((m) =>
     m.pills?.some((p) => p.isExempted || p.status === 'EXEMPTED_BY_DIAGNOSTIC')
   );
+  const progressPercent = totalPills > 0
+    ? Math.round((completedOrExemptedPills / totalPills) * 100)
+    : 0;
 
   return (
-    <div>
+    <div className="training-panel">
       {/* Top Banner de Diagnóstico Inicial */}
-      <div
-        className="card"
-        style={{
-          background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)',
-          color: '#ffffff',
-          padding: '20px 24px',
-          marginBottom: 20,
-          borderRadius: 10,
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+      <div className="card training-diagnostic-banner">
+        <div className="training-diagnostic-layout">
           <div>
-            <h2 style={{ color: '#ffffff', margin: '0 0 6px', fontSize: 18 }}>
-              🎯 Evaluación Diagnóstica Inicial y Nivelación
+            <span className="training-diagnostic-kicker">Evaluación inicial</span>
+            <h2 className="training-diagnostic-title">
+              Evaluación Diagnóstica Inicial y Nivelación
             </h2>
-            <p style={{ margin: 0, opacity: 0.9, fontSize: 13, maxWidth: 640 }}>
+            <p className="training-diagnostic-description">
               Evalúa tus conocimientos previos en un test dinámico de 5 minutos. Si obtienes el 100% en los temas de un módulo,
               quedarás automáticamente eximido para avanzar más rápido en tu ruta formativa.
             </p>
@@ -190,17 +185,9 @@ export default function TrainingPanel({ token, me }) {
           <div>
             <button
               onClick={() => setShowDiagnostic(true)}
-              style={{
-                backgroundColor: '#ffffff',
-                color: '#4f46e5',
-                border: 'none',
-                fontWeight: 700,
-                padding: '10px 18px',
-                borderRadius: 6,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-              }}
+              className="training-diagnostic-action"
             >
-              Rendir Diagnóstico Inicial
+              Rendir Diagnóstico Inicial <span aria-hidden="true">↗</span>
             </button>
           </div>
         </div>
@@ -228,24 +215,21 @@ export default function TrainingPanel({ token, me }) {
 
       {/* VISTA 1: Ruta de Aprendizaje del Empleado */}
       {!supervisorTab && (
-        <div>
+        <div className="training-path">
           {/* Barra de progreso global */}
-          <div className="card" style={{ marginBottom: 18 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div className="card training-progress-card" style={{ marginBottom: 18 }}>
+            <div className="training-progress-heading">
               <span style={{ fontWeight: 600 }}>Progreso General de Capacitación</span>
-              <span className="hint">
+              <span className="hint training-progress-stat">
                 {completedOrExemptedPills} de {totalPills} lecciones completadas
-                {totalPills > 0 ? ` (${Math.round((completedOrExemptedPills / totalPills) * 100)}%)` : ''}
+                {totalPills > 0 && <strong>{progressPercent}%</strong>}
               </span>
             </div>
-            <div style={{ width: '100%', height: 8, backgroundColor: 'var(--border)', borderRadius: 4 }}>
+            <div className="training-progress-track">
               <div
+                className="training-progress-fill"
                 style={{
                   width: totalPills > 0 ? `${(completedOrExemptedPills / totalPills) * 100}%` : '0%',
-                  height: '100%',
-                  backgroundColor: 'var(--success)',
-                  borderRadius: 4,
-                  transition: 'width 0.3s',
                 }}
               />
             </div>
@@ -266,68 +250,53 @@ export default function TrainingPanel({ token, me }) {
           )}
 
           {/* Módulos */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="training-module-list">
             {modules.map((m, mIdx) => (
-              <div key={m.id} className="card">
-                <div style={{ marginBottom: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span className="badge">Módulo {mIdx + 1}</span>
-                    <h3 style={{ margin: 0, color: 'var(--text)', fontSize: 16 }}>{m.title}</h3>
+              <div key={m.id} className="card training-module-card">
+                <div className="training-module-heading">
+                  <div className="training-module-title-row">
+                    <div className="training-module-title-copy">
+                      <span className="training-module-kicker">Módulo {mIdx + 1}</span>
+                      <h3>{m.title}</h3>
+                    </div>
+                    <span className="training-module-count">{m.pills?.length || 0} temas</span>
                   </div>
-                  {m.description && <p className="hint" style={{ marginTop: 4 }}>{m.description}</p>}
+                  {m.description && <p className="hint training-module-description">{m.description}</p>}
                 </div>
 
                 {/* Lista de Píldoras del Módulo */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div className="training-lesson-list">
                   {m.pills?.map((p, pIdx) => {
                     const isExempt = p.isExempted || p.status === 'EXEMPTED_BY_DIAGNOSTIC';
                     const isLocked = p.isLocked;
+                    const lessonClassName = [
+                      'training-lesson-card',
+                      isLocked && 'is-locked',
+                      isExempt && 'is-exempt',
+                      !isExempt && p.isCompleted && 'is-completed',
+                    ].filter(Boolean).join(' ');
 
                     return (
                       <div
                         key={p.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '10px 14px',
-                          borderRadius: 6,
-                          backgroundColor: isLocked ? 'var(--bg)' : 'var(--surface)',
-                          border: isExempt
-                            ? '1px solid var(--success)'
-                            : isLocked
-                            ? '1px solid var(--border)'
-                            : '1px solid var(--primary)',
-                          opacity: isLocked ? 0.65 : 1,
-                        }}
+                        className={lessonClassName}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <span style={{ fontSize: 18 }}>
+                        <div className="training-lesson-info">
+                          <span className="training-lesson-icon">
                             {isLocked ? '🔒' : isExempt ? '🌟' : p.isCompleted ? '✅' : '📖'}
                           </span>
-                          <div>
-                            <strong style={{ fontSize: 14 }}>
+                          <div className="training-lesson-copy">
+                            <span className={`training-lesson-status${isExempt || p.isCompleted ? ' is-complete' : isLocked ? ' is-locked' : ''}`}>
+                              {isLocked ? 'Bloqueada' : isExempt ? 'Eximido por diagnóstico' : p.isCompleted ? 'Completado' : 'Pendiente'}
+                            </span>
+                            <strong className="training-lesson-title">
                               {pIdx + 1}. {p.title}
                             </strong>
-                            <div className="msg-time">{p.objective}</div>
+                            <div className="msg-time training-lesson-objective">{p.objective}</div>
                           </div>
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          {isExempt && (
-                            <span
-                              className="badge"
-                              style={{ backgroundColor: 'var(--success-bg)', color: 'var(--success)', border: '1px solid var(--success)' }}
-                            >
-                              Eximido por diagnóstico
-                            </span>
-                          )}
-                          {!isExempt && p.isCompleted && (
-                            <span className="badge" style={{ backgroundColor: 'var(--success)', color: '#fff' }}>
-                              Completado
-                            </span>
-                          )}
-
+                        <div className="training-lesson-actions">
                           {isLocked ? (
                             <button className="secondary" disabled style={{ padding: '4px 10px', fontSize: 12 }}>
                               Bloqueada
@@ -335,31 +304,23 @@ export default function TrainingPanel({ token, me }) {
                           ) : (
                             <>
                               <button
+                                className={`training-lesson-primary${isExempt || p.isCompleted ? ' is-review' : ''}`}
                                 onClick={() => setActivePillId(p.id)}
-                                style={{
-                                  padding: '4px 10px',
-                                  fontSize: 12,
-                                  backgroundColor: isExempt ? 'var(--surface)' : 'var(--primary)',
-                                  color: isExempt ? 'var(--success)' : '#fff',
-                                  borderColor: isExempt ? 'var(--success)' : 'var(--primary)',
-                                }}
                               >
                                 {isExempt ? 'Repasar Lección' : p.isCompleted ? 'Revisar' : 'Comenzar'}
                               </button>
                               <button
                                 type="button"
-                                className="secondary"
+                                className="secondary training-simulation-button"
                                 onClick={() => setSimulationConfig({ pill: p, mode: 'GUIDED' })}
-                                style={{ padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}
                                 title="Iniciar práctica guiada con cliente simulado y objetivos pedagógicos en vivo"
                               >
                                 🧭 Práctica Guiada
                               </button>
                               <button
                                 type="button"
-                                className="secondary"
+                                className="secondary training-simulation-button"
                                 onClick={() => setSimulationConfig({ pill: p, mode: 'FREE' })}
-                                style={{ padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}
                                 title="Iniciar simulación libre de interacción real sin ayudas en vivo"
                               >
                                 🎭 Simulación Libre
@@ -379,12 +340,12 @@ export default function TrainingPanel({ token, me }) {
 
       {/* VISTA 2: Panel del Supervisor (Creación y Publicación de Módulos) */}
       {isSupervisor && supervisorTab && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Crear Módulo */}
-          <div className="card">
-            <h3>Nuevo Módulo Formativo</h3>
-            <form onSubmit={handleCreateModule} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div>
+        <div className="training-supervisor-view">
+          <div className="training-supervisor-forms">
+            <section className="card training-admin-card training-create-card">
+              <h3 className="training-admin-title">Nuevo Módulo Formativo</h3>
+              <form onSubmit={handleCreateModule} className="training-admin-form">
+                <div className="training-admin-field">
                 <label>Título del Módulo</label>
                 <input
                   type="text"
@@ -393,8 +354,8 @@ export default function TrainingPanel({ token, me }) {
                   onChange={(e) => setNewModuleTitle(e.target.value)}
                   required
                 />
-              </div>
-              <div>
+                </div>
+                <div className="training-admin-field">
                 <label>Descripción</label>
                 <textarea
                   rows={2}
@@ -402,128 +363,107 @@ export default function TrainingPanel({ token, me }) {
                   value={newModuleDesc}
                   onChange={(e) => setNewModuleDesc(e.target.value)}
                 />
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <button type="submit" disabled={creatingModule || !newModuleTitle.trim()}>
+                </div>
+                <div className="training-form-actions">
+                  <button type="submit" disabled={creatingModule || !newModuleTitle.trim()}>
                   {creatingModule ? 'Creando...' : 'Crear Módulo'}
-                </button>
-              </div>
-            </form>
-          </div>
+                  </button>
+                </div>
+              </form>
+            </section>
 
-          {/* Generar Píldora con IA */}
-          <div className="card">
-            <h3>Generar Píldora con IA (ElevenLabs / Gemini)</h3>
-            <p className="hint">
-              TrimIA utiliza la base de conocimiento y los casos reales del sector para redactar el contenido teórico y su cuestionario pedagógico.
-            </p>
-            {genNotice && (
-              <div style={{ padding: '8px 12px', backgroundColor: 'var(--success-bg)', color: 'var(--success)', borderRadius: 6, marginBottom: 12 }}>
-                ✓ {genNotice}
+            <section className="card training-admin-card training-generate-card">
+              <div className="training-admin-heading">
+                <div>
+                  <h3 className="training-admin-title">Generar Píldora con IA</h3>
+                  <span className="training-admin-subtitle">(ElevenLabs / Gemini)</span>
+                </div>
+                <span className="training-ai-mark" aria-hidden="true">✣</span>
               </div>
-            )}
-            <form onSubmit={handleGeneratePill} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div>
-                <label>Módulo de Destino</label>
-                <select value={genModuleId} onChange={(e) => setGenModuleId(e.target.value)}>
-                  {supervisorModules.map((m) => (
-                    <option key={m.id} value={m.id}>{m.title}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label>Objetivo Pedagógico / Tema</label>
-                <input
-                  type="text"
-                  placeholder="Ej: Explicar cómo negociar un plan de cuotas escalonado cuando el cliente aduce desempleo temporal"
-                  value={genObjective}
-                  onChange={(e) => setGenObjective(e.target.value)}
-                  required
-                />
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <button type="submit" disabled={generatingPill || !genObjective.trim()}>
-                  {generatingPill ? 'Generando con IA...' : '✨ Generar Píldora con IA'}
-                </button>
-              </div>
-            </form>
+              <p className="hint training-generation-note">
+                TrimIA utiliza la base de conocimiento y los casos reales del sector para redactar el contenido teórico y su cuestionario pedagógico.
+              </p>
+              {genNotice && (
+                <div className="training-generation-notice">✓ {genNotice}</div>
+              )}
+              <form onSubmit={handleGeneratePill} className="training-admin-form">
+                <div className="training-admin-field">
+                  <label>Módulo de Destino</label>
+                  <select value={genModuleId} onChange={(e) => setGenModuleId(e.target.value)}>
+                    {supervisorModules.map((m) => (
+                      <option key={m.id} value={m.id}>{m.title}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="training-admin-field">
+                  <label>Objetivo Pedagógico / Tema</label>
+                  <input
+                    type="text"
+                    placeholder="Ej: Explicar cómo negociar un plan de cuotas escalonado cuando el cliente aduce desempleo temporal"
+                    value={genObjective}
+                    onChange={(e) => setGenObjective(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="training-form-actions">
+                  <button type="submit" disabled={generatingPill || !genObjective.trim()}>
+                    {generatingPill ? 'Generando con IA...' : '✨ Generar Píldora con IA'}
+                  </button>
+                </div>
+              </form>
+            </section>
           </div>
 
           {/* Listado de Módulos y Píldoras del Supervisor */}
-          <div className="card">
-            <h3>Módulos de tu Sector y Estado de Píldoras</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 12 }}>
+          <section className="training-supervisor-modules">
+            <h3 className="training-supervisor-section-title">Módulos de tu Sector y Estado de Píldoras</h3>
+            <div className="training-supervisor-module-list">
               {supervisorModules.map((m) => (
-                <div key={m.id} style={{ border: '1px solid var(--border)', borderRadius: 6, padding: 12 }}>
-                  <strong>{m.title}</strong>
-                  <span className="msg-time" style={{ marginLeft: 8 }}>({m.pills?.length || 0} píldoras)</span>
+                <article key={m.id} className="card training-supervisor-module">
+                  <div className="training-supervisor-module-heading">
+                    <div>
+                      <span className="training-module-kicker">Módulo de capacitación</span>
+                      <h4>{m.title}</h4>
+                    </div>
+                    <span className="training-supervisor-module-count">{m.pills?.length || 0} píldoras</span>
+                  </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+                  <div className="training-supervisor-pill-list">
                     {m.pills?.map((p) => (
-                      <div
-                        key={p.id}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          padding: '6px 10px',
-                          backgroundColor: 'var(--bg)',
-                          borderRadius: 4,
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span>{p.title}</span>
-                          <span
-                            className="badge"
-                            style={{
-                              marginLeft: 6,
-                              backgroundColor: p.status === 'PUBLISHED' ? 'var(--success)' : 'var(--text-muted)',
-                              color: '#fff',
-                            }}
-                          >
-                            {p.status}
-                          </span>
-
-                          {/* Audio Status Badge */}
-                          {p.audioStatus && p.audioStatus !== 'NOT_REQUESTED' && (
-                            <span
-                              className="badge"
-                              title={p.audioError || undefined}
-                              style={{
-                                fontSize: 10,
-                                backgroundColor:
-                                  p.audioStatus === 'AUDIO_READY'
-                                    ? '#059669'
-                                    : p.audioStatus === 'AUDIO_FAILED'
-                                    ? '#dc2626'
-                                    : p.audioStatus === 'AUDIO_GENERATING' || p.audioStatus === 'AUDIO_PENDING'
-                                    ? '#d97706'
-                                    : '#4b5563',
-                                color: '#fff',
-                              }}
-                            >
-                              {p.audioStatus === 'AUDIO_READY' && '🎧 Audio Listo'}
-                              {p.audioStatus === 'AUDIO_GENERATING' && '⏳ Sintetizando...'}
-                              {p.audioStatus === 'AUDIO_PENDING' && '⏱️ En Cola'}
-                              {p.audioStatus === 'AUDIO_FAILED' && '⚠️ Audio Falló'}
-                              {p.audioStatus === 'SCRIPT_GENERATED' && '📝 Guion Creado'}
+                      <div key={p.id} className="training-supervisor-pill">
+                        <span className="training-supervisor-pill-icon" aria-hidden="true">
+                          {p.audioStatus === 'AUDIO_READY' ? '♬' : '▤'}
+                        </span>
+                        <div className="training-supervisor-pill-info">
+                          <strong className="training-supervisor-pill-title">{p.title}</strong>
+                          <div className="training-supervisor-pill-statuses">
+                            <span className={`training-admin-status${p.status === 'PUBLISHED' ? ' is-published' : ''}`}>
+                              {p.status}
                             </span>
-                          )}
+
+                            {/* Audio Status Badge */}
+                            {p.audioStatus && p.audioStatus !== 'NOT_REQUESTED' && (
+                              <span
+                                className={`training-admin-audio-status is-${p.audioStatus.toLowerCase().replaceAll('_', '-')}`}
+                                title={p.audioError || undefined}
+                              >
+                                {p.audioStatus === 'AUDIO_READY' && '🎧 Audio Listo'}
+                                {p.audioStatus === 'AUDIO_GENERATING' && '⏳ Sintetizando...'}
+                                {p.audioStatus === 'AUDIO_PENDING' && '⏱️ En Cola'}
+                                {p.audioStatus === 'AUDIO_FAILED' && '⚠️ Audio Falló'}
+                                {p.audioStatus === 'SCRIPT_GENERATED' && '📝 Guion Creado'}
+                              </span>
+                            )}
+                          </div>
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div className="training-supervisor-pill-actions">
                           {/* Botón Reintentar si falló la síntesis */}
                           {p.audioStatus === 'AUDIO_FAILED' && (
                             <button
                               onClick={() => handleRetryAudio(p.id)}
                               disabled={retryingAudioPillId === p.id}
-                              style={{
-                                padding: '3px 8px',
-                                fontSize: 11,
-                                backgroundColor: '#dc2626',
-                                borderColor: '#dc2626',
-                                color: '#fff',
-                              }}
+                              className="training-audio-retry"
                               title="Reintentar síntesis de voz en BullMQ"
                             >
                               {retryingAudioPillId === p.id ? 'Reintentando...' : '🔄 Reintentar Audio'}
@@ -533,8 +473,7 @@ export default function TrainingPanel({ token, me }) {
                           {/* Botón Abrir Guion / Síntesis */}
                           <button
                             onClick={() => setScriptModalPill(p)}
-                            className="secondary"
-                            style={{ padding: '3px 8px', fontSize: 11 }}
+                            className="secondary training-script-button"
                             title="Ver o editar guion a 2 voces y sintetizar audio"
                           >
                             🎙️ Guion & Audio
@@ -543,12 +482,7 @@ export default function TrainingPanel({ token, me }) {
                           {p.status === 'DRAFT' && (
                             <button
                               onClick={() => handlePublishPill(p.id)}
-                              style={{
-                                padding: '3px 8px',
-                                fontSize: 11,
-                                backgroundColor: 'var(--success)',
-                                borderColor: 'var(--success)',
-                              }}
+                              className="training-publish-button"
                             >
                               Publicar
                             </button>
@@ -557,10 +491,10 @@ export default function TrainingPanel({ token, me }) {
                       </div>
                     ))}
                   </div>
-                </div>
+                </article>
               ))}
             </div>
-          </div>
+          </section>
         </div>
       )}
 
