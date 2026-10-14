@@ -5,7 +5,17 @@ import {
   concludeSimulation,
 } from '../api';
 
-export default function SimulationModal({ token, pill, mode = 'GUIDED', onClose, onCompleted }) {
+export default function SimulationModal({
+  token,
+  pill,
+  pillId,
+  pillTitle,
+  mode = 'GUIDED',
+  onClose,
+  onCompleted,
+}) {
+  const currentPillId = pill?.id || pillId;
+  const currentPillTitle = pill?.title || pillTitle || 'Práctica Pedagógica';
   const [session, setSession] = useState(null);
   const [messages, setMessages] = useState([]);
   const [goals, setGoals] = useState([]);
@@ -29,7 +39,11 @@ export default function SimulationModal({ token, pill, mode = 'GUIDED', onClose,
       setLoading(true);
       setError('');
       try {
-        const data = await startSimulation(token, pill.id, mode);
+        if (!currentPillId) {
+          if (isMounted) setError('No se especificó la lección formativa.');
+          return;
+        }
+        const data = await startSimulation(token, currentPillId, mode);
         if (isMounted) {
           setSession(data);
           setMessages(data.messages || []);
@@ -44,7 +58,7 @@ export default function SimulationModal({ token, pill, mode = 'GUIDED', onClose,
     }
     init();
     return () => { isMounted = false; };
-  }, [token, pill.id, mode]);
+  }, [token, currentPillId, mode]);
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -149,7 +163,7 @@ export default function SimulationModal({ token, pill, mode = 'GUIDED', onClose,
                 {mode === 'GUIDED' ? '🧭' : '🎭'}
               </span>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0f172a' }}>
-                {mode === 'GUIDED' ? 'Práctica Guiada' : 'Simulación Libre'} — {pill.title}
+                {mode === 'GUIDED' ? 'Práctica Guiada' : 'Simulación Libre'} — {currentPillTitle}
               </h3>
               <span
                 style={{
@@ -512,3 +526,4 @@ export default function SimulationModal({ token, pill, mode = 'GUIDED', onClose,
     </div>
   );
 }
+

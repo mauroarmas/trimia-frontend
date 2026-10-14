@@ -347,17 +347,19 @@ export default function TrainingPanel({ token, me }) {
                                 {isExempt ? 'Repasar Lección' : p.isCompleted ? 'Revisar' : 'Comenzar'}
                               </button>
                               <button
+                                type="button"
                                 className="secondary"
                                 onClick={() => setSimulationConfig({ pill: p, mode: 'GUIDED' })}
-                                style={{ padding: '4px 10px', fontSize: 12 }}
+                                style={{ padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}
                                 title="Iniciar práctica guiada con cliente simulado y objetivos pedagógicos en vivo"
                               >
                                 🧭 Práctica Guiada
                               </button>
                               <button
+                                type="button"
                                 className="secondary"
                                 onClick={() => setSimulationConfig({ pill: p, mode: 'FREE' })}
-                                style={{ padding: '4px 10px', fontSize: 12 }}
+                                style={{ padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}
                                 title="Iniciar simulación libre de interacción real sin ayudas en vivo"
                               >
                                 🎭 Simulación Libre
@@ -598,8 +600,9 @@ export default function TrainingPanel({ token, me }) {
       {simulationConfig && (
         <SimulationModal
           token={token}
-          pillId={simulationConfig.pill.id}
-          pillTitle={simulationConfig.pill.title}
+          pill={simulationConfig.pill}
+          pillId={simulationConfig.pill?.id}
+          pillTitle={simulationConfig.pill?.title}
           mode={simulationConfig.mode}
           onClose={() => setSimulationConfig(null)}
           onCompleted={() => {

@@ -149,21 +149,6 @@ export default function App() {
       <aside className="app-sidebar">
         <div className="sidebar-header">
           <img src="/logo.png" alt="TrimIA" className="sidebar-logo" />
-          <button
-            type="button"
-            className="sidebar-toggle"
-            aria-label={sidebarCollapsed ? 'Expandir menú' : 'Contraer menú'}
-            title={sidebarCollapsed ? 'Expandir menú' : 'Contraer menú'}
-            onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d={sidebarCollapsed ? 'M9 18l6-6-6-6' : 'M15 18l-6-6 6-6'}
-              />
-            </svg>
-          </button>
         </div>
 
         <nav className="sidebar-nav">
@@ -179,6 +164,27 @@ export default function App() {
             </button>
           ))}
         </nav>
+
+        <button
+          type="button"
+          className="sidebar-toggle"
+          aria-label={sidebarCollapsed ? 'Expandir menú' : 'Contraer menú'}
+          title={sidebarCollapsed ? 'Expandir menú' : 'Contraer menú'}
+          onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+        >
+          <svg viewBox="0 0 26 62" fill="none" aria-hidden="true">
+            <path
+              className="sidebar-toggle-outline"
+              d="M1 1L25 31L1 61Z"
+            />
+            <path
+              className="sidebar-toggle-arrow"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d={sidebarCollapsed ? 'M10 25l6 6-6 6' : 'M16 25l-6 6 6 6'}
+            />
+          </svg>
+        </button>
 
         {/* Perfil de Usuario Inferior */}
         <div className="sidebar-user-card">

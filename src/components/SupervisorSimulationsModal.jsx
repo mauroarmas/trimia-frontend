@@ -69,7 +69,7 @@ export default function SupervisorSimulationsModal({ token, employeeId, employee
             <div style={{ overflowY: 'auto', borderRight: '1px solid var(--border)', paddingRight: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {simulations.map((sim) => {
                 const isSelected = selectedSimulation?.id === sim.id;
-                const bandStyle = getBandBadge(sim.feedback?.overallBand);
+                const bandStyle = getBandBadge(sim.feedback?.band || sim.feedback?.overallBand);
 
                 return (
                   <div
@@ -140,7 +140,7 @@ export default function SupervisorSimulationsModal({ token, employeeId, employee
                     {selectedSimulation.feedback && (
                       <div>
                         {(() => {
-                          const b = getBandBadge(selectedSimulation.feedback.overallBand);
+                          const b = getBandBadge(selectedSimulation.feedback.band || selectedSimulation.feedback.overallBand);
                           return (
                             <span
                               className="badge"
@@ -183,7 +183,7 @@ export default function SupervisorSimulationsModal({ token, employeeId, employee
                           💡 Oportunidades de mejora
                         </div>
                         <p style={{ margin: 0, fontSize: 12, lineHeight: 1.45, color: 'var(--text)' }}>
-                          {selectedSimulation.feedback.whatToImprove}
+                          {selectedSimulation.feedback.toImprove || selectedSimulation.feedback.whatToImprove}
                         </p>
                       </div>
 
@@ -192,7 +192,7 @@ export default function SupervisorSimulationsModal({ token, employeeId, employee
                           📋 Reglas del negocio
                         </div>
                         <p style={{ margin: 0, fontSize: 12, lineHeight: 1.45, color: 'var(--text)' }}>
-                          {selectedSimulation.feedback.businessRulesCompliance}
+                          {selectedSimulation.feedback.businessRules || selectedSimulation.feedback.businessRulesCompliance}
                         </p>
                       </div>
                     </div>
@@ -213,14 +213,14 @@ export default function SupervisorSimulationsModal({ token, employeeId, employee
                             gap: 8,
                             padding: '6px 8px',
                             borderRadius: 4,
-                            backgroundColor: g.isAchieved ? '#f0fdf4' : 'var(--bg)',
-                            border: g.isAchieved ? '1px solid #bbf7d0' : '1px solid var(--border)',
+                            backgroundColor: (g.isCompleted !== undefined ? g.isCompleted : g.isAchieved) ? '#f0fdf4' : 'var(--bg)',
+                            border: (g.isCompleted !== undefined ? g.isCompleted : g.isAchieved) ? '1px solid #bbf7d0' : '1px solid var(--border)',
                           }}
                         >
-                          <span style={{ fontSize: 14 }}>{g.isAchieved ? '✅' : '⏳'}</span>
+                          <span style={{ fontSize: 14 }}>{(g.isCompleted !== undefined ? g.isCompleted : g.isAchieved) ? '✅' : '⏳'}</span>
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 12, fontWeight: g.isAchieved ? 600 : 400, color: g.isAchieved ? '#166534' : 'var(--text)' }}>
-                              {g.objective}
+                            <div style={{ fontSize: 12, fontWeight: (g.isCompleted !== undefined ? g.isCompleted : g.isAchieved) ? 600 : 400, color: (g.isCompleted !== undefined ? g.isCompleted : g.isAchieved) ? '#166534' : 'var(--text)' }}>
+                              {g.description || g.objective}
                             </div>
                             {g.evaluationNotes && (
                               <div style={{ fontSize: 11, color: '#65a30d', fontStyle: 'italic', marginTop: 2 }}>
@@ -282,3 +282,4 @@ export default function SupervisorSimulationsModal({ token, employeeId, employee
     </div>
   );
 }
+
