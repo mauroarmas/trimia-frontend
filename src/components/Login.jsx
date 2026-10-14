@@ -56,6 +56,12 @@ export default function Login({ onLogin, showIntro = false }) {
 
   return (
     <main className={`login-page${showIntro ? ' login-page-with-intro' : ''}`}>
+      <div className="login-water" aria-hidden="true">
+        <span className="login-water-drop login-water-drop-one" />
+        <span className="login-water-drop login-water-drop-two" />
+        <span className="login-water-drop login-water-drop-three" />
+        <span className="login-water-drop login-water-drop-four" />
+      </div>
       {showIntro && <TrimiaBrand className="login-intro-brand" />}
       {showEntryAnimation && (
         <div className="login-entry-overlay" role="status" aria-label="Ingresando a TrimIA">
