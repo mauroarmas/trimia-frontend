@@ -57,7 +57,13 @@ function noteAuthor(note) {
   return { isAgent: false, label: name, color: colorForName(name), avatar: initials(name) };
 }
 
-export default function ConversationControls({ token, conversation, me, onRefresh }) {
+export default function ConversationControls({
+  token,
+  conversation,
+  me,
+  onRefresh,
+  hideReplyAndNotes = false,
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [replyText, setReplyText] = useState('');
@@ -162,7 +168,7 @@ export default function ConversationControls({ token, conversation, me, onRefres
         )}
       </div>
 
-      {iHoldControl && (
+      {!hideReplyAndNotes && iHoldControl && (
         <form onSubmit={handleReply} style={{ marginBottom: 12 }}>
           <div className="field">
             <label>Responder manualmente al cliente</label>
@@ -177,39 +183,43 @@ export default function ConversationControls({ token, conversation, me, onRefres
         </form>
       )}
 
-      <h4 style={{ marginBottom: 6 }}>Notas internas ({conversation.internalNotes?.length ?? 0})</h4>
-      <ul className="notes-list">
-        {(conversation.internalNotes ?? []).map((n) => {
-          const author = noteAuthor(n);
-          return (
-            <li key={n.id} className="note-item">
-              <div className="note-avatar" style={{ background: author.color }} title={author.label}>
-                {author.avatar}
+      {!hideReplyAndNotes && (
+        <>
+          <h4 style={{ marginBottom: 6 }}>Notas internas ({conversation.internalNotes?.length ?? 0})</h4>
+          <ul className="notes-list">
+            {(conversation.internalNotes ?? []).map((n) => {
+              const author = noteAuthor(n);
+              return (
+                <li key={n.id} className="note-item">
+                  <div className="note-avatar" style={{ background: author.color }} title={author.label}>
+                    {author.avatar}
+                  </div>
+                  <div className="note-bubble">
+                    <div className="note-author">{author.label}{author.isAgent && ' (IA)'}</div>
+                    {n.content}
+                    <div className="msg-time">{new Date(n.createdAt).toLocaleString()}</div>
+                  </div>
+                </li>
+              );
+            })}
+            {(conversation.internalNotes ?? []).length === 0 && (
+              <li style={{ color: 'var(--text-muted)', fontSize: 13 }}>Sin notas.</li>
+            )}
+          </ul>
+          <form onSubmit={handleNote}>
+            <div className="field-row">
+              <div className="field" style={{ marginBottom: 0 }}>
+                <input
+                  value={noteText}
+                  onChange={(e) => setNoteText(e.target.value)}
+                  placeholder="Nota interna (nunca visible para el cliente)"
+                />
               </div>
-              <div className="note-bubble">
-                <div className="note-author">{author.label}{author.isAgent && ' (IA)'}</div>
-                {n.content}
-                <div className="msg-time">{new Date(n.createdAt).toLocaleString()}</div>
-              </div>
-            </li>
-          );
-        })}
-        {(conversation.internalNotes ?? []).length === 0 && (
-          <li style={{ color: 'var(--text-muted)', fontSize: 13 }}>Sin notas.</li>
-        )}
-      </ul>
-      <form onSubmit={handleNote}>
-        <div className="field-row">
-          <div className="field" style={{ marginBottom: 0 }}>
-            <input
-              value={noteText}
-              onChange={(e) => setNoteText(e.target.value)}
-              placeholder="Nota interna (nunca visible para el cliente)"
-            />
-          </div>
-          <button type="submit" disabled={busy} style={{ flexShrink: 0, alignSelf: 'flex-start' }}>Agregar</button>
-        </div>
-      </form>
+              <button type="submit" disabled={busy} style={{ flexShrink: 0, alignSelf: 'flex-start' }}>Agregar</button>
+            </div>
+          </form>
+        </>
+      )}
     </div>
   );
 }

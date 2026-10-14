@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   listEscalations,
   getEscalation,
@@ -15,6 +15,7 @@ import {
   listSectors,
   getEscalationHygieneWarning,
   getLatestHygieneScan,
+  addInternalNote,
 } from '../api';
 import ConversationControls from './ConversationControls';
 import { HygienePairCard } from './KnowledgeHygiene';
@@ -74,6 +75,10 @@ export default function EscalationsQueue({ token, me }) {
 
   const [selected, setSelected] = useState(null);
   const [conversation, setConversation] = useState(null);
+  const detailRequestId = useRef(0);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [internalNote, setInternalNote] = useState('');
+  const [noteSaved, setNoteSaved] = useState(false);
 
   const [replyMessage, setReplyMessage] = useState('');
   const [teachAgent, setTeachAgent] = useState(false);
@@ -175,10 +180,14 @@ export default function EscalationsQueue({ token, me }) {
   }, [token, me]);
 
   async function openCase(escalation) {
+    const requestId = ++detailRequestId.current;
+    setDetailLoading(true);
     setSuggestion(null);
     setDiscardReason('');
     setSelected(escalation);
     setConversation(null);
+    setInternalNote('');
+    setNoteSaved(false);
     setActionError('');
     setReplyMessage('');
     setTeachAgent(false);
@@ -199,12 +208,14 @@ export default function EscalationsQueue({ token, me }) {
         getEscalation(token, escalation.id),
         getConversation(token, escalation.conversationId),
       ]);
+      if (requestId !== detailRequestId.current) return;
       setSelected(escDetail);
       setConversation(conv);
       // Los candidatos se piden aparte: si fallan, el caso igual se puede
       // resolver como siempre. Es información de más, no un requisito.
       try {
         const cands = await getKnowledgeCandidates(token, escalation.id);
+        if (requestId !== detailRequestId.current) return;
         setCandidates(cands);
         // El default sale del caso, no de una preferencia fija: si hay algo que
         // quedó corto, lo que conviene es corregir ESO. Solo se preselecciona
@@ -212,7 +223,7 @@ export default function EscalationsQueue({ token, me }) {
         // que no ofrecerlo.
         if (cands.some((c) => c.corregible)) setKnowledgeMode('MODIFICAR');
       } catch {
-        setCandidates([]);
+        if (requestId === detailRequestId.current) setCandidates([]);
       }
       // Spec 008 (US3): mismo criterio — si falla, el caso se resuelve igual.
       //
@@ -222,18 +233,22 @@ export default function EscalationsQueue({ token, me }) {
       // nada, se cruza contra lo que el barrido ya calculó (FR-015).
       try {
         const w = await getEscalationHygieneWarning(token, escalation.id);
+        if (requestId !== detailRequestId.current) return;
         if (w.pairs.length > 0) {
           const latest = await getLatestHygieneScan(token);
+          if (requestId !== detailRequestId.current) return;
           const idsConAviso = new Set(w.pairs.map((p) => p.pairId));
           setHygieneWarning((latest.pairs ?? []).filter((p) => idsConAviso.has(p.pairId)));
         } else {
           setHygieneWarning([]);
         }
       } catch {
-        setHygieneWarning([]);
+        if (requestId === detailRequestId.current) setHygieneWarning([]);
       }
     } catch (err) {
-      setActionError(err.message);
+      if (requestId === detailRequestId.current) setActionError(err.message);
+    } finally {
+      if (requestId === detailRequestId.current) setDetailLoading(false);
     }
   }
 
@@ -266,6 +281,24 @@ export default function EscalationsQueue({ token, me }) {
   async function refreshConversation() {
     const conv = await getConversation(token, selected.conversationId);
     setConversation(conv);
+  }
+
+  async function handleSaveInternalNote(e) {
+    e.preventDefault();
+    const content = internalNote.trim();
+    if (!content || !selected) return;
+    setActionBusy(true);
+    setActionError('');
+    setNoteSaved(false);
+    try {
+      await addInternalNote(token, selected.conversationId, content);
+      setInternalNote('');
+      setNoteSaved(true);
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setActionBusy(false);
+    }
   }
 
   async function handleResolve(e) {
@@ -345,7 +378,7 @@ export default function EscalationsQueue({ token, me }) {
     if (!knowledgeTitle.trim() || !knowledgeCategory.trim()) {
       setActionError(
         corrigiendo
-          ? 'Guardar sin enviar siempre crea un documento nuevo, así que pide título y categoría. Pasá el selector a «Documento nuevo» para completarlos, o usá «Resolver y responder» si querés corregir el existente.'
+          ? 'Guardar sin enviar siempre crea un documento nuevo, así que pide título y categoría. Pasá el selector a «Documento nuevo» para completarlos, o usá «Enviar y responder» si querés corregir el existente.'
           : 'Para guardar sin enviar hacen falta título y categoría: la respuesta se incorpora al conocimiento.',
       );
       return;
@@ -459,9 +492,19 @@ export default function EscalationsQueue({ token, me }) {
   const startIdx = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endIdx = Math.min(currentPage * pageSize, totalCount);
   const paginatedEscalations = filteredEscalations.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const originalClientMessage = selected && conversation
+    ? [...conversation.messages]
+      .reverse()
+      .find((message) => (
+        message.role === 'USER' &&
+        new Date(message.createdAt) <= new Date(selected.createdAt)
+      ))
+    : null;
 
   return (
-    <div>
+    <div className="escalations-queue">
+      {!selected && (
+        <div className="escalations-list-view">
       <div className="page-header">
         <div>
           <h2 className="page-title">Casos escalados</h2>
@@ -620,19 +663,74 @@ export default function EscalationsQueue({ token, me }) {
           </div>
         </div>
       </div>
+        </div>
+      )}
 
       {selected && (
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ margin: 0 }}>Caso: {selected.reason}</h3>
-            <button className="secondary" onClick={() => { setSelected(null); setConversation(null); }}>Cerrar</button>
+        <div className="escalation-detail-view">
+          <button
+            type="button"
+            className="secondary escalation-back-button"
+            onClick={() => {
+              detailRequestId.current += 1;
+              setSelected(null);
+              setConversation(null);
+              setDetailLoading(false);
+              setActionError('');
+            }}
+          >
+            ← Volver a Casos escalados
+          </button>
+          <div className="page-header">
+            <div>
+              <h2 className="page-title">Detalle del caso</h2>
+              <p className="page-subtitle">{selected.reason}</p>
+            </div>
           </div>
+
+          <section className="card escalation-info-card">
+            <h3>Información del caso</h3>
+            <dl className="escalation-info-grid">
+              <div><dt>Motivo</dt><dd>{selected.reason}</dd></div>
+              <div><dt>Cliente</dt><dd>{conversation?.externalId ?? selected.conversation?.externalId ?? '—'}</dd></div>
+              <div><dt>Canal</dt><dd>{conversation?.channel ?? selected.conversation?.channel ?? 'WEB'}</dd></div>
+              <div><dt>Área</dt><dd>{conversation?.currentAgent ?? selected.conversation?.currentAgent ?? 'Sin área'}</dd></div>
+              <div><dt>Creado</dt><dd>{new Date(selected.createdAt).toLocaleString()}</dd></div>
+              <div>
+                <dt>Delegado a</dt>
+                <dd>{selected.delegatedToId
+                  ? employees.find((employee) => employee.id === selected.delegatedToId)?.name ?? selected.delegatedToId
+                  : '—'}</dd>
+              </div>
+              <div><dt>Estado</dt><dd>{selected.status === 'PENDING' ? 'Pendiente' : 'Resuelto'}</dd></div>
+            </dl>
+          </section>
 
           {actionError && <p className="error" style={{ marginTop: 8 }}>{actionError}</p>}
 
+          {detailLoading && <p className="hint">Cargando información del caso…</p>}
+
           {conversation && (
-            <>
-              <h4 style={{ marginTop: 12 }}>Conversación ({conversation.externalId})</h4>
+            <section className="card escalation-message-card">
+              <h3>Mensaje del cliente</h3>
+              <div className="escalation-original-message">
+                <p>{originalClientMessage?.content ?? 'No hay una consulta original disponible.'}</p>
+                {originalClientMessage && (
+                  <span>{new Date(originalClientMessage.createdAt).toLocaleString()}</span>
+                )}
+              </div>
+              {selected.consultasPosteriores?.length > 0 && (
+                <div className="escalation-follow-up-messages">
+                  <h4>Mensajes recibidos mientras esperaba</h4>
+                  {selected.consultasPosteriores.map((message, index) => (
+                    <div className="escalation-follow-up-message" key={`${message.createdAt}-${index}`}>
+                      <p>{message.content}</p>
+                      <span>{new Date(message.createdAt).toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <h4 className="escalation-context-title">Conversación reciente</h4>
               <ul className="msg-list">
                 {conversation.messages.slice(-8).map((m) => (
                   <li key={m.id}>
@@ -647,8 +745,9 @@ export default function EscalationsQueue({ token, me }) {
                 conversation={conversation}
                 me={me}
                 onRefresh={refreshConversation}
+                hideReplyAndNotes
               />
-            </>
+            </section>
           )}
 
           {/*
@@ -677,17 +776,17 @@ export default function EscalationsQueue({ token, me }) {
           )}
 
           {selected.status === 'PENDING' && (
-            <div className="panel-section">
-              <h4>Resolver caso</h4>
+            <section className="card escalation-response-section">
+              <h3>Respuesta al cliente</h3>
 
-              <div style={{ marginBottom: 12 }}>
+              <div className="escalation-suggestion">
                 <button type="button" className="secondary" onClick={handleSuggest} disabled={suggesting}>
                   {suggesting ? 'Redactando…' : 'Proponer respuesta con la base de conocimiento'}
                 </button>
                 {suggestion && <SuggestionPanel suggestion={suggestion} />}
               </div>
 
-              <form onSubmit={handleResolve}>
+              <form className="escalation-response-form" onSubmit={handleResolve}>
                 {/*
                   Spec 013 (FR-018) — avisar que el caso no es de tus áreas y que
                   la respuesta queda registrada como tal.
@@ -710,10 +809,7 @@ export default function EscalationsQueue({ token, me }) {
                   lo que faltaba era decir por cuál de las dos.
                 */}
                 {selected.pertenencia === 'AJENA' && (
-                  <p
-                    className="hint"
-                    style={{ borderLeft: '3px solid #8a6d0b', paddingLeft: 8, marginBottom: 12 }}
-                  >
+                  <p className="hint escalation-area-warning">
                     {selected.delegatedToId ? (
                       <>
                         Este caso está <strong>derivado a{' '}
@@ -733,12 +829,13 @@ export default function EscalationsQueue({ token, me }) {
                     )}
                   </p>
                 )}
-                <div className="field">
-                  <label>Mensaje de respuesta al cliente</label>
+                <div className="field escalation-reply-field">
+                  <label>Responder manualmente al cliente</label>
                   <textarea
                     rows={3}
                     value={replyMessage}
                     onChange={(e) => setReplyMessage(e.target.value)}
+                    placeholder="Este mensaje se envía al usuario por WhatsApp/WEB"
                     required
                   />
                 </div>
@@ -750,7 +847,7 @@ export default function EscalationsQueue({ token, me }) {
                   checkbox— así que las dos opciones nunca se veían juntas y
                   crear un documento nuevo era lo que pasaba por no hacer nada.
                 */}
-                <div className="field" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div className="field escalation-teach-toggle">
                   <input
                     type="checkbox"
                     id="teachAgent"
@@ -777,7 +874,7 @@ export default function EscalationsQueue({ token, me }) {
                 )}
 
                 {teachAgent && puedeEnsenarAlgo && (
-                  <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, padding: 12, marginTop: 12 }}>
+                  <div className="escalation-knowledge-fields">
                     {/*
                       La primera decisión, antes que cualquier campo: mejorar lo
                       que hay o agregar algo nuevo. Va primero porque es la que
@@ -883,18 +980,46 @@ export default function EscalationsQueue({ token, me }) {
                         </div>
                       </>
                     )}
+
+                    <div className="escalation-internal-note">
+                      <div className="field">
+                        <label htmlFor="escalation-internal-note">Nota interna (opcional)</label>
+                        <textarea
+                          id="escalation-internal-note"
+                          rows={2}
+                          value={internalNote}
+                          onChange={(event) => {
+                            setInternalNote(event.target.value);
+                            setNoteSaved(false);
+                          }}
+                          placeholder="Observación solo para el equipo interno"
+                        />
+                        <span className="escalation-note-hint">
+                          Se guarda por separado; no se envía al cliente ni se incorpora al RAG.
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={handleSaveInternalNote}
+                        disabled={actionBusy || !internalNote.trim() || !conversation}
+                      >
+                        {actionBusy ? 'Guardando…' : 'Guardar nota interna'}
+                      </button>
+                      {noteSaved && <span className="success-msg escalation-note-success">Nota guardada.</span>}
+                    </div>
                   </div>
                 )}
 
-                <button type="submit" disabled={actionBusy} style={{ marginTop: teachAgent ? 12 : 0 }}>
-                  Resolver y responder
+                <button type="submit" disabled={actionBusy || detailLoading} className="escalation-submit-button">
+                  Enviar y responder
                 </button>
               </form>
 
               {/* Los otros dos cierres. Van juntos y con la diferencia
                   explicada porque las tres acciones son terminales: elegir
                   mal no se deshace. */}
-              <div className="panel-section" style={{ marginTop: 16 }}>
+              <div className="escalation-close-actions">
                 <h4>Otras formas de cerrar el caso</h4>
 
                 <p className="hint">
@@ -934,7 +1059,7 @@ export default function EscalationsQueue({ token, me }) {
                       {' '}
                       <strong>Ojo:</strong> siempre crea un documento nuevo, aunque
                       arriba hayas elegido modificar uno. Para corregir, respondé
-                      el caso con «Resolver y responder».
+                      el caso con «Enviar y responder».
                     </>
                   )}
                 </span>
@@ -954,38 +1079,40 @@ export default function EscalationsQueue({ token, me }) {
                 <button type="button" className="secondary" onClick={handleDiscard} disabled={actionBusy}>
                   Descartar caso
                 </button>
-              </div>
 
-              <h4 style={{ marginTop: 16 }}>Delegar a otro supervisor</h4>
-              <form onSubmit={handleDelegate}>
-                <div className="field-row">
-                  <div className="field">
-                    <select value={delegateTo} onChange={(e) => setDelegateTo(e.target.value)}>
-                      <option value="">— elegir supervisor —</option>
-                      {/* Primero quien maneja el área del caso, con ★. Se puede
-                          elegir a otro —responder no está restringido por área—
-                          pero no por no saber quién correspondía. */}
-                      {ordenarCandidatos(
-                        employees.filter((e) => e.id !== me.id),
-                        conversation?.currentAgent ?? null,
-                      ).map((e) => (
-                        <option key={e.id} value={e.id}>
-                          {etiquetaDeCandidato(e, conversation?.currentAgent ?? null)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <button type="submit" className="secondary" disabled={actionBusy || !delegateTo}>
-                    Delegar
-                  </button>
+                <div className="escalation-delegate">
+                  <h4>Delegar a otro supervisor</h4>
+                  <form onSubmit={handleDelegate}>
+                    <div className="field-row">
+                      <div className="field">
+                        <select value={delegateTo} onChange={(e) => setDelegateTo(e.target.value)}>
+                          <option value="">— elegir supervisor —</option>
+                          {/* Primero quien maneja el área del caso, con ★. Se puede
+                              elegir a otro —responder no está restringido por área—
+                              pero no por no saber quién correspondía. */}
+                          {ordenarCandidatos(
+                            employees.filter((e) => e.id !== me.id),
+                            conversation?.currentAgent ?? null,
+                          ).map((e) => (
+                            <option key={e.id} value={e.id}>
+                              {etiquetaDeCandidato(e, conversation?.currentAgent ?? null)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <button type="submit" className="secondary" disabled={actionBusy || !delegateTo}>
+                        Delegar
+                      </button>
+                    </div>
+                    {employees.length <= 1 && (
+                      <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                        No hay otros supervisores activos para delegar.
+                      </p>
+                    )}
+                  </form>
                 </div>
-                {employees.length <= 1 && (
-                  <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                    No hay otros supervisores activos para delegar.
-                  </p>
-                )}
-              </form>
-            </div>
+              </div>
+            </section>
           )}
 
           {selected.status === 'RESOLVED' && (

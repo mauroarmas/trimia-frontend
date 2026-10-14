@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { listEmployees, listSectors, setSupervisedAreas } from '../api';
 import { esGerente } from '../areas';
 import SupervisorDiagnosticModal from './SupervisorDiagnosticModal';
+import SupervisorSimulationsModal from './SupervisorSimulationsModal';
 
 /**
  * Pantalla de empleados (spec 005, US3).
@@ -19,6 +20,7 @@ export default function EmployeesPanel({ token }) {
   const [sectors, setSectors] = useState([]);
   const [editando, setEditando] = useState(null);
   const [diagnosticEmployee, setDiagnosticEmployee] = useState(null);
+  const [simulationEmployee, setSimulationEmployee] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -109,6 +111,14 @@ export default function EmployeesPanel({ token }) {
                     >
                       🎯 Diagnóstico
                     </button>
+                    <button
+                      className="secondary"
+                      style={{ fontSize: 12, padding: '4px 8px' }}
+                      onClick={() => setSimulationEmployee({ id: e.id, name: e.name })}
+                      title="Ver historial de simulaciones y devoluciones pedagógicas"
+                    >
+                      🎭 Simulaciones
+                    </button>
                     {e.role === 'SUPERVISOR' ? (
                       <button className="secondary" style={{ fontSize: 12, padding: '4px 8px' }} onClick={() => setEditando(e)}>
                         Cambiar áreas
@@ -130,6 +140,14 @@ export default function EmployeesPanel({ token }) {
           employeeId={diagnosticEmployee.id}
           employeeName={diagnosticEmployee.name}
           onClose={() => setDiagnosticEmployee(null)}
+        />
+      )}
+      {simulationEmployee && (
+        <SupervisorSimulationsModal
+          token={token}
+          employeeId={simulationEmployee.id}
+          employeeName={simulationEmployee.name}
+          onClose={() => setSimulationEmployee(null)}
         />
       )}
       {editando && (

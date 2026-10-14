@@ -1134,3 +1134,44 @@ export function getAudioStreamUrl(pillId, token) {
   const qs = token ? `?token=${encodeURIComponent(token)}` : '';
   return `${API_BASE}/training/pills/${pillId}/audio${qs}`;
 }
+
+// ========================================================================
+// Spec 017 — Práctica Guiada, Simulación Libre y Devolución Cualitativa
+// ========================================================================
+
+/** Inicia una sesión de práctica interactiva (GUIDED o FREE). */
+export function startSimulation(token, pillId, mode = 'GUIDED') {
+  return request(`/training/pills/${pillId}/simulations`, {
+    method: 'POST',
+    token,
+    body: { mode },
+  });
+}
+
+/** Envía un mensaje como empleado y recibe la respuesta del cliente simulado. */
+export function sendSimulationMessage(token, sessionId, content) {
+  return request(`/training/simulations/${sessionId}/messages`, {
+    method: 'POST',
+    token,
+    body: { content },
+  });
+}
+
+/** Obtiene el estado y transcripción completa de una simulación. */
+export function getSimulation(token, sessionId) {
+  return request(`/training/simulations/${sessionId}`, { token });
+}
+
+/** Concluye la simulación y genera las 3 tarjetas de devolución formativa. */
+export function concludeSimulation(token, sessionId) {
+  return request(`/training/simulations/${sessionId}/conclude`, {
+    method: 'POST',
+    token,
+  });
+}
+
+/** Consulta el historial de simulaciones de un empleado (supervisor). */
+export function getEmployeeSimulations(token, employeeId) {
+  return request(`/training/supervisor/employees/${employeeId}/simulations`, { token });
+}
+

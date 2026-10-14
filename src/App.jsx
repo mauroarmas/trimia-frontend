@@ -111,6 +111,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [tab, setTab] = useState('escalations');
   const [interviewStart, setInterviewStart] = useState(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   if (!token) {
     return <Login onLogin={(t, u) => { setToken(t); setUser(u); }} />;
@@ -143,11 +144,26 @@ export default function App() {
   const currentTab = visibleTabs.some((t) => t.id === tab) ? tab : defaultTab;
 
   return (
-    <div className="app-layout">
+    <div className={`app-layout${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
       {/* Sidebar Fija Lateral */}
       <aside className="app-sidebar">
         <div className="sidebar-header">
           <img src="/logo.png" alt="TrimIA" className="sidebar-logo" />
+          <button
+            type="button"
+            className="sidebar-toggle"
+            aria-label={sidebarCollapsed ? 'Expandir menú' : 'Contraer menú'}
+            title={sidebarCollapsed ? 'Expandir menú' : 'Contraer menú'}
+            onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d={sidebarCollapsed ? 'M9 18l6-6-6-6' : 'M15 18l-6-6 6-6'}
+              />
+            </svg>
+          </button>
         </div>
 
         <nav className="sidebar-nav">
@@ -155,6 +171,7 @@ export default function App() {
             <button
               key={t.id}
               className={`sidebar-nav-item${currentTab === t.id ? ' active' : ''}`}
+              title={sidebarCollapsed ? t.label : undefined}
               onClick={() => setTab(t.id)}
             >
               <NavIcon type={t.icon} />

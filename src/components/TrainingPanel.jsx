@@ -11,6 +11,7 @@ import {
 import AudioScriptModal from './AudioScriptModal';
 import DiagnosticQuizModal from './DiagnosticQuizModal';
 import PillStudyModal from './PillStudyModal';
+import SimulationModal from './SimulationModal';
 
 export default function TrainingPanel({ token, me }) {
   const [modules, setModules] = useState([]);
@@ -21,6 +22,7 @@ export default function TrainingPanel({ token, me }) {
   const [showDiagnostic, setShowDiagnostic] = useState(false);
   const [activePillId, setActivePillId] = useState(null);
   const [scriptModalPill, setScriptModalPill] = useState(null);
+  const [simulationConfig, setSimulationConfig] = useState(null);
 
   // Sección Supervisor
   const isSupervisor = me?.role === 'SUPERVISOR';
@@ -331,18 +333,36 @@ export default function TrainingPanel({ token, me }) {
                               Bloqueada
                             </button>
                           ) : (
-                            <button
-                              onClick={() => setActivePillId(p.id)}
-                              style={{
-                                padding: '4px 12px',
-                                fontSize: 12,
-                                backgroundColor: isExempt ? 'var(--surface)' : 'var(--primary)',
-                                color: isExempt ? 'var(--success)' : '#fff',
-                                borderColor: isExempt ? 'var(--success)' : 'var(--primary)',
-                              }}
-                            >
-                              {isExempt ? 'Repasar Lección' : p.isCompleted ? 'Revisar' : 'Comenzar'}
-                            </button>
+                            <>
+                              <button
+                                onClick={() => setActivePillId(p.id)}
+                                style={{
+                                  padding: '4px 10px',
+                                  fontSize: 12,
+                                  backgroundColor: isExempt ? 'var(--surface)' : 'var(--primary)',
+                                  color: isExempt ? 'var(--success)' : '#fff',
+                                  borderColor: isExempt ? 'var(--success)' : 'var(--primary)',
+                                }}
+                              >
+                                {isExempt ? 'Repasar Lección' : p.isCompleted ? 'Revisar' : 'Comenzar'}
+                              </button>
+                              <button
+                                className="secondary"
+                                onClick={() => setSimulationConfig({ pill: p, mode: 'GUIDED' })}
+                                style={{ padding: '4px 10px', fontSize: 12 }}
+                                title="Iniciar práctica guiada con cliente simulado y objetivos pedagógicos en vivo"
+                              >
+                                🧭 Práctica Guiada
+                              </button>
+                              <button
+                                className="secondary"
+                                onClick={() => setSimulationConfig({ pill: p, mode: 'FREE' })}
+                                style={{ padding: '4px 10px', fontSize: 12 }}
+                                title="Iniciar simulación libre de interacción real sin ayudas en vivo"
+                              >
+                                🎭 Simulación Libre
+                              </button>
+                            </>
                           )}
                         </div>
                       </div>
@@ -570,6 +590,19 @@ export default function TrainingPanel({ token, me }) {
           pillId={activePillId}
           onClose={() => setActivePillId(null)}
           onProgressUpdated={() => {
+            loadEmployeePath();
+          }}
+        />
+      )}
+
+      {simulationConfig && (
+        <SimulationModal
+          token={token}
+          pillId={simulationConfig.pill.id}
+          pillTitle={simulationConfig.pill.title}
+          mode={simulationConfig.mode}
+          onClose={() => setSimulationConfig(null)}
+          onCompleted={() => {
             loadEmployeePath();
           }}
         />
