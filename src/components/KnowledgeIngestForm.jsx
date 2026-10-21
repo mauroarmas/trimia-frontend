@@ -13,8 +13,13 @@ const FILE_STATUS_CLASS = {
   FAILED: 'badge status-error',
 };
 
-export default function KnowledgeIngestForm({ token, alcance, onIngested }) {
-  const [mode, setMode] = useState('text'); // 'text' | 'file'
+const FILE_STATUS_LABEL = {
+  READY: 'Listo',
+  PROCESSING: 'Procesando',
+  FAILED: 'Falló',
+};
+
+export default function KnowledgeIngestForm({ token, alcance, onIngested, onViewAll, onSearch }) {
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
   const [audience, setAudience] = useState('PUBLICO');
@@ -39,14 +44,14 @@ export default function KnowledgeIngestForm({ token, alcance, onIngested }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function refreshFiles(tries = 0) {
+  async function refreshFiles(tries = 0, notifyWhenDone = false) {
     try {
       const res = await listKnowledgeFiles(token, { limit: 8 });
       setFiles(res.data);
       const procesando = res.data.some((f) => f.status === 'PROCESSING');
       if (procesando && tries < POLL_MAX_TRIES) {
-        pollRef.current = setTimeout(() => refreshFiles(tries + 1), POLL_INTERVAL_MS);
-      } else if (!procesando) {
+        pollRef.current = setTimeout(() => refreshFiles(tries + 1, notifyWhenDone), POLL_INTERVAL_MS);
+      } else if (!procesando && notifyWhenDone) {
         onIngested?.();
       }
     } catch {
@@ -59,7 +64,18 @@ export default function KnowledgeIngestForm({ token, alcance, onIngested }) {
     setError(null);
     setResultMsg('');
 
-    if (mode === 'text') {
+    const hasText = Boolean(content.trim());
+    const hasFile = Boolean(file);
+    if (hasText && hasFile) {
+      setError({ message: 'Elegí solo una opción: escribí el contenido o seleccioná un archivo.' });
+      return;
+    }
+    if (!hasText && !hasFile) {
+      setError({ message: 'Escribí el contenido o seleccioná un archivo para continuar.' });
+      return;
+    }
+
+    if (hasText) {
       if (!title.trim() || !content.trim() || !category.trim()) {
         setError({ message: 'Título, categoría y contenido son obligatorios para cargar texto.' });
         return;
@@ -84,7 +100,7 @@ export default function KnowledgeIngestForm({ token, alcance, onIngested }) {
         setBusy(false);
       }
     } else {
-      // mode === 'file'
+      // File upload branch
       if (!file) {
         setError({ message: 'Seleccioná un archivo para subir.' });
         return;
@@ -105,7 +121,7 @@ export default function KnowledgeIngestForm({ token, alcance, onIngested }) {
         setTitle('');
         if (fileInputRef.current) fileInputRef.current.value = '';
         clearTimeout(pollRef.current);
-        refreshFiles();
+        refreshFiles(0, true);
       } catch (err) {
         setError(err);
       } finally {
@@ -125,150 +141,169 @@ export default function KnowledgeIngestForm({ token, alcance, onIngested }) {
     return alcance.misAreas.some((area) => area.agentType === a);
   });
 
+  const usandoArchivo = Boolean(file) && !content.trim();
+
   return (
-    <div className="card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <div>
-          <h3>Cargar conocimiento</h3>
-          <p className="hint">
-            Agregá información a la base de conocimiento redactando texto directo o subiendo documentos (PDF, Word, imagen o audio).
-          </p>
-        </div>
-      </div>
-
-      {/* Selector de modo unificado */}
-      <div className="submenu-pills" style={{ marginBottom: 16 }}>
-        <button
-          type="button"
-          className={`submenu-pill${mode === 'text' ? ' active' : ''}`}
-          onClick={() => { setMode('text'); setError(null); setResultMsg(''); }}
-        >
-          ✍️ Escribir o pegar texto
-        </button>
-        <button
-          type="button"
-          className={`submenu-pill${mode === 'file' ? ' active' : ''}`}
-          onClick={() => { setMode('file'); setError(null); setResultMsg(''); }}
-        >
-          📄 Subir archivo (PDF, Word, imágenes, audio)
-        </button>
-      </div>
-
-      <form onSubmit={(e) => handleSubmit(e, false)}>
-        <div className="field-row">
-          <div className="field">
-            <label>Título {mode === 'file' ? '(opcional)' : '(obligatorio)'}</label>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={mode === 'file' ? 'Si se omite, se usa el nombre del archivo' : 'Ej: Política de entregas'}
-              required={mode === 'text'}
-            />
-          </div>
-          <div className="field">
-            <label>Categoría</label>
-            <input
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder="Ej: Cobranzas, Planes, FAQs"
-              required
-            />
-          </div>
-        </div>
-
-        <div className="field-row">
-          <div className="field">
-            <label>Audiencia</label>
-            <select value={audience} onChange={(e) => setAudience(e.target.value)}>
-              <option value="PUBLICO">PUBLICO (clientes y empleados)</option>
-              <option value="INTERNO">INTERNO (solo empleados)</option>
-            </select>
-          </div>
-          <div className="field">
-            <label>Área / Agente asignado</label>
-            <select value={agentType} onChange={(e) => setAgentType(e.target.value)}>
-              {alcance?.misAreas && alcance.misAreas.length === alcance.totalAreas && (
-                <option value="">— documento general (todas las áreas) —</option>
-              )}
-              {availableAgents.map((a) => (
-                <option key={a} value={a}>{a}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {mode === 'text' ? (
-          <div className="field">
-            <label>Contenido del documento</label>
-            <textarea
-              rows={8}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Escribí o pegá acá el texto completo para responder dudas sobre este tema..."
-              required
-            />
-          </div>
-        ) : (
-          <div className="field">
-            <label>Seleccionar archivo</label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.webp,.mp3,.wav,.ogg,.aac,.flac"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              required
-            />
-            <p className="hint" style={{ marginTop: 4 }}>
-              Formatos aceptados: PDF, Word (.docx), texto (.txt), imágenes (JPG/PNG/WEBP) o audio (MP3/WAV/OGG).
+    <div className="knowledge-ingest-layout">
+      <section className="knowledge-panel knowledge-ingest-card">
+        <header className="knowledge-panel-heading">
+          <div>
+            <span className="knowledge-kicker">Nuevo documento</span>
+            <h3>Cargar conocimiento</h3>
+            <p className="knowledge-panel-description">
+              Redactá el texto directamente o subí un documento (PDF, Word, imagen o audio).
             </p>
           </div>
-        )}
+        </header>
 
-        {bloqueo && <p className="hint" style={{ color: 'var(--error)' }}>{bloqueo}</p>}
+        <form className="knowledge-ingest-form" onSubmit={(e) => handleSubmit(e, false)}>
+          <div className="knowledge-ingest-fields">
+            <div className="knowledge-filter">
+              <label>
+                Título <span className="knowledge-label-note">{usandoArchivo ? 'opcional' : 'obligatorio'}</span>
+              </label>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder={usandoArchivo ? 'Si se omite, se usa el nombre del archivo' : 'Ej: Política de entregas'}
+                required={!file}
+              />
+            </div>
+            <div className="knowledge-filter">
+              <label>Categoría</label>
+              <input
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                placeholder="Ej: Cobranzas, Planes, FAQs"
+                required
+              />
+            </div>
+            <div className="knowledge-filter">
+              <label>Audiencia</label>
+              <select value={audience} onChange={(e) => setAudience(e.target.value)}>
+                <option value="PUBLICO">PUBLICO (clientes y empleados)</option>
+                <option value="INTERNO">INTERNO (solo empleados)</option>
+              </select>
+            </div>
+            <div className="knowledge-filter">
+              <label>Área / Agente asignado</label>
+              <select value={agentType} onChange={(e) => setAgentType(e.target.value)}>
+                {alcance?.misAreas && alcance.misAreas.length === alcance.totalAreas && (
+                  <option value="">Documento general (todas las áreas)</option>
+                )}
+                {availableAgents.map((a) => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
+              </select>
+            </div>
+          </div>
 
-        <button
-          type="submit"
-          disabled={busy || !!bloqueo || (mode === 'file' && !file)}
-          style={{ marginTop: 12 }}
-        >
-          {busy
-            ? (mode === 'text' ? 'Guardando...' : 'Subiendo archivo...')
-            : (mode === 'text' ? 'Guardar texto en base de conocimiento' : 'Subir y procesar archivo')}
-        </button>
-      </form>
+          <h4 className="knowledge-section-title">
+            Contenido <span className="knowledge-label-note">elegí una sola opción</span>
+          </h4>
+          <div className="knowledge-source-options">
+            <div className={`knowledge-input-option${content.trim() ? ' is-selected' : ''}${file ? ' is-dimmed' : ''}`}>
+              <div className="knowledge-option-heading">
+                <span className="knowledge-option-icon" aria-hidden="true">✎</span>
+                <div>
+                  <h4>Escribir texto</h4>
+                  <p className="knowledge-option-copy">Pegá la información que el asistente debe conocer.</p>
+                </div>
+              </div>
+              <textarea
+                rows={8}
+                value={content}
+                aria-label="Contenido del documento"
+                onChange={(e) => { setContent(e.target.value); setError(null); setResultMsg(''); }}
+                placeholder="Escribí o pegá acá el texto completo para responder dudas sobre este tema…"
+              />
+            </div>
 
-      {error && <FormError error={error} onForce={(e) => handleSubmit(e, true)} />}
-      {resultMsg && <p className="success-msg" style={{ marginTop: 12 }}>{resultMsg}</p>}
+            <div className={`knowledge-input-option${file ? ' is-selected' : ''}${content.trim() ? ' is-dimmed' : ''}`}>
+              <div className="knowledge-option-heading">
+                <span className="knowledge-option-icon" aria-hidden="true">⇪</span>
+                <div>
+                  <h4>Subir un archivo</h4>
+                  <p className="knowledge-option-copy">El texto se extrae y vectoriza automáticamente.</p>
+                </div>
+              </div>
+              <label className={`knowledge-dropzone${file ? ' has-file' : ''}`}>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.webp,.mp3,.wav,.ogg,.aac,.flac"
+                  onChange={(e) => { setFile(e.target.files?.[0] ?? null); setError(null); setResultMsg(''); }}
+                />
+                <span className="knowledge-dropzone-title">
+                  {file ? file.name : 'Hacé clic para seleccionar un archivo'}
+                </span>
+                <span className="knowledge-dropzone-hint">
+                  {file
+                    ? 'Hacé clic para cambiarlo'
+                    : 'PDF, Word (.docx), texto (.txt), imágenes (JPG/PNG/WEBP) o audio (MP3/WAV/OGG)'}
+                </span>
+              </label>
+              {file && (
+                <button
+                  type="button"
+                  className="knowledge-text-button"
+                  onClick={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                >
+                  Quitar archivo
+                </button>
+              )}
+            </div>
+          </div>
+
+          {bloqueo && <p className="knowledge-block-note">{bloqueo}</p>}
+          {error && <FormError error={error} onForce={(e) => handleSubmit(e, true)} />}
+          {resultMsg && <p className="success-msg">{resultMsg}</p>}
+
+          <div className="knowledge-form-actions">
+            <button
+              type="submit"
+              disabled={busy || !!bloqueo || (!content.trim() && !file)}
+              className="knowledge-primary-button"
+            >
+              {busy
+                ? (file ? 'Subiendo archivo…' : 'Guardando texto…')
+                : 'Guardar conocimiento'}
+            </button>
+          </div>
+        </form>
+      </section>
 
       {/* Historial de archivos subidos recientemente */}
-      <div style={{ marginTop: 24, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-        <h4>Archivos procesados recientemente</h4>
-        {files.length === 0 && <p className="hint">Todavía no se subió ningún archivo.</p>}
+      <aside className="knowledge-panel knowledge-recent-files">
+        <header className="knowledge-recent-heading">
+          <h3>Procesados recientemente</h3>
+          <button type="button" className="knowledge-text-button" onClick={onViewAll}>Ver todos</button>
+        </header>
+        {files.length === 0 && <p className="knowledge-empty">Todavía no se subió ningún archivo.</p>}
         {files.length > 0 && (
-          <table style={{ marginTop: 8 }}>
-            <thead>
-              <tr><th>Archivo</th><th>Estado</th><th>Detalle</th></tr>
-            </thead>
-            <tbody>
-              {files.map((f) => (
-                <tr key={f.id}>
-                  <td>{f.filename}</td>
-                  <td>
-                    <span className={FILE_STATUS_CLASS[f.status] ?? 'badge'}>
-                      {f.status === 'PROCESSING' ? 'PROCESANDO' : f.status}
-                    </span>
-                  </td>
-                  <td>
-                    {f.status === 'FAILED' && <span className="error">{f.failureReason}</span>}
-                    {f.status === 'READY' && <span className="hint">Listo para consultar</span>}
-                    {f.status === 'PROCESSING' && <span className="hint">Extrayendo texto y vectorizando…</span>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <ul className="knowledge-recent-list">
+            {files.map((f) => (
+              <li key={f.id} className="knowledge-recent-item">
+                <span className="knowledge-recent-name" title={f.filename}>{f.filename}</span>
+                <div className="knowledge-recent-meta">
+                  <span className={FILE_STATUS_CLASS[f.status] ?? 'badge'}>
+                    {FILE_STATUS_LABEL[f.status] ?? f.status}
+                  </span>
+                  <span className={`knowledge-recent-detail${f.status === 'FAILED' ? ' is-error' : ''}`}>
+                    {f.status === 'FAILED' && f.failureReason}
+                    {f.status === 'READY' && 'Listo para consultar'}
+                    {f.status === 'PROCESSING' && 'Extrayendo texto y vectorizando…'}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
-      </div>
+        <div className="knowledge-search-tip">
+          Después de cargar, usá <button type="button" className="knowledge-text-button" onClick={onSearch}>Probar búsqueda</button> para
+          revisar que el asistente encuentre el contenido.
+        </div>
+      </aside>
     </div>
   );
 }

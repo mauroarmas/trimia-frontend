@@ -18,6 +18,7 @@ import {
   addInternalNote,
 } from '../api';
 import ConversationControls from './ConversationControls';
+import InfoNotes, { InfoToggle } from './InfoNotes';
 import { HygienePairCard } from './KnowledgeHygiene';
 import {
   etiquetaDeCandidato,
@@ -64,6 +65,7 @@ export default function EscalationsQueue({ token, me }) {
   // pero sin filtrar. Ocultar lo ajeno dejaría sin cobertura las áreas que no
   // tienen responsable activo.
   const [soloMios, setSoloMios] = useState(false);
+  const [mostrarInfo, setMostrarInfo] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAreaFilter, setSelectedAreaFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -539,17 +541,32 @@ export default function EscalationsQueue({ token, me }) {
           </label>
         </div>
 
-        <button className="btn-pill-action" onClick={loadQueue} disabled={loading}>
-          <span style={{ fontSize: 14 }}>🔄</span>
-          <span>{loading ? 'Cargando...' : 'Refrescar'}</span>
-        </button>
+        <div className="info-bar-actions">
+          <InfoToggle open={mostrarInfo} onToggle={() => setMostrarInfo((v) => !v)} />
+          <button className="btn-pill-action" onClick={loadQueue} disabled={loading}>
+            <span style={{ fontSize: 14 }}>🔄</span>
+            <span>{loading ? 'Cargando...' : 'Refrescar'}</span>
+          </button>
+        </div>
       </div>
 
-      {soloMios && (
-        <div className="hint" style={{ marginBottom: 16 }}>
-          Se ocultan los casos de otras áreas. Los que no tienen área siguen
-          apareciendo: no le tocan a nadie en particular.
-        </div>
+      {mostrarInfo && (
+        <InfoNotes
+          title="Casos escalados"
+          onClose={() => setMostrarInfo(false)}
+          notes={[
+            ['Pendientes y resueltos.',
+              'Pendientes son las conversaciones que el asistente derivó y todavía esperan '
+              + 'a una persona; resueltos, las que ya se cerraron.'],
+            ['Ver solo lo mío.',
+              'Se ocultan los casos de otras áreas. Los que no tienen área siguen '
+              + 'apareciendo: no le tocan a nadie en particular.'],
+            ['Cerrar un caso.',
+              'Se puede responder al usuario, guardar la respuesta sin enviarla para que '
+              + 'quede como conocimiento, o descartar. Las tres son definitivas: cada '
+              + 'opción se explica al lado de su botón dentro del caso.'],
+          ]}
+        />
       )}
 
       {error && <p className="error">{error}</p>}

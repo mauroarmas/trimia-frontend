@@ -10,14 +10,105 @@ import {
 import KnowledgeIngestForm from './KnowledgeIngestForm';
 import KnowledgeDetail from './KnowledgeDetail';
 import KnowledgeHygiene from './KnowledgeHygiene';
+import Improvements from './Improvements';
+import Interview from './Interview';
+import InfoNotes, { InfoToggle } from './InfoNotes';
 import { motivoDeBloqueo, puedeEscribirEn } from '../areas';
 
 const AGENT_TYPES = ['ORCHESTRATOR', 'SALES', 'COLLECTIONS', 'LOGISTICS', 'DEPOSITS', 'ADMIN'];
 const PAGE_SIZE = 15;
 
-export default function KnowledgeIngest({ token, me }) {
+/** Qué explica el botón «Info» en cada pestaña. */
+const INFO_POR_VISTA = {
+  lista: [
+    ['Columna Uso.', <>
+      Consultas en las que sirvió para responder / consultas que lo recuperaron · similitud
+      promedio. <em>Sin datos</em> no es cero: nadie hizo todavía una consulta que lo
+      recuperara, no significa que el documento no sirva.
+    </>],
+    ['Solo lectura.',
+      'Se ven todos los documentos, de todas las áreas, para no duplicarlos y saber a quién '
+      + 'derivar. Solo podés modificar los de las áreas de las que sos responsable.'],
+    ['Audiencia.',
+      'PUBLICO lo usa el asistente con clientes y empleados; INTERNO, solo con empleados.'],
+  ],
+  cargar: [
+    ['Una sola opción.',
+      'Escribí el contenido o subí un archivo, no las dos cosas. Con archivo el título es '
+      + 'opcional: si se omite, se usa el nombre del archivo.'],
+    ['Archivos.',
+      'PDF, Word, texto, imagen o audio. El texto se extrae y vectoriza en segundo plano; '
+      + 'el avance se ve en «Procesados recientemente».'],
+    ['Documento general.',
+      'Un documento sin área asignada es transversal: solo lo puede cargar quien es '
+      + 'responsable de todas las áreas.'],
+  ],
+  buscar: [
+    ['Confidencialidad.',
+      'La misma consulta con audiencia PUBLICO no debería recuperar documentos INTERNO.'],
+    // Spec 006. Este buscador NO aplica el umbral a propósito: muestra lo crudo
+    // que devuelve el RAG. Sin decirlo, cinco resultados en 53% se leen como
+    // «encontró esto» cuando en una conversación real habrían derivado a un humano.
+    ['Muestra todo lo que recupera, sin filtrar.', (umbral) => <>
+      En una conversación real el asistente solo responde si el mejor resultado alcanza el
+      umbral{umbral !== null && <> de <strong>{(umbral * 100).toFixed(0)}%</strong></>}; por
+      debajo deriva a una persona. Acá no se aplica ese corte a propósito, para poder ver lo
+      crudo.
+    </>],
+    ['Estado del vector.', <>
+      <em>Desfasado</em> significa que el documento se editó y el vector quedó atrás: la
+      búsqueda sigue corriendo contra el texto viejo aunque el panel muestre el nuevo. Se
+      arregla reindexando el documento desde su ficha.
+    </>],
+  ],
+  higiene: [
+    ['Qué hace.',
+      'Busca documentos activos que se solapan entre sí (misma área y audiencia) para '
+      + 'ofrecer fusionarlos.'],
+    ['Cuánto tarda.',
+      'Alrededor de un minuto. No hace falta esperar en esta pantalla: se puede volver más tarde.'],
+    ['Fusionar o descartar.',
+      'Al fusionar, el documento que sobrevive sube de versión y el otro queda desactivado, '
+      + 'no borrado. Si son distintos a propósito, al descartarlos no se vuelven a proponer '
+      + 'mientras ninguno de los dos cambie.'],
+  ],
+  mejorar: [
+    ['Qué es.', 'Todo lo que le falta al asistente en un área, en una sola lista.'],
+    ['De dónde sale.',
+      'Lo que le preguntaron y no supo contestar, los casos que terminaron en una persona y '
+      + 'los documentos que quedaron incompletos.'],
+    ['Cómo se arregla.',
+      'Cada cosa se arregla con una entrevista. Si algo está bien como está, marcalo con '
+      + '«Está bien así».'],
+  ],
+};
+
+export default function KnowledgeIngest({
+  token,
+  me,
+  showImprovements = false,
+  interviewStart,
+  onEntrevistar,
+  onRetomar,
+  onSalirEntrevista,
+}) {
   const [view, setView] = useState('lista'); // lista | subir | alta | buscar
   const [selectedId, setSelectedId] = useState(null);
+  const [mostrarInfo, setMostrarInfo] = useState(false);
+  // Umbral vigente (spec 006). No hace falta endpoint nuevo: `agents/status` ya
+  // lo devuelve y el Panel del Supervisor ya lo pinta. Vive acá y no en la
+  // búsqueda porque también lo cita la nota de «Info».
+  const [umbral, setUmbral] = useState(null);
+
+  useEffect(() => {
+    let vivo = true;
+    getAgentsStatus(token)
+      .then((d) => { if (vivo) setUmbral(d?.confidenceThreshold ?? null); })
+      // Si falla, la búsqueda se muestra igual pero sin la marca de umbral: es
+      // información de más, no un requisito para buscar.
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, [token]);
 
   /**
    * De qué áreas es responsable quien está mirando (spec 005).
@@ -47,57 +138,107 @@ export default function KnowledgeIngest({ token, me }) {
 
   const alcance = { misAreas, totalAreas };
 
-  if (selectedId) {
+  if (interviewStart) {
     return (
-      <KnowledgeDetail
-        token={token}
-        id={selectedId}
-        alcance={alcance}
-        onClose={() => setSelectedId(null)}
-      />
+      <div className="knowledge-page">
+        <Interview token={token} me={me} start={interviewStart} onSalir={onSalirEntrevista} />
+      </div>
     );
   }
 
-  return (
-    <div>
-      <div className="page-header">
-        <div>
-          <h2 className="page-title">Base de Conocimiento</h2>
-          <p className="page-subtitle">Gestión de documentos, ingesta de información y control de calidad RAG.</p>
-        </div>
+  if (selectedId) {
+    return (
+      <div className="knowledge-page knowledge-detail-view">
+        <KnowledgeDetail
+          token={token}
+          id={selectedId}
+          alcance={alcance}
+          onClose={() => setSelectedId(null)}
+        />
       </div>
+    );
+  }
 
-      <div className="submenu-bar" style={{ marginBottom: 20 }}>
-        <div className="submenu-pills">
-          {[
-            ['lista', 'Documentos'],
-            ['cargar', 'Cargar conocimiento'],
-            ['buscar', 'Probar búsqueda'],
-            ['higiene', 'Limpiar base de conocimiento'],
-          ].map(([id, label]) => (
+  const tabs = [
+    ['lista', 'Documentos'],
+    ['cargar', 'Cargar conocimiento'],
+    ['buscar', 'Probar búsqueda'],
+    ['higiene', 'Limpiar base'],
+    ...(showImprovements ? [['mejorar', 'Mejorar conocimiento']] : []),
+  ];
+
+  return (
+    <div className="knowledge-page">
+      <section className="knowledge-hero">
+        <div className="knowledge-hero-layout">
+          <div>
+            <span className="knowledge-hero-kicker">Gestión de documentos y calidad RAG</span>
+            <h2 className="knowledge-hero-title">Base de Conocimiento</h2>
+            <p className="knowledge-hero-description">
+              Lo que cargues acá es lo que el asistente usa para responder. Mantené los documentos
+              al día, probá cómo los encuentra y limpiá duplicados para que las respuestas sean precisas.
+            </p>
+          </div>
+          {view !== 'cargar' && (
+            <button type="button" className="knowledge-hero-action" onClick={() => setView('cargar')}>
+              Cargar conocimiento <span aria-hidden="true">↗</span>
+            </button>
+          )}
+        </div>
+      </section>
+
+      <div className="submenu-bar">
+        <nav className="submenu-pills" aria-label="Secciones de la base de conocimiento">
+          {tabs.map(([id, label]) => (
             <button
               key={id}
+              type="button"
               className={`submenu-pill${view === id ? ' active' : ''}`}
+              aria-current={view === id ? 'page' : undefined}
               onClick={() => setView(id)}
             >
               {label}
             </button>
           ))}
+        </nav>
+        <div className="info-bar-actions">
+          <InfoToggle open={mostrarInfo} onToggle={() => setMostrarInfo((v) => !v)} />
         </div>
       </div>
+
+      {mostrarInfo && (
+        <InfoNotes
+          title={tabs.find(([id]) => id === view)?.[1]}
+          onClose={() => setMostrarInfo(false)}
+          notes={(INFO_POR_VISTA[view] ?? []).map(([titulo, contenido]) => [
+            titulo,
+            typeof contenido === 'function' ? contenido(umbral) : contenido,
+          ])}
+        />
+      )}
 
       {view === 'lista' && (
         <KnowledgeList token={token} alcance={alcance} onSelect={setSelectedId} />
       )}
       {view === 'higiene' && <KnowledgeHygiene token={token} />}
+      {view === 'mejorar' && showImprovements && (
+        <Improvements
+          token={token}
+          me={me}
+          onEntrevistar={onEntrevistar}
+          onRetomar={onRetomar}
+        />
+      )}
       {view === 'cargar' && (
         <KnowledgeIngestForm
           token={token}
           alcance={alcance}
           onIngested={() => setView('lista')}
+          onViewAll={() => setView('lista')}
+          onSearch={() => setView('buscar')}
         />
       )}
-      {view === 'buscar' && <SearchForm token={token} />}
+      {view === 'buscar' && <SearchForm token={token} umbral={umbral} />}
     </div>
   );
 }
@@ -140,39 +281,48 @@ function KnowledgeList({ token, alcance, onSelect }) {
 
   useEffect(() => { load(); }, [load]);
 
+  const desde = data ? (data.page - 1) * PAGE_SIZE + 1 : 0;
+  const hasta = data ? desde + data.data.length - 1 : 0;
+
   return (
-    <div className="card">
-      <h3>Documentos de la base de conocimiento</h3>
+    <section className="knowledge-panel">
+      <header className="knowledge-panel-heading">
+        <div>
+          <span className="knowledge-kicker">Biblioteca</span>
+          <h3>Documentos de la base</h3>
+        </div>
+        {data && <span className="knowledge-panel-count">{data.total} documentos</span>}
+      </header>
 
-      <div className="field">
-        <label>Buscar</label>
-        <input
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="Por título o contenido…"
-        />
-      </div>
-
-      <div className="field-row">
-        <div className="field">
+      <div className="knowledge-filters">
+        <label className="knowledge-search-box">
+          <span className="knowledge-search-icon" aria-hidden="true">⌕</span>
+          <input
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Buscar por título o contenido…"
+            aria-label="Buscar documentos"
+          />
+        </label>
+        <div className="knowledge-filter">
           <label>Área</label>
           <select value={agentType} onChange={(e) => { setPage(1); setAgentType(e.target.value); }}>
-            <option value="">— todas —</option>
+            <option value="">Todas</option>
             {AGENT_TYPES.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
         </div>
-        <div className="field">
+        <div className="knowledge-filter">
           <label>Categoría</label>
           <input
             value={category}
             onChange={(e) => { setPage(1); setCategory(e.target.value); }}
-            placeholder="— todas —"
+            placeholder="Todas"
           />
         </div>
-        <div className="field">
+        <div className="knowledge-filter">
           <label>Estado</label>
           <select value={isActive} onChange={(e) => { setPage(1); setIsActive(e.target.value); }}>
-            <option value="">— todos —</option>
+            <option value="">Todos</option>
             <option value="true">Activos</option>
             <option value="false">Desactivados</option>
           </select>
@@ -180,68 +330,95 @@ function KnowledgeList({ token, alcance, onSelect }) {
       </div>
 
       {error && <p className="error">{error}</p>}
-      {loading && <p className="hint">Cargando…</p>}
+      {loading && !data && <p className="knowledge-empty">Cargando documentos…</p>}
 
       {data && (
         <>
-          <table style={{ marginTop: 12 }}>
-            <thead>
-              <tr>
-                <th>Título</th><th>Área</th><th>Audiencia</th>
-                <th>Estado</th><th>Uso</th><th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.data.length === 0 && (
-                <tr><td colSpan={6}>No hay documentos con esos filtros.</td></tr>
-              )}
-              {data.data.map((d) => (
-                <tr key={d.id}>
-                  <td>
-                    {d.title}
-                    <div className="hint">{d.summary?.slice(0, 90)}…</div>
-                  </td>
-                  <td>
-                    {d.agentType ?? 'general'}
-                    {/* Se marca, no se esconde: ver no es editar (FR-013). Saber
-                        de entrada cuáles no vas a poder tocar evita abrir el
-                        detalle para descubrirlo. */}
-                    {alcance?.misAreas &&
-                      !puedeEscribirEn(alcance.misAreas, alcance.totalAreas, d.agentType) && (
-                        <div className="hint" title="Podés verlo, no modificarlo">
-                          solo lectura
-                        </div>
-                      )}
-                  </td>
-                  <td>
-                    <span className={`badge ${d.audience === 'INTERNO' ? 'status-warning' : 'status-idle'}`}>
-                      {d.audience}
-                    </span>
-                  </td>
-                  <td><EstadoDoc doc={d} /></td>
-                  <td><UsoCorto usage={d.usage} /></td>
-                  <td>
-                    <button type="button" className="secondary" onClick={() => onSelect(d.id)}>
-                      Ver
-                    </button>
-                  </td>
+          <div className={`knowledge-table-wrap${loading ? ' is-loading' : ''}`}>
+            <table className="knowledge-table">
+              <thead>
+                <tr>
+                  <th>Documento</th><th>Área</th><th>Audiencia</th>
+                  <th>Estado</th><th>Uso</th><th><span className="sr-only">Acciones</span></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12 }}>
-            <button type="button" className="secondary" disabled={page === 1} onClick={() => setPage(page - 1)}>
-              ← Anterior
-            </button>
-            <span className="hint">Página {data.page} · {data.total} documentos</span>
-            <button type="button" className="secondary" disabled={!data.hasMore} onClick={() => setPage(page + 1)}>
-              Siguiente →
-            </button>
+              </thead>
+              <tbody>
+                {data.data.length === 0 && (
+                  <tr className="knowledge-table-empty">
+                    <td colSpan={6}>No hay documentos con esos filtros.</td>
+                  </tr>
+                )}
+                {data.data.map((d) => (
+                  <tr key={d.id}>
+                    <td className="knowledge-doc-cell">
+                      <strong className="knowledge-doc-title">{d.title}</strong>
+                      {d.summary && (
+                        <span className="knowledge-doc-summary">
+                          {d.summary.length > 110 ? `${d.summary.slice(0, 110)}…` : d.summary}
+                        </span>
+                      )}
+                    </td>
+                    <td data-label="Área">
+                      <span className="knowledge-area">{d.agentType ?? 'General'}</span>
+                      {/* Se marca, no se esconde: ver no es editar (FR-013). Saber
+                          de entrada cuáles no vas a poder tocar evita abrir el
+                          detalle para descubrirlo. */}
+                      {alcance?.misAreas &&
+                        !puedeEscribirEn(alcance.misAreas, alcance.totalAreas, d.agentType) && (
+                          <span className="knowledge-readonly" title="Podés verlo, no modificarlo">
+                            Solo lectura
+                          </span>
+                        )}
+                    </td>
+                    <td data-label="Audiencia">
+                      <span className={`badge ${d.audience === 'INTERNO' ? 'status-warning' : 'status-idle'}`}>
+                        {d.audience}
+                      </span>
+                    </td>
+                    <td data-label="Estado"><EstadoDoc doc={d} /></td>
+                    <td data-label="Uso"><UsoCorto usage={d.usage} /></td>
+                    <td className="knowledge-row-action">
+                      <button type="button" className="secondary" onClick={() => onSelect(d.id)}>
+                        Ver detalle
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+
+          {data.total > 0 && (
+            <div className="table-pagination-footer knowledge-pagination">
+              <span className="pagination-text">
+                Mostrando {desde} a {hasta} de {data.total} documentos
+              </span>
+              <div className="page-btn-group">
+                <button
+                  type="button"
+                  className="page-nav-btn"
+                  aria-label="Página anterior"
+                  disabled={page === 1}
+                  onClick={() => setPage(page - 1)}
+                >
+                  ‹
+                </button>
+                <span className="page-num-active" aria-current="page">{data.page}</span>
+                <button
+                  type="button"
+                  className="page-nav-btn"
+                  aria-label="Página siguiente"
+                  disabled={!data.hasMore}
+                  onClick={() => setPage(page + 1)}
+                >
+                  ›
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -257,10 +434,10 @@ function EstadoDoc({ doc }) {
  * documento que nadie consultó nunca invita a darlo de baja por inútil.
  */
 function UsoCorto({ usage }) {
-  if (!usage?.hasData) return <span className="hint">sin datos</span>;
+  if (!usage?.hasData) return <span className="knowledge-usage is-empty">sin datos</span>;
   return (
-    <span className="hint">
-      {usage.answeredCount}/{usage.retrievedCount} · {usage.avgScore}
+    <span className="knowledge-usage" title="Respondidas / recuperadas · score promedio">
+      <strong>{usage.answeredCount}/{usage.retrievedCount}</strong> · {usage.avgScore}
     </span>
   );
 }
@@ -377,84 +554,70 @@ function ResultRow({ r, alcanza }) {
   const estado = ESTADO_VECTOR[r.desincronizado];
 
   return (
-    <tr>
-      <td style={alcanza === false ? { color: 'var(--text-muted)' } : undefined}>
-        {r.score.toFixed(3)}
-      </td>
-      <td>
-        {alcanza === null && <span className="hint">—</span>}
-        {alcanza === true && <span className="badge status-active">sí</span>}
+    <article className={`knowledge-result${alcanza === false ? ' is-below' : ''}`}>
+      <div className="knowledge-result-score">
+        <span className="knowledge-result-score-value">{(r.score * 100).toFixed(1)}%</span>
+        <div className="knowledge-result-score-track" aria-hidden="true">
+          <div style={{ width: `${Math.max(0, Math.min(1, r.score)) * 100}%` }} />
+        </div>
+        {alcanza === true && <span className="badge status-active">Alcanza</span>}
         {alcanza === false && (
           // No es un error del sistema: es el corte funcionando. Por eso va en
           // gris/aviso y no en rojo de error.
           <span className="badge status-idle" title="Por debajo del umbral: en una conversación real esto habría derivado a una persona">
-            derivaría
+            Derivaría
           </span>
         )}
-      </td>
-      <td>
-        {/* El título CON EL QUE SE VECTORIZÓ, no el vigente. Cuando difieren,
-            se muestran los dos: ver solo el vigente taparía el desfase. */}
-        {r.title}
-        {r.desincronizado === 'DESFASADO' && r.vigente?.title !== r.title && (
-          <div className="hint" style={{ color: '#09b4aa' }}>
-            hoy se llama «{r.vigente.title}»
+      </div>
+
+      <div className="knowledge-result-body">
+        <div className="knowledge-result-heading">
+          <div className="knowledge-result-title">
+            {/* El título CON EL QUE SE VECTORIZÓ, no el vigente. Cuando difieren,
+                se muestran los dos: ver solo el vigente taparía el desfase. */}
+            <strong>{r.title}</strong>
+            {r.desincronizado === 'DESFASADO' && r.vigente?.title !== r.title && (
+              <span className="knowledge-result-renamed">hoy se llama «{r.vigente.title}»</span>
+            )}
           </div>
-        )}
-      </td>
-      <td>
-        {estado && (
-          <span className={`badge ${estado.clase}`} title={estado.title}>
-            {estado.texto}
-          </span>
-        )}
-        {r.version !== undefined && (
-          <div className="hint">
-            v{r.version}
-            {r.vigente && r.vigente.version !== r.version && ` · doc v${r.vigente.version}`}
+          <div className="knowledge-result-vector">
+            {estado && (
+              <span className={`badge ${estado.clase}`} title={estado.title}>
+                {estado.texto}
+              </span>
+            )}
+            {r.version !== undefined && (
+              <span className="knowledge-result-version">
+                v{r.version}
+                {r.vigente && r.vigente.version !== r.version && ` · doc v${r.vigente.version}`}
+              </span>
+            )}
           </div>
-        )}
-      </td>
-      <td>
-        <div style={{ whiteSpace: 'pre-wrap' }}>
-          {abierto || !largo ? r.content : `${r.content.slice(0, 140)}…`}
         </div>
+        <p className="knowledge-result-content">
+          {abierto || !largo ? r.content : `${r.content.slice(0, 140)}…`}
+        </p>
         {largo && (
           <button
             type="button"
-            className="secondary"
-            style={{ padding: '2px 8px', fontSize: 11, marginTop: 4 }}
+            className="knowledge-text-button"
             onClick={() => setAbierto((v) => !v)}
           >
             {abierto ? 'Ver menos' : 'Ver el fragmento completo'}
           </button>
         )}
-      </td>
-    </tr>
+      </div>
+    </article>
   );
 }
 
-function SearchForm({ token }) {
+function SearchForm({ token, umbral }) {
   const [query, setQuery] = useState('');
   const [audience, setAudience] = useState('PUBLICO');
   const [agentType, setAgentType] = useState('');
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState(null);
   const [error, setError] = useState('');
-  // Umbral vigente (spec 006). No hace falta endpoint nuevo: `agents/status` ya
-  // lo devuelve y el Panel del Supervisor ya lo pinta.
-  const [umbral, setUmbral] = useState(null);
-
-  useEffect(() => {
-    let vivo = true;
-    getAgentsStatus(token)
-      .then((d) => { if (vivo) setUmbral(d?.confidenceThreshold ?? null); })
-      // Si falla, la tabla se muestra igual pero sin la marca de umbral: es
-      // información de más, no un requisito para buscar.
-      .catch(() => {});
-    return () => { vivo = false; };
-  }, [token]);
-
   async function handleSearch(e) {
     e.preventDefault();
     setBusy(true); setError(''); setResults(null);
@@ -470,83 +633,67 @@ function SearchForm({ token }) {
   }
 
   return (
-    <div className="card">
-      <h3>Probar búsqueda (RAG)</h3>
-      <p className="hint">
-        Sirve para comprobar la confidencialidad: la misma consulta con
-        audiencia PUBLICO no debería recuperar documentos INTERNO.
-      </p>
-      {/*
-        Spec 006. Este buscador NO aplica el umbral a propósito: muestra lo
-        crudo que devuelve el RAG para poder inspeccionarlo. Sin decirlo, cinco
-        resultados en 53% se leen como «encontró esto» cuando en una
-        conversación real esos mismos habrían derivado a un humano — que es
-        justo lo que hizo pensar que había un bug donde no lo había.
-      */}
-      <p className="hint">
-        <strong>Muestra todo lo que recupera, sin filtrar.</strong> En una
-        conversación real el asistente solo responde si el mejor resultado
-        alcanza el umbral
-        {umbral !== null && <> de <strong>{(umbral * 100).toFixed(0)}%</strong></>};
-        por debajo deriva a una persona. Acá no se aplica ese corte a propósito,
-        para poder ver lo crudo.
-      </p>
-      <p className="hint">
-        La columna <strong>Vector</strong> dice si lo que el agente busca está al
-        día. <strong>Desfasado</strong> significa que el documento se editó y el
-        vector quedó atrás: la búsqueda sigue corriendo contra el texto viejo
-        aunque el panel muestre el nuevo. Se arregla reindexando el documento
-        desde su ficha.
-      </p>
-      <form onSubmit={handleSearch}>
-        <div className="field">
+    <section className="knowledge-panel">
+      <header className="knowledge-panel-heading">
+        <div>
+          <span className="knowledge-kicker">Diagnóstico RAG</span>
+          <h3>Probar búsqueda</h3>
+        </div>
+        {umbral !== null && (
+          <span className="knowledge-panel-count">
+            Umbral vigente <strong>{(umbral * 100).toFixed(0)}%</strong>
+          </span>
+        )}
+      </header>
+
+      <form className="knowledge-search-form" onSubmit={handleSearch}>
+        <div className="knowledge-filter knowledge-search-query">
           <label>Consulta</label>
-          <input value={query} onChange={(e) => setQuery(e.target.value)} required />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Ej: ¿Cuántas cuotas puedo financiar?"
+            required
+          />
         </div>
-        <div className="field-row">
-          <div className="field">
-            <label>Audiencia</label>
-            <select value={audience} onChange={(e) => setAudience(e.target.value)}>
-              <option value="PUBLICO">PUBLICO</option>
-              <option value="INTERNO">INTERNO</option>
-            </select>
-          </div>
-          <div className="field">
-            <label>Agente (opcional)</label>
-            <select value={agentType} onChange={(e) => setAgentType(e.target.value)}>
-              <option value="">— cualquiera —</option>
-              {AGENT_TYPES.map((a) => <option key={a} value={a}>{a}</option>)}
-            </select>
-          </div>
+        <div className="knowledge-filter">
+          <label>Audiencia</label>
+          <select value={audience} onChange={(e) => setAudience(e.target.value)}>
+            <option value="PUBLICO">PUBLICO</option>
+            <option value="INTERNO">INTERNO</option>
+          </select>
         </div>
-        <button type="submit" disabled={busy} className="secondary">
-          {busy ? 'Buscando...' : 'Buscar'}
+        <div className="knowledge-filter">
+          <label>Agente</label>
+          <select value={agentType} onChange={(e) => setAgentType(e.target.value)}>
+            <option value="">Cualquiera</option>
+            {AGENT_TYPES.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+        <button type="submit" disabled={busy} className="knowledge-primary-button">
+          {busy ? 'Buscando…' : 'Buscar'}
         </button>
       </form>
-      {error && <p className="error" style={{ marginTop: 12 }}>{error}</p>}
+
+      {error && <p className="error">{error}</p>}
       {results && (
-        <table style={{ marginTop: 12 }}>
-          <thead>
-            <tr>
-              <th>Score</th>
-              <th>¿Alcanza?</th>
-              <th>Título</th>
-              <th>Vector</th>
-              <th>Contenido</th>
-            </tr>
-          </thead>
-          <tbody>
-            {results.length === 0 && <tr><td colSpan={5}>Sin resultados.</td></tr>}
-            {results.map((r) => {
-              // `null` mientras no se conozca el umbral: sin dato no se opina.
-              const alcanza = umbral === null ? null : r.score >= umbral;
-              return (
-                <ResultRow key={r.documentId + r.content.slice(0, 10)} r={r} alcanza={alcanza} />
-              );
-            })}
-          </tbody>
-        </table>
+        <div className="knowledge-results">
+          <h4 className="knowledge-section-title">
+            {results.length} {results.length === 1 ? 'resultado' : 'resultados'}
+            {/* Spec 006: el buscador muestra lo crudo, sin el corte del umbral.
+                El detalle está en «Info»; acá se recuerda al lado de los números. */}
+            <span className="knowledge-label-note">sin filtrar por umbral</span>
+          </h4>
+          {results.length === 0 && <p className="knowledge-empty">Sin resultados para esa consulta.</p>}
+          {results.map((r) => {
+            // `null` mientras no se conozca el umbral: sin dato no se opina.
+            const alcanza = umbral === null ? null : r.score >= umbral;
+            return (
+              <ResultRow key={r.documentId + r.content.slice(0, 10)} r={r} alcanza={alcanza} />
+            );
+          })}
+        </div>
       )}
-    </div>
+    </section>
   );
 }

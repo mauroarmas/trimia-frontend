@@ -52,7 +52,7 @@ export default function SupervisorPanel({ token, me }) {
   }
 
   return (
-    <div>
+    <div className="supervisor-panel">
       <div className="page-header">
         <div>
           <h2 className="page-title">Panel del Supervisor</h2>
@@ -64,7 +64,49 @@ export default function SupervisorPanel({ token, me }) {
       </div>
       {error && <p className="error" style={{ marginTop: 12 }}>{error}</p>}
 
-      <div className="card" style={{ marginTop: 16 }}>
+      <section className="supervisor-metrics-section" aria-labelledby="supervisor-metrics-title">
+        <h3 id="supervisor-metrics-title">Métricas globales</h3>
+        {metrics && (
+          <div className="supervisor-metric-grid">
+            <article className="supervisor-metric-card">
+              <div className="supervisor-metric-summary">
+                <span className="supervisor-metric-label">Conversaciones totales</span>
+                <strong className="supervisor-metric-value">{metrics.conversations?.total ?? 0}</strong>
+                <span className="badge status-active">{metrics.conversations?.active ?? 0} activas</span>
+              </div>
+              <div className="supervisor-metric-breakdown">
+                <div className="supervisor-breakdown-title">Conversaciones por agente</div>
+                {metrics.conversations?.byAgent && Object.keys(metrics.conversations.byAgent).length > 0 ? (
+                  Object.entries(metrics.conversations.byAgent).map(([agent, count]) => (
+                    <div className="supervisor-breakdown-row" key={agent}><span>{agent}</span><strong>{count}</strong></div>
+                  ))
+                ) : <span className="hint">Sin datos por agente</span>}
+              </div>
+            </article>
+            <article className="supervisor-metric-card">
+              <div className="supervisor-metric-summary">
+                <span className="supervisor-metric-label">Tokens totales</span>
+                <strong className="supervisor-metric-value">
+                  {((metrics.tokens?.totalInput ?? 0) + (metrics.tokens?.totalOutput ?? 0)).toLocaleString('es-AR')}
+                </strong>
+                <span className="hint">Entrada: {metrics.tokens?.totalInput ?? 0} · Salida: {metrics.tokens?.totalOutput ?? 0}</span>
+              </div>
+              <div className="supervisor-metric-breakdown">
+                <div className="supervisor-breakdown-title">Tokens por agente</div>
+                {metrics.tokens?.byAgent && Object.keys(metrics.tokens.byAgent).length > 0 ? (
+                  Object.entries(metrics.tokens.byAgent).map(([agent, tokens]) => (
+                    <div className="supervisor-breakdown-row" key={agent}>
+                      <span>{agent}</span><span>Entrada <strong>{tokens.input ?? tokens}</strong> · Salida <strong>{tokens.output ?? '—'}</strong></span>
+                    </div>
+                  ))
+                ) : <span className="hint">Sin datos por agente</span>}
+              </div>
+            </article>
+          </div>
+        )}
+      </section>
+
+      <div className="card supervisor-agents-card">
         <h3>Agentes (umbral confianza: {agents?.confidenceThreshold ?? '?'})</h3>
         <table>
           <thead>
@@ -110,67 +152,7 @@ export default function SupervisorPanel({ token, me }) {
         </table>
       </div>
 
-      <div className="card">
-        <h3>Métricas globales</h3>
-        {metrics && (
-          <div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7f3', borderRadius: 6, padding: 12 }}>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Conversaciones totales</div>
-                <div style={{ fontSize: 20, fontWeight: 'bold', marginTop: 4 }}>{metrics.conversations?.total ?? 0}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>activas: {metrics.conversations?.active ?? 0}</div>
-              </div>
-              <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 6, padding: 12 }}>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Tokens totales</div>
-                <div style={{ fontSize: 20, fontWeight: 'bold', marginTop: 4 }}>
-                  {(metrics.tokens?.totalInput ?? 0) + (metrics.tokens?.totalOutput ?? 0)}
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                  entrada: {metrics.tokens?.totalInput ?? 0} | salida: {metrics.tokens?.totalOutput ?? 0}
-                </div>
-              </div>
-            </div>
-
-            {metrics.conversations?.byAgent && Object.keys(metrics.conversations.byAgent).length > 0 && (
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Conversaciones por agente</div>
-                <table>
-                  <thead>
-                    <tr><th>Agente</th><th>Count</th></tr>
-                  </thead>
-                  <tbody>
-                    {Object.entries(metrics.conversations.byAgent).map(([agent, count]) => (
-                      <tr key={agent}><td>{agent}</td><td>{count}</td></tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {metrics.tokens?.byAgent && Object.keys(metrics.tokens.byAgent).length > 0 && (
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Tokens por agente</div>
-                <table>
-                  <thead>
-                    <tr><th>Agente</th><th>Input</th><th>Output</th></tr>
-                  </thead>
-                  <tbody>
-                    {Object.entries(metrics.tokens.byAgent).map(([agent, tokens]) => (
-                      <tr key={agent}>
-                        <td>{agent}</td>
-                        <td>{tokens.input ?? tokens}</td>
-                        <td>{tokens.output ?? '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="card">
+      <div className="card supervisor-conversations-card">
         <h3>Conversaciones ({conversations.length})</h3>
         <table>
           <thead>

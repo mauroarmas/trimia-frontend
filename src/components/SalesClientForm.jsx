@@ -75,11 +75,8 @@ export default function SalesClientForm({ token }) {
 
   return (
     <div className="card" style={{ marginTop: 12 }}>
+      {/* Qué hace el alta está en el botón «Info» de la barra de Ventas. */}
       <h3>Alta de cliente</h3>
-      <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-        Al cerrar una venta financiada, se da de alta el cliente con su plan de cuotas.
-        Si no se le asigna cobrador, queda en la cola del Cobrador Controlador.
-      </p>
 
       {error && <p className="error">{error}</p>}
 

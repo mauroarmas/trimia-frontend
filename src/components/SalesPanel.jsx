@@ -1,5 +1,31 @@
 import { useState } from 'react';
 import SalesClientForm from './SalesClientForm';
+import InfoNotes, { InfoToggle } from './InfoNotes';
+
+const SUBTAB_TITULO = {
+  prospects: 'Clientes por contactar',
+  stock: 'Consultar stock',
+  new_client: 'Alta de cliente',
+};
+
+/** Qué explica el botón «Info» en cada subpestaña. */
+const INFO_POR_SUBTAB = {
+  prospects: [
+    ['Clientes por contactar.',
+      'Derivados automáticamente por el bot de WhatsApp según turno y disponibilidad.'],
+  ],
+  stock: [
+    ['Consultar stock.',
+      'Verificá disponibilidad de productos para asesorar al cliente o derivarlo con el link '
+      + 'web oficial de Credimisión.'],
+  ],
+  new_client: [
+    ['Alta de cliente.',
+      'Al cerrar una venta financiada, se da de alta el cliente con su plan de cuotas.'],
+    ['Sin cobrador asignado.',
+      'Si no se le asigna cobrador, queda en la cola del Cobrador Controlador.'],
+  ],
+};
 
 // Datos de demostración basados en las especificaciones del documento
 const INITIAL_PROSPECTS = [
@@ -106,6 +132,7 @@ export default function SalesPanel({ token, me }) {
   const [prospects, setProspects] = useState(INITIAL_PROSPECTS);
   const [stockSearch, setStockSearch] = useState('');
   const [contactedMsg, setContactedMsg] = useState('');
+  const [mostrarInfo, setMostrarInfo] = useState(false);
 
   function handleTakeProspect(p) {
     setContactedMsg(`Iniciando contacto con ${p.name} (${p.phone}). Podés contactarlo vía WhatsApp o llamarlo.`);
@@ -152,7 +179,18 @@ export default function SalesPanel({ token, me }) {
             📝 Alta de cliente (Cierre)
           </button>
         </div>
+        <div className="info-bar-actions">
+          <InfoToggle open={mostrarInfo} onToggle={() => setMostrarInfo((v) => !v)} />
+        </div>
       </div>
+
+      {mostrarInfo && (
+        <InfoNotes
+          title={SUBTAB_TITULO[activeSubtab]}
+          notes={INFO_POR_SUBTAB[activeSubtab]}
+          onClose={() => setMostrarInfo(false)}
+        />
+      )}
 
       {contactedMsg && <p className="success-msg" style={{ marginBottom: 16 }}>{contactedMsg}</p>}
 
@@ -162,9 +200,6 @@ export default function SalesPanel({ token, me }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div>
               <h3>Clientes que requieren atención de un vendedor</h3>
-              <p className="hint">
-                Derivados automáticamente por el bot de WhatsApp según turno y disponibilidad.
-              </p>
             </div>
           </div>
 
@@ -227,9 +262,6 @@ export default function SalesPanel({ token, me }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div>
               <h3>Consulta de Stock en Catálogo</h3>
-              <p className="hint">
-                Verificá disponibilidad de productos para asesorar al cliente o derivarlo con el link web oficial de Credimisión.
-              </p>
             </div>
             <input
               type="text"

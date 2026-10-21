@@ -17,6 +17,7 @@ import {
   ordenarCandidatos,
   puedeEscribirEn,
 } from '../areas';
+import InfoNotes, { InfoToggle } from './InfoNotes';
 
 /**
  * Dónde se recuerda la conversación entre recargas.
@@ -78,6 +79,7 @@ function esInformeDeBajaConfianza(m) {
  */
 export default function WebChat({ token, me }) {
   const [text, setText] = useState('');
+  const [mostrarInfo, setMostrarInfo] = useState(false);
   const claveConv = claveDeConversacion(me?.id);
   const [convId, setConvId] = useState(() => localStorage.getItem(claveConv));
   const [messages, setMessages] = useState([]);
@@ -301,12 +303,21 @@ export default function WebChat({ token, me }) {
 
   return (
     <div className="card">
-      <h3>Chat con el asistente</h3>
-      <p className="hint">
-        Conversás como vos mismo: el asistente te reconoce como empleado y puede
-        usar conocimiento interno. Es un hilo aparte del de WhatsApp, aunque los
-        dos sean tuyos.
-      </p>
+      <div className="info-heading-row">
+        <h3>Chat con el asistente</h3>
+        <InfoToggle open={mostrarInfo} onToggle={() => setMostrarInfo((v) => !v)} />
+      </div>
+      {mostrarInfo && (
+        <InfoNotes
+          title="Chat con el asistente"
+          onClose={() => setMostrarInfo(false)}
+          notes={[
+            ['Conversás como vos mismo.',
+              'El asistente te reconoce como empleado y puede usar conocimiento interno.'],
+            ['Hilo aparte.', 'Es un hilo aparte del de WhatsApp, aunque los dos sean tuyos.'],
+          ]}
+        />
+      )}
 
       {/* 409: el backend no puede resolver la identidad conversacional sin
           teléfono. El mensaje viene accionable desde el backend. */}

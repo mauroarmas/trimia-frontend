@@ -9,8 +9,21 @@ import {
   applyAiEdit,
 } from '../api';
 import { motivoDeBloqueo, puedeEscribirEn } from '../areas';
+import InfoNotes, { InfoToggle } from './InfoNotes';
 
 const AGENT_TYPES = ['SALES', 'COLLECTIONS', 'LOGISTICS', 'DEPOSITS', 'ADMIN'];
+
+const INFO_DETALLE = [
+  ['Reindexación.',
+    'Cambiar el contenido, la audiencia o el agente vuelve a indexar el documento. '
+    + 'Cambiar solo el título o la categoría, no.'],
+  ['Mientras se indexa.',
+    'El cambio ya está guardado, pero hasta que termine el asistente sigue respondiendo '
+    + 'con el contenido anterior. No hace falta volver a guardar.'],
+  ['Editar con la IA.',
+    'La propuesta no se aplica sola: el documento no cambia hasta que la apruebes, y el '
+    + 'texto propuesto se puede corregir antes de aplicarlo.'],
+];
 
 /**
  * Detalle de un documento (US2/US6/US7): edición manual, activar/desactivar,
@@ -21,6 +34,7 @@ export default function KnowledgeDetail({ token, id, alcance, onClose, onChanged
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(null);
+  const [mostrarInfo, setMostrarInfo] = useState(false);
 
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [id]);
 
@@ -76,8 +90,15 @@ export default function KnowledgeDetail({ token, id, alcance, onClose, onChanged
     await load();
   }
 
-  if (error && !doc) return <p className="error">{error}</p>;
-  if (!doc || !form) return <p className="hint">Cargando…</p>;
+  if (error && !doc) {
+    return (
+      <>
+        <button type="button" className="knowledge-text-button knowledge-back-button" onClick={onClose}>← Volver a documentos</button>
+        <p className="error">{error}</p>
+      </>
+    );
+  }
+  if (!doc || !form) return <p className="knowledge-empty">Cargando documento…</p>;
 
   /**
    * Spec 005: el documento se **ve** siempre; se **modifica** solo si es de un área
@@ -92,92 +113,131 @@ export default function KnowledgeDetail({ token, id, alcance, onClose, onChanged
     : '';
 
   return (
-    <div className="card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-        <div>
-          <h3 style={{ marginBottom: 4 }}>{doc.title}</h3>
-          <span className="hint">
-            versión {doc.version} · {doc.category} · {doc.agentType ?? 'general'}
-          </span>
+    <>
+      <div className="submenu-bar">
+        <button type="button" className="btn-pill-action" onClick={onClose}>← Volver a documentos</button>
+        <div className="info-bar-actions">
+          <InfoToggle open={mostrarInfo} onToggle={() => setMostrarInfo((v) => !v)} />
         </div>
-        <button type="button" className="secondary" onClick={onClose}>Volver</button>
       </div>
+      {mostrarInfo && (
+        <InfoNotes
+          title="Detalle del documento"
+          notes={INFO_DETALLE}
+          onClose={() => setMostrarInfo(false)}
+        />
+      )}
+
+      <section className="knowledge-hero knowledge-detail-hero">
+        <span className="knowledge-hero-kicker">Documento · versión {doc.version}</span>
+        <h2 className="knowledge-hero-title">{doc.title}</h2>
+        <div className="knowledge-detail-meta">
+          <span className="knowledge-detail-chip">{doc.category}</span>
+          <span className="knowledge-detail-chip">{doc.agentType ?? 'General'}</span>
+          <span className="knowledge-detail-chip">{doc.audience}</span>
+          <span className={`knowledge-detail-chip${doc.isActive ? ' is-active' : ' is-off'}`}>
+            {doc.isActive ? 'Activo' : 'Desactivado'}
+          </span>
+          {soloLectura && <span className="knowledge-detail-chip is-off">Solo lectura</span>}
+        </div>
+      </section>
 
       {soloLectura && (
-        <div className="hint" style={{ marginTop: 12 }}>
+        <p className="knowledge-block-note knowledge-detail-alert">
           <strong>Solo lectura.</strong> {motivo} Podés leerlo entero —para no
           duplicarlo, o para saber a quién pedirle el cambio—, pero las acciones de
           edición están deshabilitadas.
-        </div>
+        </p>
       )}
 
       <SyncIndicator doc={doc} onReindex={handleReindex} soloLectura={soloLectura} />
 
-      <div className="field-row" style={{ marginTop: 16 }}>
-        <UsagePanel usage={doc.usage} />
-        <SourcePanel source={doc.source} token={token} />
-      </div>
+      <div className="knowledge-detail-layout">
+        <section className="knowledge-panel knowledge-detail-main">
+          <header className="knowledge-panel-heading">
+            <div>
+              <span className="knowledge-kicker">Edición manual</span>
+              <h3>Contenido del documento</h3>
+            </div>
+          </header>
 
-      <form onSubmit={handleSave} style={{ marginTop: 16 }}>
-        <div className="field-row">
-          <div className="field">
-            <label>Título</label>
-            <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-          </div>
-          <div className="field">
-            <label>Categoría</label>
-            <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
-          </div>
-        </div>
-        <div className="field">
-          <label>Contenido</label>
-          <textarea rows={10} value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} />
-        </div>
-        <div className="field-row">
-          <div className="field">
-            <label>Audiencia</label>
-            <select value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value })}>
-              <option value="PUBLICO">PUBLICO</option>
-              <option value="INTERNO">INTERNO</option>
-            </select>
-          </div>
-          <div className="field">
-            <label>Agente</label>
-            <select value={form.agentType} onChange={(e) => setForm({ ...form, agentType: e.target.value })}>
-              <option value="">— general —</option>
-              {AGENT_TYPES.map((a) => <option key={a} value={a}>{a}</option>)}
-            </select>
-          </div>
-        </div>
-        <p className="hint">
-          Cambiar el contenido, la audiencia o el agente vuelve a indexar el
-          documento. Cambiar solo el título o la categoría, no.
-        </p>
-        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-          <button type="submit" disabled={saving || soloLectura} title={motivo}>
-            {saving ? 'Guardando…' : 'Guardar cambios'}
-          </button>
-          <button
-            type="button"
-            className="secondary"
-            onClick={handleToggleActive}
-            disabled={soloLectura}
-            title={motivo}
-          >
-            {doc.isActive ? 'Desactivar' : 'Reactivar'}
-          </button>
-          <button
-            type="button"
-            className="secondary"
-            onClick={handleDelete}
-            disabled={soloLectura}
-            title={motivo}
-          >
-            Borrar
-          </button>
-        </div>
-        {error && <p className="error" style={{ marginTop: 12 }}>{error}</p>}
-      </form>
+          <form onSubmit={handleSave}>
+            <div className="knowledge-ingest-fields">
+              <div className="knowledge-filter">
+                <label>Título</label>
+                <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+              </div>
+              <div className="knowledge-filter">
+                <label>Categoría</label>
+                <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+              </div>
+              <div className="knowledge-filter">
+                <label>Audiencia</label>
+                <select value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value })}>
+                  <option value="PUBLICO">PUBLICO</option>
+                  <option value="INTERNO">INTERNO</option>
+                </select>
+              </div>
+              <div className="knowledge-filter">
+                <label>Agente</label>
+                <select value={form.agentType} onChange={(e) => setForm({ ...form, agentType: e.target.value })}>
+                  <option value="">General</option>
+                  {AGENT_TYPES.map((a) => <option key={a} value={a}>{a}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="knowledge-filter">
+              <label>Contenido</label>
+              <textarea
+                className="knowledge-detail-content"
+                rows={14}
+                value={form.content}
+                onChange={(e) => setForm({ ...form, content: e.target.value })}
+              />
+            </div>
+            {error && <p className="error">{error}</p>}
+            <div className="knowledge-form-actions">
+              <button
+                type="submit"
+                className="knowledge-primary-button"
+                disabled={saving || soloLectura}
+                title={motivo}
+              >
+                {saving ? 'Guardando…' : 'Guardar cambios'}
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <aside className="knowledge-detail-side">
+          <UsagePanel usage={doc.usage} />
+          <SourcePanel source={doc.source} token={token} />
+
+          <section className="knowledge-panel knowledge-side-card">
+            <span className="knowledge-kicker">Acciones</span>
+            <div className="knowledge-side-actions">
+              <button
+                type="button"
+                className="secondary"
+                onClick={handleToggleActive}
+                disabled={soloLectura}
+                title={motivo}
+              >
+                {doc.isActive ? 'Desactivar documento' : 'Reactivar documento'}
+              </button>
+              <button
+                type="button"
+                className="secondary knowledge-danger-button"
+                onClick={handleDelete}
+                disabled={soloLectura}
+                title={motivo}
+              >
+                Borrar definitivamente
+              </button>
+            </div>
+          </section>
+        </aside>
+      </div>
 
       <AiEditor
         token={token}
@@ -188,7 +248,7 @@ export default function KnowledgeDetail({ token, id, alcance, onClose, onChanged
       />
 
       <ChangeLog changes={doc.changes} />
-    </div>
+    </>
   );
 }
 
@@ -202,7 +262,7 @@ function SyncIndicator({ doc, onReindex, soloLectura }) {
 
   const pendiente = doc.syncStatus === 'PENDING_REINDEX';
   return (
-    <div className={pendiente ? 'success-msg' : 'error'} style={{ marginTop: 12 }}>
+    <div className={`knowledge-detail-alert ${pendiente ? 'success-msg' : 'error'}`}>
       {pendiente ? (
         <p>
           <strong>Indexando…</strong> El cambio ya está guardado. Hasta que
@@ -238,23 +298,36 @@ function SyncIndicator({ doc, onReindex, soloLectura }) {
 function UsagePanel({ usage }) {
   if (!usage) return null;
   return (
-    <div className="field">
-      <label>Uso</label>
+    <section className="knowledge-panel knowledge-side-card">
+      <span className="knowledge-kicker">Uso</span>
       {!usage.hasData ? (
-        <p className="hint">
+        <p className="knowledge-side-copy">
           Sin datos todavía: nadie hizo una consulta que lo recuperara.
         </p>
       ) : (
-        <p className="hint">
-          Apareció en <strong>{usage.retrievedCount}</strong> consultas y sirvió
-          para responder en <strong>{usage.answeredCount}</strong>.
-          Similitud promedio: <strong>{usage.avgScore}</strong>.
+        <>
+          <div className="knowledge-stat-grid">
+            <div>
+              <strong>{usage.retrievedCount}</strong>
+              <span>recuperado</span>
+            </div>
+            <div>
+              <strong>{usage.answeredCount}</strong>
+              <span>respondió</span>
+            </div>
+            <div>
+              <strong>{usage.avgScore}</strong>
+              <span>similitud</span>
+            </div>
+          </div>
           {usage.answeredCount < usage.retrievedCount && (
-            <> Aparece más veces de las que alcanza para responder.</>
+            <p className="knowledge-side-copy">
+              Aparece más veces de las que alcanza para responder.
+            </p>
           )}
-        </p>
+        </>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -273,15 +346,17 @@ function SourcePanel({ source, token }) {
   }
 
   return (
-    <div className="field">
-      <label>Origen</label>
+    <section className="knowledge-panel knowledge-side-card">
+      <span className="knowledge-kicker">Origen</span>
       {source.type === 'ESCALADO' && source.escalation ? (
-        <p className="hint">
+        <p className="knowledge-side-copy">
           Salió de una consulta escalada: «{source.escalation.reason}»
         </p>
       ) : source.file ? (
-        <p className="hint">
-          Archivo <strong>{source.file.filename}</strong>{' '}
+        <>
+          <p className="knowledge-side-copy">
+            Archivo <strong className="knowledge-side-file">{source.file.filename}</strong>
+          </p>
           <button
             type="button"
             className="secondary"
@@ -289,13 +364,13 @@ function SourcePanel({ source, token }) {
           >
             Descargar original
           </button>
-        </p>
+        </>
       ) : (
         // Sin `file` no hay nada que bajar: o se cargó como texto, o vino de un
         // audio, que se elimina apenas se transcribe.
-        <p className="hint">Cargado como texto, o transcripto de un audio que ya se eliminó.</p>
+        <p className="knowledge-side-copy">Cargado como texto, o transcripto de un audio que ya se eliminó.</p>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -353,38 +428,35 @@ function AiEditor({ token, doc, soloLectura, motivo, onApplied }) {
   // persona— para nada.
   if (soloLectura) {
     return (
-      <div className="panel-section" style={{ marginTop: 24 }}>
-        <h4>Editar con la IA</h4>
-        <p className="hint">No disponible: {motivo}</p>
-      </div>
+      <section className="knowledge-panel">
+        <AiEditorHeading />
+        <p className="knowledge-side-copy">No disponible: {motivo}</p>
+      </section>
     );
   }
 
   return (
-    <div className="panel-section" style={{ marginTop: 24 }}>
-      <h4>Editar con la IA</h4>
-      <form onSubmit={handlePreview}>
-        <div className="field">
+    <section className="knowledge-panel">
+      <AiEditorHeading />
+      <form className="knowledge-ai-form" onSubmit={handlePreview}>
+        <div className="knowledge-filter">
           <label>¿Qué querés cambiar?</label>
           <input
             value={instruction}
             onChange={(e) => setInstruction(e.target.value)}
-            placeholder="ej. el anticipo mínimo pasó de 20% a 30%"
+            placeholder="Ej: el anticipo mínimo pasó de 20% a 30%"
             required
           />
         </div>
-        <button type="submit" disabled={loading}>
-          {loading ? 'Preparando…' : 'Proponer cambio'}
+        <button type="submit" className="knowledge-primary-button" disabled={loading}>
+          {loading ? 'Preparando…' : '✨ Proponer cambio'}
         </button>
-        <span className="hint" style={{ marginLeft: 8 }}>
-          La propuesta no se aplica sola: el documento no cambia hasta que la apruebes.
-        </span>
       </form>
 
-      {error && <p className="error" style={{ marginTop: 12 }}>{error}</p>}
+      {error && <p className="error knowledge-ai-message">{error}</p>}
 
       {conflict && (
-        <div className="error" style={{ marginTop: 12 }}>
+        <div className="error knowledge-ai-message">
           <p>{conflict.message}</p>
           <button type="button" className="secondary" onClick={handlePreview}>
             Regenerar sobre la versión {conflict.currentVersion}
@@ -393,7 +465,7 @@ function AiEditor({ token, doc, soloLectura, motivo, onApplied }) {
       )}
 
       {proposal && !proposal.confident && (
-        <div className="error" style={{ marginTop: 12 }}>
+        <div className="error knowledge-ai-message">
           <p><strong>No se pudo resolver el pedido.</strong> {proposal.summary}</p>
           <p className="hint">
             El documento quedó intacto. Probá con una instrucción más concreta,
@@ -403,72 +475,91 @@ function AiEditor({ token, doc, soloLectura, motivo, onApplied }) {
       )}
 
       {proposal && proposal.confident && (
-        <div style={{ marginTop: 12 }}>
+        <div className="knowledge-ai-proposal">
           <p className="success-msg">{proposal.summary}</p>
 
           {proposal.changedSections.length > 0 && (
-            <table style={{ marginTop: 8 }}>
-              <thead><tr><th>Antes</th><th>Después</th></tr></thead>
-              <tbody>
-                {proposal.changedSections.map((s, i) => (
-                  <tr key={i}>
-                    <td style={{ color: 'var(--danger)' }}>{s.before}</td>
-                    <td style={{ color: 'var(--success)' }}>{s.after}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="knowledge-table-wrap">
+              <table className="knowledge-diff-table">
+                <thead><tr><th>Antes</th><th>Después</th></tr></thead>
+                <tbody>
+                  {proposal.changedSections.map((s, i) => (
+                    <tr key={i}>
+                      <td className="is-before">{s.before}</td>
+                      <td className="is-after">{s.after}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
 
-          <div className="field" style={{ marginTop: 12 }}>
+          <div className="knowledge-filter knowledge-ai-edited">
             <label>Texto propuesto (editable antes de aplicar)</label>
             <textarea rows={10} value={editedContent} onChange={(e) => setEditedContent(e.target.value)} />
           </div>
 
-          <button type="button" onClick={handleApply} disabled={loading}>
-            {loading ? 'Aplicando…' : 'Aprobar y aplicar'}
-          </button>
-          <button
-            type="button"
-            className="secondary"
-            style={{ marginLeft: 8 }}
-            onClick={() => setProposal(null)}
-          >
-            Descartar propuesta
-          </button>
+          <div className="knowledge-form-actions">
+            <button type="button" className="secondary" onClick={() => setProposal(null)}>
+              Descartar propuesta
+            </button>
+            <button type="button" className="knowledge-primary-button" onClick={handleApply} disabled={loading}>
+              {loading ? 'Aplicando…' : 'Aprobar y aplicar'}
+            </button>
+          </div>
         </div>
       )}
-    </div>
+    </section>
+  );
+}
+
+function AiEditorHeading() {
+  return (
+    <header className="knowledge-panel-heading">
+      <div>
+        <span className="knowledge-kicker">Asistido por IA</span>
+        <h3>Editar con la IA</h3>
+      </div>
+      <span className="knowledge-option-icon" aria-hidden="true">✣</span>
+    </header>
   );
 }
 
 function ChangeLog({ changes }) {
   if (!changes?.length) return null;
   return (
-    <div className="panel-section" style={{ marginTop: 24 }}>
-      <h4>Historial de cambios ({changes.length})</h4>
-      <table>
-        <thead>
-          <tr><th>Cuándo</th><th>Quién</th><th>Qué</th><th>Origen</th></tr>
-        </thead>
-        <tbody>
-          {changes.map((c) => (
-            <tr key={c.id}>
-              <td>{new Date(c.createdAt).toLocaleString()}</td>
-              <td>{c.author?.name ?? '—'}</td>
-              <td>
-                {c.changedFields.join(', ')}
-                {c.aiInstruction && <div className="hint">«{c.aiInstruction}»</div>}
-              </td>
-              <td>
-                <span className={`badge ${c.origin === 'AI_ACCEPTED' ? 'status-info' : 'status-idle'}`}>
-                  {c.origin === 'AI_ACCEPTED' ? 'con IA' : 'manual'}
-                </span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <section className="knowledge-panel">
+      <header className="knowledge-panel-heading">
+        <div>
+          <span className="knowledge-kicker">Auditoría</span>
+          <h3>Historial de cambios</h3>
+        </div>
+        <span className="knowledge-panel-count">{changes.length} cambios</span>
+      </header>
+      <div className="knowledge-table-wrap">
+        <table className="knowledge-history-table">
+          <thead>
+            <tr><th>Cuándo</th><th>Quién</th><th>Qué</th><th>Origen</th></tr>
+          </thead>
+          <tbody>
+            {changes.map((c) => (
+              <tr key={c.id}>
+                <td>{new Date(c.createdAt).toLocaleString()}</td>
+                <td>{c.author?.name ?? '—'}</td>
+                <td>
+                  {c.changedFields.join(', ')}
+                  {c.aiInstruction && <span className="knowledge-history-instruction">«{c.aiInstruction}»</span>}
+                </td>
+                <td>
+                  <span className={`badge ${c.origin === 'AI_ACCEPTED' ? 'status-info' : 'status-idle'}`}>
+                    {c.origin === 'AI_ACCEPTED' ? 'con IA' : 'manual'}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }

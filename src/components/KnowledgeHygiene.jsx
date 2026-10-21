@@ -93,19 +93,16 @@ export default function KnowledgeHygiene({ token }) {
 
   return (
     <div className="card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      {/* Qué hace y cuánto tarda está en el botón «Info» de la barra del módulo. */}
+      <header className="knowledge-panel-heading">
         <div>
-          <h3 style={{ marginBottom: 4 }}>Limpiar base de conocimiento</h3>
-          <p className="hint" style={{ margin: 0 }}>
-            Busca documentos activos que se solapan entre sí (misma área y
-            audiencia) para ofrecer fusionarlos. Tarda alrededor de un minuto:
-            no hace falta esperar en esta pantalla, se puede volver más tarde.
-          </p>
+          <span className="knowledge-kicker">Duplicados y solapamientos</span>
+          <h3>Limpiar base de conocimiento</h3>
         </div>
-        <button onClick={handleStartScan} disabled={corriendo}>
-          {corriendo ? 'Analizando…' : 'Limpiar base de conocimiento'}
+        <button className="knowledge-primary-button" onClick={handleStartScan} disabled={corriendo}>
+          {corriendo ? 'Analizando…' : 'Analizar la base'}
         </button>
-      </div>
+      </header>
 
       {error && <p className="error" style={{ marginTop: 12 }}>{error}</p>}
 

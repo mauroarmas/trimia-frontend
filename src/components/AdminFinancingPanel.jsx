@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import InfoNotes, { InfoToggle } from './InfoNotes';
 
 const INITIAL_REQUESTS = [
   {
@@ -42,19 +43,76 @@ const INITIAL_REQUESTS = [
   },
 ];
 
+const FILTROS = [
+  ['PENDING_ADMIN_REVIEW', 'Pendientes'],
+  ['APPROVED', 'Aprobadas'],
+  ['REJECTED', 'Rechazadas'],
+  ['ALL', 'Todas'],
+];
+
+const ESTADO = {
+  PENDING_ADMIN_REVIEW: { texto: 'Pendiente', clase: 'status-warning' },
+  APPROVED: { texto: 'Aprobada', clase: 'status-active' },
+  REJECTED: { texto: 'Rechazada', clase: 'status-error' },
+};
+
+const INFO = [
+  ['Cómo revisar.',
+    'Hacé clic en «Revisar» para analizar los antecedentes crediticios y las fotos del comercio.'],
+  ['Pre-evaluación.',
+    'Cada solicitud llega pre-evaluada por el bot con el scoring de Riesgo Online y el '
+    + 'historial de Paljet.'],
+  ['Decisión.',
+    'Al aprobar se notifica al vendedor y se asienta en el sistema. Al rechazar se registra '
+    + 'el motivo, si lo indicás.'],
+];
+
+/** El score viene como texto ("SCORE: 780 / 1000 — …"); se extrae solo para el medidor. */
+function scoreDe(texto) {
+  const m = /SCORE:\s*(\d+)\s*\/\s*(\d+)/i.exec(texto ?? '');
+  return m ? Number(m[1]) / Number(m[2]) : null;
+}
+
 export default function AdminFinancingPanel({ token, me }) {
   const [requests, setRequests] = useState(INITIAL_REQUESTS);
-  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
   const [actionFeedback, setActionFeedback] = useState('');
+  const [filtro, setFiltro] = useState('PENDING_ADMIN_REVIEW');
+  const [mostrarInfo, setMostrarInfo] = useState(false);
+  const [rechazando, setRechazando] = useState(false);
+  const [motivo, setMotivo] = useState('');
+  const detalleRef = useRef(null);
+
+  // En pantallas medianas el detalle se abre debajo de la lista: sin esto,
+  // «Revisar» parece no hacer nada.
+  useEffect(() => {
+    if (selectedId) detalleRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [selectedId]);
+
+  const selectedRequest = requests.find((r) => r.id === selectedId) ?? null;
+  const conteos = {
+    ALL: requests.length,
+    PENDING_ADMIN_REVIEW: requests.filter((r) => r.status === 'PENDING_ADMIN_REVIEW').length,
+    APPROVED: requests.filter((r) => r.status === 'APPROVED').length,
+    REJECTED: requests.filter((r) => r.status === 'REJECTED').length,
+  };
+  const visibles = filtro === 'ALL' ? requests : requests.filter((r) => r.status === filtro);
+
+  function abrir(id) {
+    setSelectedId(id);
+    setRechazando(false);
+    setMotivo('');
+  }
 
   function handleDecision(id, decision) {
-    const reason = decision === 'REJECTED' ? window.prompt('Motivo del rechazo de la venta financiada:', '') : '';
-    if (decision === 'REJECTED' && reason === null) return;
+    const reason = decision === 'REJECTED' ? motivo.trim() : '';
 
     setRequests((prev) =>
       prev.map((r) => (r.id === id ? { ...r, status: decision, rejectionReason: reason } : r)),
     );
-    setSelectedRequest(null);
+    setSelectedId(null);
+    setRechazando(false);
+    setMotivo('');
     setActionFeedback(
       decision === 'APPROVED'
         ? `Solicitud ${id} aprobada con éxito. Se notifica al vendedor y se asienta en el sistema.`
@@ -63,158 +121,261 @@ export default function AdminFinancingPanel({ token, me }) {
     setTimeout(() => setActionFeedback(''), 5000);
   }
 
+  const score = scoreDe(selectedRequest?.riskScore);
+
   return (
-    <div>
-      <div className="page-header">
-        <div>
-          <h2 className="page-title">Aprobación de Venta Financiada</h2>
-          <p className="page-subtitle">
-            Revisión administrativa de solicitudes pre-evaluadas por el bot con scoring de Riesgo Online y Paljet.
-          </p>
+    <div className="knowledge-page financing-page">
+      <section className="knowledge-hero">
+        <div className="knowledge-hero-layout">
+          <div>
+            <span className="knowledge-hero-kicker">Riesgo y aprobación</span>
+            <h2 className="knowledge-hero-title">Aprobación de Venta Financiada</h2>
+            <p className="knowledge-hero-description">
+              Revisión administrativa de solicitudes pre-evaluadas por el bot con scoring de Riesgo
+              Online y Paljet.
+            </p>
+          </div>
+          <div className="employees-hero-stats">
+            <div>
+              <strong>{conteos.PENDING_ADMIN_REVIEW}</strong>
+              <span>pendientes</span>
+            </div>
+            <div>
+              <strong>{conteos.APPROVED}</strong>
+              <span>aprobadas</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="submenu-bar">
+        <nav className="submenu-pills" aria-label="Filtrar solicitudes">
+          {FILTROS.map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              className={`submenu-pill${filtro === id ? ' active' : ''}`}
+              aria-current={filtro === id ? 'page' : undefined}
+              onClick={() => setFiltro(id)}
+            >
+              {label} <span className="employees-tab-count">{conteos[id]}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="info-bar-actions">
+          <InfoToggle open={mostrarInfo} onToggle={() => setMostrarInfo((v) => !v)} />
         </div>
       </div>
 
-      {actionFeedback && <p className="success-msg" style={{ marginBottom: 16 }}>{actionFeedback}</p>}
+      {mostrarInfo && (
+        <InfoNotes
+          title="Aprobación de venta financiada"
+          notes={INFO}
+          onClose={() => setMostrarInfo(false)}
+        />
+      )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: selectedRequest ? '1fr 1fr' : '1fr', gap: 20 }}>
+      {actionFeedback && <p className="success-msg financing-feedback">{actionFeedback}</p>}
+
+      <div className={`financing-layout${selectedRequest ? ' has-detail' : ''}`}>
         {/* Lista de solicitudes */}
-        <div className="card">
-          <h3>Solicitudes de Crédito / Venta Financiada</h3>
-          <p className="hint">
-            Hacé clic en "Revisar" para analizar los antecedentes crediticios y las fotos del comercio.
-          </p>
+        <section className="knowledge-panel">
+          <header className="knowledge-panel-heading">
+            <div>
+              <span className="knowledge-kicker">Bandeja</span>
+              <h3>Solicitudes de crédito</h3>
+            </div>
+            <span className="knowledge-panel-count">{visibles.length} solicitudes</span>
+          </header>
 
-          <table style={{ marginTop: 12 }}>
-            <thead>
-              <tr>
-                <th>Cliente / DNI</th>
-                <th>Comercio</th>
-                <th>Producto / Monto</th>
-                <th>Dictamen IA</th>
-                <th>Estado</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {requests.map((r) => (
-                <tr key={r.id}>
-                  <td>
-                    <strong>{r.clientName}</strong>
-                    <div className="hint" style={{ fontSize: 12 }}>DNI {r.dni}</div>
-                  </td>
-                  <td>
-                    <div>{r.businessName}</div>
-                    <div className="hint" style={{ fontSize: 12 }}>{r.businessAddress}</div>
-                  </td>
-                  <td>
-                    <div>{r.productRequested}</div>
-                    <div className="hint" style={{ fontSize: 12 }}>{r.totalAmount}</div>
-                  </td>
-                  <td>
-                    <span className="badge status-active" style={{ fontSize: 11 }}>
-                      {r.agentPreApproval.slice(0, 25)}...
-                    </span>
-                  </td>
-                  <td>
-                    <span
-                      className={`badge ${
-                        r.status === 'APPROVED'
-                          ? 'status-active'
-                          : r.status === 'REJECTED'
-                          ? 'status-error'
-                          : 'status-warning'
-                      }`}
-                    >
-                      {r.status === 'PENDING_ADMIN_REVIEW'
-                        ? 'PENDIENTE'
-                        : r.status === 'APPROVED'
-                        ? 'APROBADO'
-                        : 'RECHAZADO'}
-                    </span>
-                  </td>
-                  <td>
-                    <button
-                      className="secondary"
-                      style={{ padding: '3px 8px', fontSize: 12 }}
-                      onClick={() => setSelectedRequest(r)}
-                    >
-                      Revisar
-                    </button>
-                  </td>
+          <div className="knowledge-table-wrap">
+            <table className="knowledge-table financing-table">
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Comercio</th>
+                  <th>Producto / Monto</th>
+                  <th>Dictamen IA</th>
+                  <th>Estado</th>
+                  <th><span className="sr-only">Acciones</span></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {visibles.length === 0 && (
+                  <tr className="knowledge-table-empty">
+                    <td colSpan={6}>No hay solicitudes en esta vista.</td>
+                  </tr>
+                )}
+                {visibles.map((r) => (
+                  <tr key={r.id} className={r.id === selectedId ? 'is-selected' : undefined}>
+                    <td className="knowledge-doc-cell">
+                      <strong className="knowledge-doc-title">{r.clientName}</strong>
+                      <span className="knowledge-doc-summary">DNI {r.dni} · {r.submittedAt}</span>
+                    </td>
+                    <td data-label="Comercio">
+                      <span className="financing-cell-main">{r.businessName}</span>
+                      <span className="knowledge-doc-summary">{r.businessAddress}</span>
+                    </td>
+                    <td data-label="Producto / Monto">
+                      <span className="financing-cell-main">{r.productRequested}</span>
+                      <span className="financing-amount">{r.totalAmount}</span>
+                    </td>
+                    <td data-label="Dictamen IA">
+                      <span className="financing-verdict" title={r.agentPreApproval}>
+                        {r.agentPreApproval}
+                      </span>
+                    </td>
+                    <td data-label="Estado">
+                      <span className={`badge ${ESTADO[r.status].clase}`}>{ESTADO[r.status].texto}</span>
+                    </td>
+                    <td className="knowledge-row-action">
+                      <button type="button" className="secondary" onClick={() => abrir(r.id)}>
+                        Revisar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
         {/* Detalle y Aprobación */}
         {selectedRequest && (
-          <div className="card" style={{ borderLeft: '4px solid var(--accent, #2f6ea3)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3>Detalle de la Solicitud #{selectedRequest.id}</h3>
-              <button className="secondary" style={{ padding: '2px 8px', fontSize: 12 }} onClick={() => setSelectedRequest(null)}>
+          <section className="knowledge-panel financing-detail" ref={detalleRef}>
+            <header className="knowledge-panel-heading">
+              <div>
+                <span className="knowledge-kicker">Solicitud #{selectedRequest.id}</span>
+                <h3>{selectedRequest.clientName}</h3>
+              </div>
+              <button type="button" className="secondary" onClick={() => setSelectedId(null)}>
                 ✕ Cerrar
               </button>
-            </div>
+            </header>
 
-            <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10, fontSize: 14 }}>
-              <div><strong>👤 Solicitante:</strong> {selectedRequest.clientName} (DNI {selectedRequest.dni}) - Tel: {selectedRequest.phone}</div>
-              <div><strong>🏬 Negocio:</strong> {selectedRequest.businessName} ({selectedRequest.businessAddress})</div>
-              <div><strong>📦 Producto:</strong> {selectedRequest.productRequested}</div>
-              <div><strong>💰 Monto y Plan:</strong> {selectedRequest.totalAmount} — {selectedRequest.requestedPlan}</div>
-
-              <div style={{ backgroundColor: 'var(--bg, #f8fafc)', padding: 12, borderRadius: 6, marginTop: 6 }}>
-                <div><strong>📊 Riesgo Online:</strong> <span style={{ color: '#0d9488', fontWeight: 600 }}>{selectedRequest.riskScore}</span></div>
-                <div style={{ marginTop: 4 }}><strong>📁 Historial Paljet:</strong> {selectedRequest.paljetHistory}</div>
-                <div style={{ marginTop: 4 }}><strong>🤖 Evaluación del Agente:</strong> {selectedRequest.agentPreApproval}</div>
-              </div>
-
+            <dl className="financing-facts">
               <div>
-                <strong>📸 Fotos y Videos del Local:</strong>
-                <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
-                  {selectedRequest.photos.map((ph, idx) => (
-                    <div key={idx} style={{ textAlign: 'center' }}>
-                      <img
-                        src={ph.url}
-                        alt={ph.label}
-                        style={{ width: 140, height: 100, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }}
-                      />
-                      <div className="hint" style={{ fontSize: 11, marginTop: 4 }}>{ph.label}</div>
-                    </div>
-                  ))}
-                </div>
+                <dt>DNI</dt>
+                <dd>{selectedRequest.dni}</dd>
               </div>
+              <div>
+                <dt>Teléfono</dt>
+                <dd>{selectedRequest.phone}</dd>
+              </div>
+              <div>
+                <dt>Negocio</dt>
+                <dd>{selectedRequest.businessName}<small>{selectedRequest.businessAddress}</small></dd>
+              </div>
+              <div>
+                <dt>Producto</dt>
+                <dd>{selectedRequest.productRequested}</dd>
+              </div>
+              <div>
+                <dt>Monto</dt>
+                <dd className="financing-amount">{selectedRequest.totalAmount}</dd>
+              </div>
+              <div>
+                <dt>Plan</dt>
+                <dd>{selectedRequest.requestedPlan}</dd>
+              </div>
+            </dl>
 
-              {selectedRequest.status === 'PENDING_ADMIN_REVIEW' ? (
-                <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
-                  <button
-                    onClick={() => handleDecision(selectedRequest.id, 'APPROVED')}
-                    style={{ backgroundColor: 'var(--success, #0d9488)', borderColor: 'var(--success, #0d9488)' }}
-                  >
-                    ✓ Aprobar Venta Financiada
-                  </button>
-                  <button
-                    className="secondary"
-                    onClick={() => handleDecision(selectedRequest.id, 'REJECTED')}
-                    style={{ color: '#2f6ea3' }}
-                  >
-                    ✕ Rechazar Venta
-                  </button>
-                </div>
-              ) : (
-                <div style={{ marginTop: 12 }}>
-                  <span className={`badge ${selectedRequest.status === 'APPROVED' ? 'status-active' : 'status-error'}`}>
-                    Estado: {selectedRequest.status}
-                  </span>
-                  {selectedRequest.rejectionReason && (
-                    <p className="hint" style={{ marginTop: 6, color: '#2f6ea3' }}>
-                      Motivo de rechazo: {selectedRequest.rejectionReason}
-                    </p>
+            <div className="financing-risk">
+              <h4 className="knowledge-section-title">Evaluación de riesgo</h4>
+              <div className="financing-risk-row">
+                <span className="financing-risk-label">Riesgo Online</span>
+                <div className="financing-risk-value">
+                  <strong>{selectedRequest.riskScore}</strong>
+                  {score !== null && (
+                    <div className="knowledge-result-score-track financing-score-track" aria-hidden="true">
+                      <div style={{ width: `${score * 100}%` }} />
+                    </div>
                   )}
                 </div>
-              )}
+              </div>
+              <div className="financing-risk-row">
+                <span className="financing-risk-label">Historial Paljet</span>
+                <p>{selectedRequest.paljetHistory}</p>
+              </div>
+              <div className="financing-risk-row">
+                <span className="financing-risk-label">Agente IA</span>
+                <p>{selectedRequest.agentPreApproval}</p>
+              </div>
             </div>
-          </div>
+
+            <div>
+              <h4 className="knowledge-section-title">Fotos y videos del local</h4>
+              <div className="financing-photos">
+                {selectedRequest.photos.map((ph, idx) => (
+                  <figure key={idx}>
+                    <img src={ph.url} alt={ph.label} />
+                    <figcaption>{ph.label}</figcaption>
+                  </figure>
+                ))}
+              </div>
+            </div>
+
+            {selectedRequest.status === 'PENDING_ADMIN_REVIEW' ? (
+              <div className="financing-decision">
+                {rechazando && (
+                  <div className="knowledge-filter">
+                    <label>Motivo del rechazo (opcional)</label>
+                    <textarea
+                      rows={3}
+                      value={motivo}
+                      onChange={(e) => setMotivo(e.target.value)}
+                      placeholder="Ej: score insuficiente para el monto solicitado"
+                      autoFocus
+                    />
+                  </div>
+                )}
+                <div className="knowledge-form-actions">
+                  {rechazando ? (
+                    <>
+                      <button type="button" className="secondary" onClick={() => setRechazando(false)}>
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary knowledge-danger-button"
+                        onClick={() => handleDecision(selectedRequest.id, 'REJECTED')}
+                      >
+                        Confirmar rechazo
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="secondary knowledge-danger-button"
+                        onClick={() => setRechazando(true)}
+                      >
+                        ✕ Rechazar venta
+                      </button>
+                      <button
+                        type="button"
+                        className="knowledge-primary-button financing-approve"
+                        onClick={() => handleDecision(selectedRequest.id, 'APPROVED')}
+                      >
+                        ✓ Aprobar venta financiada
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="financing-decision">
+                <span className={`badge ${ESTADO[selectedRequest.status].clase}`}>
+                  {ESTADO[selectedRequest.status].texto}
+                </span>
+                {selectedRequest.rejectionReason && (
+                  <p className="knowledge-side-copy">
+                    Motivo de rechazo: {selectedRequest.rejectionReason}
+                  </p>
+                )}
+              </div>
+            )}
+          </section>
         )}
       </div>
     </div>

@@ -139,13 +139,13 @@ export default function Improvements({ token, me, onEntrevistar, onRetomar }) {
   if (!sectorId) {
     return (
       <div className="card">
-        <h3>Mejorar el conocimiento</h3>
-        <p className="hint" style={{ margin: '0 0 12px' }}>
-          Todo lo que le falta al asistente en un área, en una sola lista: lo que
-          le preguntaron y no supo contestar, los casos que terminaron en una
-          persona, y los documentos que quedaron incompletos. Cada cosa se
-          arregla con una entrevista.
-        </p>
+        {/* Qué es y de dónde salen los ítems está en el botón «Info» del módulo. */}
+        <header className="knowledge-panel-heading">
+          <div>
+            <span className="knowledge-kicker">Elegí un área</span>
+            <h3>Mejorar el conocimiento</h3>
+          </div>
+        </header>
         {error && <p className="error">{error}</p>}
         {misSectores.length === 0 && (
           <p className="hint">No sos responsable de ningún área con agente asociado.</p>
@@ -168,15 +168,18 @@ export default function Improvements({ token, me, onEntrevistar, onRetomar }) {
 
   return (
     <div className="card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-        <h3 style={{ margin: 0 }}>Mejorar el conocimiento — {nombreArea}</h3>
+      <header className="knowledge-panel-heading">
+        <div>
+          <span className="knowledge-kicker">Mejorar el conocimiento</span>
+          <h3>{nombreArea}</h3>
+        </div>
         <button
           className="secondary"
           onClick={() => { setSectorId(null); setData(null); setAviso(''); }}
         >
           Elegir otra área
         </button>
-      </div>
+      </header>
 
       <Resumen data={data} onActualizar={handleActualizar} refreshing={refreshing} />
 

@@ -4,7 +4,6 @@ import SupervisorPanel from './components/SupervisorPanel';
 import ChatSimulator from './components/ChatSimulator';
 import KnowledgeIngest from './components/KnowledgeIngest';
 import Interview from './components/Interview';
-import Improvements from './components/Improvements';
 import WebChat from './components/WebChat';
 import EscalationsQueue from './components/EscalationsQueue';
 import CollectionsPanel from './components/CollectionsPanel';
@@ -89,7 +88,8 @@ export default function App() {
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
   const [showLogoutIntro, setShowLogoutIntro] = useState(false);
-  const [tab, setTab] = useState('escalations');
+  // Sin pestaña elegida se abre la primera del perfil (para el supervisor, su panel).
+  const [tab, setTab] = useState(null);
   const [interviewStart, setInterviewStart] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -97,6 +97,9 @@ export default function App() {
     setShowLogoutIntro(true);
     setToken(null);
     setUser(null);
+    // Quien entre después arranca en su propia primera pestaña, no en la del anterior.
+    setTab(null);
+    setInterviewStart(null);
   }
 
   if (!token) {
@@ -129,7 +132,6 @@ export default function App() {
       { id: 'supervisor', label: 'Panel del Supervisor', icon: 'supervisor' },
       { id: 'escalations', label: 'Casos escalados', icon: 'escalations' },
       { id: 'knowledge', label: 'Base de Conocimiento', icon: 'knowledge' },
-      { id: 'improvements', label: 'Mejorar el conocimiento', icon: 'improvements' },
       { id: 'employees', label: 'Empleados y Áreas', icon: 'employees' },
       { id: 'training', label: 'Capacitación y Diagnóstico', icon: 'training' },
       { id: 'collections', label: 'Panel de Cobranzas', icon: 'collections' },
@@ -206,6 +208,7 @@ export default function App() {
         </div>
 
         <nav className="sidebar-nav">
+          <span className="sidebar-section-label">Menú</span>
           {visibleTabs.map((t) => (
             <button
               key={t.id}
@@ -248,10 +251,13 @@ export default function App() {
         {/* Perfil de Usuario Inferior */}
         <div className="sidebar-user-card">
           <div className="user-profile-pill">
-            <div className="user-avatar">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
+            <div className="user-avatar" aria-hidden="true">
+              {(user.name || user.email.split('@')[0])
+                .split(/[\s._-]+/)
+                .filter(Boolean)
+                .slice(0, 2)
+                .map((p) => p[0].toUpperCase())
+                .join('')}
             </div>
             <div className="user-info">
               <div className="user-name" title={user.email}>
@@ -285,24 +291,15 @@ export default function App() {
         {isDiego && currentTab === 'supervisor' && <SupervisorPanel token={token} me={user} />}
         {isDiego && currentTab === 'chat' && <ChatSimulator token={token} />}
         {currentTab === 'knowledge' && (
-          <KnowledgeIngest token={token} me={user} />
-        )}
-        {isDiego && currentTab === 'improvements' && (
-          interviewStart ? (
-            <Interview
-              token={token}
-              me={user}
-              start={interviewStart}
-              onSalir={() => setInterviewStart(null)}
-            />
-          ) : (
-            <Improvements
-              token={token}
-              me={user}
-              onEntrevistar={(sectorId, itemId) => setInterviewStart({ sectorId, itemId })}
-              onRetomar={(sectorId) => setInterviewStart({ sectorId })}
-            />
-          )
+          <KnowledgeIngest
+            token={token}
+            me={user}
+            showImprovements={isDiego}
+            interviewStart={interviewStart}
+            onEntrevistar={(sectorId, itemId) => setInterviewStart({ sectorId, itemId })}
+            onRetomar={(sectorId) => setInterviewStart({ sectorId })}
+            onSalirEntrevista={() => setInterviewStart(null)}
+          />
         )}
         {isDiego && currentTab === 'employees' && <EmployeesPanel token={token} />}
       </main>

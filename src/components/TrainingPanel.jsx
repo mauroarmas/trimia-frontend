@@ -10,8 +10,27 @@ import {
 } from '../api';
 import AudioScriptModal from './AudioScriptModal';
 import DiagnosticQuizModal from './DiagnosticQuizModal';
+import InfoNotes, { InfoToggle } from './InfoNotes';
 import PillStudyModal from './PillStudyModal';
 import SimulationModal from './SimulationModal';
+
+/** Qué explica el botón «Info» en cada subpestaña del supervisor. */
+const INFO_RUTA = [
+  ['Eximición por diagnóstico.',
+    'Si en el diagnóstico inicial se obtiene el 100% en los temas de un módulo, esas '
+    + 'lecciones quedan eximidas y habilitadas para libre repaso.'],
+  ['Práctica guiada.',
+    'Cliente simulado con objetivos pedagógicos en vivo, que se tildan a medida que avanza el diálogo.'],
+  ['Simulación libre.', 'Interacción realista con el cliente simulado, sin ayudas en vivo.'],
+];
+
+const INFO_GESTION = [
+  ['Generar píldora con IA.',
+    'TrimIA utiliza la base de conocimiento y los casos reales del sector para redactar el '
+    + 'contenido teórico y su cuestionario pedagógico. La píldora queda en borrador hasta publicarla.'],
+  ['Guion & Audio.', 'Ver o editar el guion a 2 voces y sintetizar el audio de la píldora.'],
+  ['Audio fallido.', 'Si la síntesis de voz falla, se puede reintentar desde la misma píldora.'],
+];
 
 export default function TrainingPanel({ token, me }) {
   const [modules, setModules] = useState([]);
@@ -29,6 +48,7 @@ export default function TrainingPanel({ token, me }) {
   // Sección Supervisor
   const isSupervisor = me?.role === 'SUPERVISOR';
   const [supervisorTab, setSupervisorTab] = useState(false);
+  const [mostrarInfo, setMostrarInfo] = useState(false);
   const [supervisorModules, setSupervisorModules] = useState([]);
   const [supervisorModulePage, setSupervisorModulePage] = useState(1);
   const [newModuleTitle, setNewModuleTitle] = useState('');
@@ -236,7 +256,18 @@ export default function TrainingPanel({ token, me }) {
               Gestión y Generación de Píldoras
             </button>
           </div>
+          <div className="info-bar-actions">
+            <InfoToggle open={mostrarInfo} onToggle={() => setMostrarInfo((v) => !v)} />
+          </div>
         </div>
+      )}
+
+      {isSupervisor && mostrarInfo && (
+        <InfoNotes
+          title={supervisorTab ? 'Gestión y generación de píldoras' : 'Mi ruta de aprendizaje'}
+          notes={supervisorTab ? INFO_GESTION : INFO_RUTA}
+          onClose={() => setMostrarInfo(false)}
+        />
       )}
 
       {/* VISTA 1: Ruta de Aprendizaje del Empleado */}
@@ -453,9 +484,6 @@ export default function TrainingPanel({ token, me }) {
                 </div>
                 <span className="training-ai-mark" aria-hidden="true">✣</span>
               </div>
-              <p className="hint training-generation-note">
-                TrimIA utiliza la base de conocimiento y los casos reales del sector para redactar el contenido teórico y su cuestionario pedagógico.
-              </p>
               {genNotice && (
                 <div className="training-generation-notice">✓ {genNotice}</div>
               )}

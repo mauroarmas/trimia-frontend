@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { simulateMessage, getConversation, openConversationStream } from '../api';
+import InfoNotes, { InfoToggle } from './InfoNotes';
 
 const esperaDeReintento = (intentos) => Math.min(1000 * 2 ** intentos, 15000);
 
@@ -22,6 +23,7 @@ const esperaDeReintento = (intentos) => Math.min(1000 * 2 ** intentos, 15000);
  */
 export default function ChatSimulator({ token }) {
   const [phone, setPhone] = useState('5493764000000');
+  const [mostrarInfo, setMostrarInfo] = useState(false);
   const [text, setText] = useState('Hola, quiero consultar por un producto');
   const [status, setStatus] = useState('');
   const [convId, setConvId] = useState(null);
@@ -167,13 +169,26 @@ export default function ChatSimulator({ token }) {
 
   return (
     <div>
-      <div className="hint">
-        Escribe como el teléfono que pongas abajo y muestra la respuesta en vivo.
-        Con un número que <b>no</b> esté en la whitelist de empleados, el sistema
-        lo trata como <b>cliente</b>: solo llega a los agentes de ventas y
-        cobranzas, y solo se le recupera conocimiento público. Ese es el camino
-        que este simulador existe para probar.
+      <div className="info-heading-row">
+        <h3>Simulador de chat</h3>
+        <InfoToggle open={mostrarInfo} onToggle={() => setMostrarInfo((v) => !v)} />
       </div>
+      {mostrarInfo && (
+        <InfoNotes
+          title="Simulador de chat"
+          onClose={() => setMostrarInfo(false)}
+          notes={[
+            ['Cómo funciona.',
+              'Escribe como el teléfono que pongas abajo y muestra la respuesta en vivo.'],
+            ['Número de cliente.', <>
+              Con un número que <b>no</b> esté en la whitelist de empleados, el sistema lo
+              trata como <b>cliente</b>: solo llega a los agentes de ventas y cobranzas, y
+              solo se le recupera conocimiento público.
+            </>],
+            ['Para qué sirve.', 'Ese es el camino que este simulador existe para probar.'],
+          ]}
+        />
+      )}
 
       <div className="card">
         <form onSubmit={handleSend}>

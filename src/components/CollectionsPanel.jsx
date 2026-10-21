@@ -244,24 +244,26 @@ export default function CollectionsPanel({ token, me, isCollector }) {
         </div>
       </div>
 
-      <div className="tabs" style={{ marginTop: 12 }}>
-        <button className={`tab${tab === 'proofs' ? ' active' : ''}`} onClick={() => setTab('proofs')}>
-          {isCollector ? 'Mis Comprobantes' : 'Comprobantes'} ({proofs.length})
-        </button>
-        {isController && (
-          <button className={`tab${tab === 'impact' ? ' active' : ''}`} onClick={() => setTab('impact')}>
-            Verificar Impacto ({acceptedProofs.length})
+      <div className="submenu-bar collections-tabs">
+        <div className="submenu-pills">
+          <button className={`submenu-pill${tab === 'proofs' ? ' active' : ''}`} onClick={() => setTab('proofs')}>
+            {isCollector ? 'Mis Comprobantes' : 'Comprobantes'} ({proofs.length})
           </button>
-        )}
-        <button className={`tab${tab === 'clients' ? ' active' : ''}`} onClick={() => setTab('clients')}>
-          {isCollector ? 'Mis Clientes' : 'Clientes'} ({clients.length})
-        </button>
-        <button className={`tab${tab === 'reminders' ? ' active' : ''}`} onClick={() => setTab('reminders')}>
-          Recordatorios Enviados
-        </button>
-        <button className={`tab${tab === 'activity' ? ' active' : ''}`} onClick={() => setTab('activity')}>
-          Registro de Actividad
-        </button>
+          {isController && (
+            <button className={`submenu-pill${tab === 'impact' ? ' active' : ''}`} onClick={() => setTab('impact')}>
+              Verificar Impacto ({acceptedProofs.length})
+            </button>
+          )}
+          <button className={`submenu-pill${tab === 'clients' ? ' active' : ''}`} onClick={() => setTab('clients')}>
+            {isCollector ? 'Mis Clientes' : 'Clientes'} ({clients.length})
+          </button>
+          <button className={`submenu-pill${tab === 'reminders' ? ' active' : ''}`} onClick={() => setTab('reminders')}>
+            Recordatorios Enviados
+          </button>
+          <button className={`submenu-pill${tab === 'activity' ? ' active' : ''}`} onClick={() => setTab('activity')}>
+            Registro de Actividad
+          </button>
+        </div>
       </div>
 
       {tab === 'proofs' && (
