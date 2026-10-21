@@ -270,7 +270,7 @@ function CandidateCard({ token, sessionId, candidate, onChanged }) {
                 <option value="REEMPLAZAR">Reemplazar todo el contenido</option>
               </select>
               {applyMode === 'REEMPLAZAR' && (
-                <p className="hint" style={{ color: '#b45309', marginTop: 4 }}>
+                <p className="hint" style={{ color: '#09b4aa', marginTop: 4 }}>
                   ⚠️ Se va a borrar todo lo que el documento dice hoy y quedará
                   solo este texto. La pregunta fue qué le <em>falta</em>, así que
                   esta ficha probablemente no lo cubra entero.

@@ -229,12 +229,12 @@ export default function CollectionsPanel({ token, me, isCollector }) {
       <div className="card" style={{ marginTop: 12 }}>
         <h3>{isController ? 'KPIs de Cobranzas (todos)' : 'Mis KPIs'}</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 8 }}>
-          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, padding: 12 }}>
+          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7f3', borderRadius: 6, padding: 12 }}>
             <div style={{ fontSize: 24, fontWeight: 'bold', color: 'var(--success)' }}>{kpis?.clientsWithPendingQuotas ?? 0}</div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Cuotas pendientes</div>
           </div>
-          <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6, padding: 12 }}>
-            <div style={{ fontSize: 24, fontWeight: 'bold', color: '#b45309' }}>{kpis?.proofsToReview ?? 0}</div>
+          <div style={{ background: '#fffbeb', border: '1px solid #8afdf6', borderRadius: 6, padding: 12 }}>
+            <div style={{ fontSize: 24, fontWeight: 'bold', color: '#09b4aa' }}>{kpis?.proofsToReview ?? 0}</div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Comprobantes para revisar</div>
           </div>
           <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 6, padding: 12 }}>

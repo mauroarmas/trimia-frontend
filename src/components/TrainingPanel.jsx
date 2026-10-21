@@ -17,6 +17,8 @@ export default function TrainingPanel({ token, me }) {
   const [modules, setModules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [modulePage, setModulePage] = useState(1);
+  const [modulePageSize, setModulePageSize] = useState(5);
 
   // Modales
   const [showDiagnostic, setShowDiagnostic] = useState(false);
@@ -28,6 +30,7 @@ export default function TrainingPanel({ token, me }) {
   const isSupervisor = me?.role === 'SUPERVISOR';
   const [supervisorTab, setSupervisorTab] = useState(false);
   const [supervisorModules, setSupervisorModules] = useState([]);
+  const [supervisorModulePage, setSupervisorModulePage] = useState(1);
   const [newModuleTitle, setNewModuleTitle] = useState('');
   const [newModuleDesc, setNewModuleDesc] = useState('');
   const [creatingModule, setCreatingModule] = useState(false);
@@ -166,6 +169,29 @@ export default function TrainingPanel({ token, me }) {
   const progressPercent = totalPills > 0
     ? Math.round((completedOrExemptedPills / totalPills) * 100)
     : 0;
+  const modulePageCount = Math.max(1, Math.ceil(modules.length / modulePageSize));
+  const safeModulePage = Math.min(modulePage, modulePageCount);
+  const moduleStartIndex = (safeModulePage - 1) * modulePageSize;
+  const visibleModules = modules.slice(moduleStartIndex, moduleStartIndex + modulePageSize);
+  const supervisorModulePageCount = Math.max(1, Math.ceil(supervisorModules.length / modulePageSize));
+  const safeSupervisorModulePage = Math.min(supervisorModulePage, supervisorModulePageCount);
+  const supervisorModuleStartIndex = (safeSupervisorModulePage - 1) * modulePageSize;
+  const visibleSupervisorModules = supervisorModules.slice(
+    supervisorModuleStartIndex,
+    supervisorModuleStartIndex + modulePageSize,
+  );
+
+  useEffect(() => {
+    if (modulePage !== safeModulePage) {
+      setModulePage(safeModulePage);
+    }
+  }, [modulePage, safeModulePage]);
+
+  useEffect(() => {
+    if (supervisorModulePage !== safeSupervisorModulePage) {
+      setSupervisorModulePage(safeSupervisorModulePage);
+    }
+  }, [supervisorModulePage, safeSupervisorModulePage]);
 
   return (
     <div className="training-panel">
@@ -201,13 +227,13 @@ export default function TrainingPanel({ token, me }) {
               className={`submenu-pill${!supervisorTab ? ' active' : ''}`}
               onClick={() => setSupervisorTab(false)}
             >
-              Mi Ruta de Aprendizaje (Empleado)
+              Mi Ruta de Aprendizaje
             </button>
             <button
               className={`submenu-pill${supervisorTab ? ' active' : ''}`}
               onClick={() => setSupervisorTab(true)}
             >
-              Gestión y Generación de Píldoras (Supervisor)
+              Gestión y Generación de Píldoras
             </button>
           </div>
         </div>
@@ -251,7 +277,9 @@ export default function TrainingPanel({ token, me }) {
 
           {/* Módulos */}
           <div className="training-module-list">
-            {modules.map((m, mIdx) => (
+            {visibleModules.map((m, visibleIndex) => {
+              const mIdx = moduleStartIndex + visibleIndex;
+              return (
               <div key={m.id} className="card training-module-card">
                 <div className="training-module-heading">
                   <div className="training-module-title-row">
@@ -333,8 +361,53 @@ export default function TrainingPanel({ token, me }) {
                   })}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
+          {!loading && !error && modules.length > 0 && (
+            <div className="table-pagination-footer training-module-pagination">
+              <span className="pagination-text">
+                Mostrando {moduleStartIndex + 1} a {Math.min(moduleStartIndex + modulePageSize, modules.length)} de{' '}
+                {modules.length} módulos
+              </span>
+              <div className="pagination-controls">
+                <div className="page-btn-group">
+                  <button
+                    type="button"
+                    className="page-nav-btn"
+                    aria-label="Página anterior de módulos"
+                    disabled={safeModulePage === 1}
+                    onClick={() => setModulePage((page) => Math.max(1, page - 1))}
+                  >
+                    ‹
+                  </button>
+                  <span className="page-num-active" aria-current="page">{safeModulePage}</span>
+                  <button
+                    type="button"
+                    className="page-nav-btn"
+                    aria-label="Página siguiente de módulos"
+                    disabled={safeModulePage === modulePageCount}
+                    onClick={() => setModulePage((page) => Math.min(modulePageCount, page + 1))}
+                  >
+                    ›
+                  </button>
+                </div>
+                <select
+                  className="page-size-select"
+                  aria-label="Módulos por página"
+                  value={modulePageSize}
+                  onChange={(e) => {
+                    setModulePageSize(Number(e.target.value));
+                    setModulePage(1);
+                  }}
+                >
+                  {[5, 10, 20].map((size) => (
+                    <option key={size} value={size}>{size} por página</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -418,7 +491,7 @@ export default function TrainingPanel({ token, me }) {
           <section className="training-supervisor-modules">
             <h3 className="training-supervisor-section-title">Módulos de tu Sector y Estado de Píldoras</h3>
             <div className="training-supervisor-module-list">
-              {supervisorModules.map((m) => (
+              {visibleSupervisorModules.map((m) => (
                 <article key={m.id} className="card training-supervisor-module">
                   <div className="training-supervisor-module-heading">
                     <div>
@@ -494,6 +567,53 @@ export default function TrainingPanel({ token, me }) {
                 </article>
               ))}
             </div>
+            {supervisorModules.length > 0 && (
+              <div className="table-pagination-footer training-module-pagination">
+                <span className="pagination-text">
+                  Mostrando {supervisorModuleStartIndex + 1} a{' '}
+                  {Math.min(supervisorModuleStartIndex + modulePageSize, supervisorModules.length)} de{' '}
+                  {supervisorModules.length} módulos
+                </span>
+                <div className="pagination-controls">
+                  <div className="page-btn-group">
+                    <button
+                      type="button"
+                      className="page-nav-btn"
+                      aria-label="Página anterior de módulos"
+                      disabled={safeSupervisorModulePage === 1}
+                      onClick={() => setSupervisorModulePage((page) => Math.max(1, page - 1))}
+                    >
+                      ‹
+                    </button>
+                    <span className="page-num-active" aria-current="page">{safeSupervisorModulePage}</span>
+                    <button
+                      type="button"
+                      className="page-nav-btn"
+                      aria-label="Página siguiente de módulos"
+                      disabled={safeSupervisorModulePage === supervisorModulePageCount}
+                      onClick={() =>
+                        setSupervisorModulePage((page) => Math.min(supervisorModulePageCount, page + 1))
+                      }
+                    >
+                      ›
+                    </button>
+                  </div>
+                  <select
+                    className="page-size-select"
+                    aria-label="Módulos por página"
+                    value={modulePageSize}
+                    onChange={(e) => {
+                      setModulePageSize(Number(e.target.value));
+                      setSupervisorModulePage(1);
+                    }}
+                  >
+                    {[5, 10, 20].map((size) => (
+                      <option key={size} value={size}>{size} por página</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
           </section>
         </div>
       )}

@@ -19,16 +19,16 @@ const AGENT_LABELS = {
 const AGENT_COLORS = {
   ORCHESTRATOR: '#6b7280',
   SALES: '#2563eb',
-  COLLECTIONS: '#d97706',
-  LOGISTICS: '#059669',
-  DEPOSITS: '#7c3aed',
-  ADMIN: '#dc2626',
+  COLLECTIONS: '#06d9cc',
+  LOGISTICS: '#05968d',
+  DEPOSITS: '#3aa2ed',
+  ADMIN: '#2690dc',
 };
 
 // Paleta para personas: color estable por nombre (hash simple), no por id,
 // para que la misma persona se vea igual en toda la sesión sin pedirle
 // nada extra al backend.
-const PERSON_COLORS = ['#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#db2777'];
+const PERSON_COLORS = ['#2563eb', '#05968d', '#06d9cc', '#2690dc', '#3aa2ed', '#0891b2', '#278fdb'];
 
 function colorForName(name) {
   let hash = 0;

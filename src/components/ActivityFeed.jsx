@@ -53,7 +53,7 @@ const HIDDEN_EVENT_TYPES = new Set(['internal_note_added', 'ROUTED_TO_AGENT']);
  *   - verificación de impacto MISSING y escalamientos -> rojo (requieren
  *     atención)
  */
-const DOT_COLORS = { gray: '#9ca3af', teal: '#0d9488', orange: '#d97706', red: '#dc2626' };
+const DOT_COLORS = { gray: '#9ca3af', teal: '#0d9488', orange: '#06d9cc', red: '#2690dc' };
 
 const COLLECTOR_EVENT_TYPES = new Set([
   'payment_proof_accepted',

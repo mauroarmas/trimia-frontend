@@ -412,15 +412,15 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
               {hasAudio && (
                 <div
                   style={{
-                    backgroundColor: isAudioCompleted ? 'rgba(5, 150, 105, 0.1)' : 'rgba(79, 70, 229, 0.08)',
-                    border: `1px solid ${isAudioCompleted ? 'var(--success)' : '#6366f1'}`,
+                    backgroundColor: isAudioCompleted ? 'rgba(5, 150, 141, 0.1)' : 'rgba(47, 110, 163, 0.08)',
+                    border: `1px solid ${isAudioCompleted ? 'var(--success)' : '#63b5f1'}`,
                     padding: '6px 12px',
                     borderRadius: 6,
                     fontSize: 12,
                     display: 'flex',
                     alignItems: 'center',
                     gap: 6,
-                    color: isAudioCompleted ? 'var(--success)' : '#4338ca',
+                    color: isAudioCompleted ? 'var(--success)' : '#388dca',
                     fontWeight: isAudioCompleted ? 600 : 500,
                   }}
                 >
@@ -433,7 +433,7 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
             {hasAudio && (
               <div
                 style={{
-                  background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(99, 102, 241, 0.03) 100%)',
+                  background: 'linear-gradient(135deg, rgba(47, 110, 163, 0.08) 0%, rgba(117, 185, 179, 0.03) 100%)',
                   border: '1px solid #c7d2fe',
                   borderRadius: 10,
                   padding: '16px 18px',
@@ -444,8 +444,8 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 20 }}>🎙️</span>
                     <div>
-                      <strong style={{ fontSize: 14, color: '#312e81' }}>Episodio de Podcast Formativo</strong>
-                      <div style={{ fontSize: 11, color: isPlaying ? '#4338ca' : 'var(--text-muted)', fontWeight: isPlaying ? 600 : 400 }}>
+                      <strong style={{ fontSize: 14, color: '#2e5e81' }}>Episodio de Podcast Formativo</strong>
+                      <div style={{ fontSize: 11, color: isPlaying ? '#388dca' : 'var(--text-muted)', fontWeight: isPlaying ? 600 : 400 }}>
                         {isPlaying
                           ? '🔊 Narrando a 2 voces (Locutor 1 y Locutor 2)...'
                           : 'Conversación guiada a 2 voces sobre los conceptos clave de esta píldora.'}
@@ -486,7 +486,7 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
                         style={{
                           width: `${progressPercent}%`,
                           height: '100%',
-                          backgroundColor: isAudioCompleted ? 'var(--success)' : '#4f46e5',
+                          backgroundColor: isAudioCompleted ? 'var(--success)' : '#46a2e5',
                           transition: 'width 0.3s ease',
                         }}
                       />
@@ -516,7 +516,7 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
                       borderTop: '1px dashed #c7d2fe',
                     }}
                   >
-                    <h5 style={{ margin: '0 0 10px', fontSize: 13, color: '#312e81' }}>
+                    <h5 style={{ margin: '0 0 10px', fontSize: 13, color: '#2e5e81' }}>
                       Transcripción del Diálogo a 2 Voces:
                     </h5>
 
@@ -534,19 +534,19 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
                                 padding: '6px 10px',
                                 borderRadius: 6,
                                 backgroundColor: isCurrentActive
-                                  ? 'rgba(79, 70, 229, 0.15)'
+                                  ? 'rgba(47, 110, 163, 0.15)'
                                   : isSpk1
-                                  ? 'rgba(79, 70, 229, 0.05)'
-                                  : 'rgba(16, 185, 129, 0.05)',
+                                  ? 'rgba(47, 110, 163, 0.05)'
+                                  : 'rgba(16, 185, 175, 0.05)',
                                 borderLeft: `3px solid ${
-                                  isCurrentActive ? '#6366f1' : isSpk1 ? '#4f46e5' : '#10b981'
+                                  isCurrentActive ? '#63b5f1' : isSpk1 ? '#46a2e5' : '#10b9af'
                                 }`,
                                 fontSize: 12,
                                 lineHeight: 1.4,
                                 transition: 'all 0.2s ease',
                               }}
                             >
-                              <strong style={{ color: isSpk1 ? '#4338ca' : '#047857', marginRight: 6 }}>
+                              <strong style={{ color: isSpk1 ? '#388dca' : '#047871', marginRight: 6 }}>
                                 {isCurrentActive && '🔊 '}
                                 {isSpk1 ? 'Locutor 1:' : 'Locutor 2:'}
                               </strong>

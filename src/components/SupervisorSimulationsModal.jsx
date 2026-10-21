@@ -31,11 +31,11 @@ export default function SupervisorSimulationsModal({ token, employeeId, employee
   const getBandBadge = (band) => {
     switch (band) {
       case 'ACHIEVED':
-        return { label: 'Logrado', bg: '#dcfce7', color: '#166534', border: '#bbf7d0' };
+        return { label: 'Logrado', bg: '#dcfce7', color: '#166560', border: '#bbf7f3' };
       case 'NEEDS_IMPROVEMENT':
-        return { label: 'A mejorar', bg: '#fef3c7', color: '#92400e', border: '#fde68a' };
+        return { label: 'A mejorar', bg: '#c7fefb', color: '#0e928a', border: '#8afdf6' };
       case 'NOT_ACHIEVED':
-        return { label: 'No alcanzado', bg: '#fee2e2', color: '#991b1b', border: '#fecaca' };
+        return { label: 'No alcanzado', bg: '#fee2e2', color: '#1b6499', border: '#cae8fe' };
       default:
         return { label: 'Sin evaluar', bg: 'var(--bg)', color: 'var(--text-muted)', border: 'var(--border)' };
     }
@@ -80,7 +80,7 @@ export default function SupervisorSimulationsModal({ token, employeeId, employee
                       borderRadius: 8,
                       cursor: 'pointer',
                       border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border)',
-                      backgroundColor: isSelected ? 'rgba(79, 70, 229, 0.05)' : 'var(--surface)',
+                      backgroundColor: isSelected ? 'rgba(47, 110, 163, 0.05)' : 'var(--surface)',
                       transition: 'all 0.15s ease',
                     }}
                   >
@@ -169,8 +169,8 @@ export default function SupervisorSimulationsModal({ token, employeeId, employee
                       Devolución Cualitativa en 3 Dimensiones
                     </h5>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
-                      <div className="card" style={{ borderLeft: '4px solid #16a34a', margin: 0, padding: 12 }}>
-                        <div style={{ fontWeight: 600, color: '#16a34a', fontSize: 13, marginBottom: 4 }}>
+                      <div className="card" style={{ borderLeft: '4px solid #16a39b', margin: 0, padding: 12 }}>
+                        <div style={{ fontWeight: 600, color: '#16a39b', fontSize: 13, marginBottom: 4 }}>
                           ✨ Qué hizo bien
                         </div>
                         <p style={{ margin: 0, fontSize: 12, lineHeight: 1.45, color: 'var(--text)' }}>
@@ -178,8 +178,8 @@ export default function SupervisorSimulationsModal({ token, employeeId, employee
                         </p>
                       </div>
 
-                      <div className="card" style={{ borderLeft: '4px solid #ea580c', margin: 0, padding: 12 }}>
-                        <div style={{ fontWeight: 600, color: '#ea580c', fontSize: 13, marginBottom: 4 }}>
+                      <div className="card" style={{ borderLeft: '4px solid #0ceadd', margin: 0, padding: 12 }}>
+                        <div style={{ fontWeight: 600, color: '#0ceadd', fontSize: 13, marginBottom: 4 }}>
                           💡 Oportunidades de mejora
                         </div>
                         <p style={{ margin: 0, fontSize: 12, lineHeight: 1.45, color: 'var(--text)' }}>
@@ -214,16 +214,16 @@ export default function SupervisorSimulationsModal({ token, employeeId, employee
                             padding: '6px 8px',
                             borderRadius: 4,
                             backgroundColor: (g.isCompleted !== undefined ? g.isCompleted : g.isAchieved) ? '#f0fdf4' : 'var(--bg)',
-                            border: (g.isCompleted !== undefined ? g.isCompleted : g.isAchieved) ? '1px solid #bbf7d0' : '1px solid var(--border)',
+                            border: (g.isCompleted !== undefined ? g.isCompleted : g.isAchieved) ? '1px solid #bbf7f3' : '1px solid var(--border)',
                           }}
                         >
                           <span style={{ fontSize: 14 }}>{(g.isCompleted !== undefined ? g.isCompleted : g.isAchieved) ? '✅' : '⏳'}</span>
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 12, fontWeight: (g.isCompleted !== undefined ? g.isCompleted : g.isAchieved) ? 600 : 400, color: (g.isCompleted !== undefined ? g.isCompleted : g.isAchieved) ? '#166534' : 'var(--text)' }}>
+                            <div style={{ fontSize: 12, fontWeight: (g.isCompleted !== undefined ? g.isCompleted : g.isAchieved) ? 600 : 400, color: (g.isCompleted !== undefined ? g.isCompleted : g.isAchieved) ? '#166560' : 'var(--text)' }}>
                               {g.description || g.objective}
                             </div>
                             {g.evaluationNotes && (
-                              <div style={{ fontSize: 11, color: '#65a30d', fontStyle: 'italic', marginTop: 2 }}>
+                              <div style={{ fontSize: 11, color: '#0da39a', fontStyle: 'italic', marginTop: 2 }}>
                                 Evidencia: {g.evaluationNotes}
                               </div>
                             )}
@@ -282,4 +282,3 @@ export default function SupervisorSimulationsModal({ token, employeeId, employee
     </div>
   );
 }
-

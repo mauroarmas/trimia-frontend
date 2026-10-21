@@ -11,8 +11,8 @@ const POLL_MS = 4000;
 
 /** De dónde salió el ítem, en términos que se entienden sin conocer el sistema. */
 const FUENTE = {
-  CONSULTA_FALLIDA: { label: 'Alguien preguntó y no supo contestar', color: '#b45309' },
-  ESCALADO: { label: 'Caso que pasó a una persona', color: '#6d28d9' },
+  CONSULTA_FALLIDA: { label: 'Alguien preguntó y no supo contestar', color: '#09b4aa' },
+  ESCALADO: { label: 'Caso que pasó a una persona', color: '#288fd9' },
   DOCUMENTO_INCONCLUSO: { label: 'Documento incompleto', color: '#0369a1' },
 };
 
@@ -193,7 +193,7 @@ export default function Improvements({ token, me, onEntrevistar, onRetomar }) {
         <div
           style={{
             marginTop: 12, padding: 12, borderRadius: 6,
-            background: '#fffbeb', border: '1px solid #fcd34d',
+            background: '#fffbeb', border: '1px solid #4dfcf2',
             display: 'flex', justifyContent: 'space-between',
             alignItems: 'center', gap: 12, flexWrap: 'wrap',
           }}

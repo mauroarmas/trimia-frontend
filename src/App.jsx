@@ -8,7 +8,8 @@ import Improvements from './components/Improvements';
 import WebChat from './components/WebChat';
 import EscalationsQueue from './components/EscalationsQueue';
 import CollectionsPanel from './components/CollectionsPanel';
-import SalesClientForm from './components/SalesClientForm';
+import SalesPanel from './components/SalesPanel';
+import AdminFinancingPanel from './components/AdminFinancingPanel';
 import EmployeesPanel from './components/EmployeesPanel';
 import TrainingPanel from './components/TrainingPanel';
 
@@ -84,28 +85,6 @@ function NavIcon({ type, className = 'sidebar-nav-icon' }) {
   }
 }
 
-const SUPERVISOR_TABS = [
-  { id: 'supervisor', label: 'Panel del Supervisor', icon: 'supervisor' },
-  { id: 'escalations', label: 'Casos escalados', icon: 'escalations' },
-  { id: 'knowledge', label: 'Base de Conocimiento', icon: 'knowledge' },
-  { id: 'improvements', label: 'Mejorar el conocimiento', icon: 'improvements' },
-  { id: 'employees', label: 'Empleados y Áreas', icon: 'employees' },
-  { id: 'chat', label: 'Simulador de Chat', icon: 'chat' },
-];
-
-const COMMON_TABS = [
-  { id: 'training', label: 'Capacitación y Diagnóstico', icon: 'training' },
-  { id: 'webchat', label: 'Chat con el Asistente', icon: 'webchat' },
-];
-
-const COLLECTOR_TABS = [
-  { id: 'collections', label: 'Mi Panel de Cobranzas', icon: 'collections' },
-];
-
-const SALES_TABS = [
-  { id: 'sales', label: 'Alta de Cliente', icon: 'sales' },
-];
-
 export default function App() {
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
@@ -134,28 +113,87 @@ export default function App() {
   }
 
   const isSupervisor = user.role === 'SUPERVISOR';
-  const isCollector = user.sectorName === 'Cobranzas';
-  const isSales = user.sectorName === 'Ventas';
+  const isDiego =
+    user.email === 'diego.bazan@credimision.com' ||
+    user.isGeneralSupervisor === true;
+  const isCobranzas = user.sectorName === 'Cobranzas';
+  const isVentas = user.sectorName === 'Ventas';
+  const isAdmin = user.sectorName === 'Administración' || user.sectorName === 'Admin';
 
-  if (!isSupervisor && !isCollector && !isSales) {
-    return (
-      <div className="container" style={{ maxWidth: 420, margin: '80px auto' }}>
-        <div className="card">
-          <p>Logueado como {user.email} ({user.role}).</p>
-          <p>El acceso requiere rol SUPERVISOR, o sector Cobranzas o Ventas.</p>
-          <button onClick={handleLogout}>Salir</button>
-        </div>
-      </div>
-    );
+  // Configuración estricta de pestañas según el perfil
+  let visibleTabs = [];
+
+  if (isDiego) {
+    // 👑 Diego Bazán: Acceso TOTAL a todo el sistema
+    visibleTabs = [
+      { id: 'supervisor', label: 'Panel del Supervisor', icon: 'supervisor' },
+      { id: 'escalations', label: 'Casos escalados', icon: 'escalations' },
+      { id: 'knowledge', label: 'Base de Conocimiento', icon: 'knowledge' },
+      { id: 'improvements', label: 'Mejorar el conocimiento', icon: 'improvements' },
+      { id: 'employees', label: 'Empleados y Áreas', icon: 'employees' },
+      { id: 'training', label: 'Capacitación y Diagnóstico', icon: 'training' },
+      { id: 'collections', label: 'Panel de Cobranzas', icon: 'collections' },
+      { id: 'sales', label: 'Panel de Ventas', icon: 'sales' },
+      { id: 'admin_financing', label: 'Aprobación Financiación', icon: 'sales' },
+      { id: 'chat', label: 'Simulador de Chat', icon: 'chat' },
+      { id: 'webchat', label: 'Chat con el Asistente', icon: 'webchat' },
+    ];
+  } else if (isSupervisor) {
+    // 🛡️ Supervisores de área específica (ej. Silvia Ríos en Cobranzas)
+    if (isCobranzas) {
+      visibleTabs = [
+        { id: 'collections', label: 'Panel de Cobranzas', icon: 'collections' },
+        { id: 'escalations', label: 'Casos escalados', icon: 'escalations' },
+        { id: 'knowledge', label: 'Base de Conocimiento', icon: 'knowledge' },
+        { id: 'training', label: 'Capacitación y Diagnóstico', icon: 'training' },
+        { id: 'webchat', label: 'Chat con el Asistente', icon: 'webchat' },
+      ];
+    } else if (isVentas) {
+      visibleTabs = [
+        { id: 'sales', label: 'Panel de Ventas', icon: 'sales' },
+        { id: 'escalations', label: 'Casos escalados', icon: 'escalations' },
+        { id: 'knowledge', label: 'Base de Conocimiento', icon: 'knowledge' },
+        { id: 'training', label: 'Capacitación y Diagnóstico', icon: 'training' },
+        { id: 'webchat', label: 'Chat con el Asistente', icon: 'webchat' },
+      ];
+    } else {
+      // Logística o Depósito
+      visibleTabs = [
+        { id: 'escalations', label: 'Casos escalados', icon: 'escalations' },
+        { id: 'knowledge', label: 'Base de Conocimiento', icon: 'knowledge' },
+        { id: 'training', label: 'Capacitación y Diagnóstico', icon: 'training' },
+        { id: 'webchat', label: 'Chat con el Asistente', icon: 'webchat' },
+      ];
+    }
+  } else {
+    // 👤 Empleados operativos
+    if (isCobranzas) {
+      visibleTabs = [
+        { id: 'collections', label: 'Mi Panel de Cobranzas', icon: 'collections' },
+        { id: 'training', label: 'Mi Capacitación', icon: 'training' },
+        { id: 'webchat', label: 'Chat con el Asistente', icon: 'webchat' },
+      ];
+    } else if (isVentas) {
+      visibleTabs = [
+        { id: 'sales', label: 'Panel de Ventas', icon: 'sales' },
+        { id: 'training', label: 'Mi Capacitación', icon: 'training' },
+        { id: 'webchat', label: 'Chat con el Asistente', icon: 'webchat' },
+      ];
+    } else if (isAdmin) {
+      visibleTabs = [
+        { id: 'admin_financing', label: 'Aprobación Financiación', icon: 'sales' },
+        { id: 'training', label: 'Mi Capacitación', icon: 'training' },
+        { id: 'webchat', label: 'Chat con el Asistente', icon: 'webchat' },
+      ];
+    } else {
+      // Logística / Depósito u otros
+      visibleTabs = [
+        { id: 'training', label: 'Mi Capacitación', icon: 'training' },
+        { id: 'webchat', label: 'Chat con el Asistente', icon: 'webchat' },
+      ];
+    }
   }
 
-  // Lista visible de pestañas según los permisos y rol del usuario
-  const visibleTabs = [
-    ...(isSupervisor ? SUPERVISOR_TABS : []),
-    ...COMMON_TABS,
-    ...(isCollector ? COLLECTOR_TABS : []),
-    ...(isSales ? SALES_TABS : []),
-  ];
   const defaultTab = visibleTabs[0]?.id;
   const currentTab = visibleTabs.some((t) => t.id === tab) ? tab : defaultTab;
 
@@ -164,7 +202,7 @@ export default function App() {
       {/* Sidebar Fija Lateral */}
       <aside className="app-sidebar">
         <div className="sidebar-header">
-          <img src="/logo.png" alt="TrimIA" className="sidebar-logo" />
+          <img src="/logo-sidebar.png" alt="TrimIA" className="sidebar-logo" />
         </div>
 
         <nav className="sidebar-nav">
@@ -220,7 +258,7 @@ export default function App() {
                 {user.name || (user.email.includes('@') ? user.email.split('@')[0] : user.email)}
               </div>
               <div className="user-role-badge">
-                {user.role} {user.sectorName ? `(${user.sectorName})` : ''}
+                {isDiego ? 'SUPERVISOR GENERAL' : `${user.role} ${user.sectorName ? `(${user.sectorName})` : ''}`}
               </div>
             </div>
             <button
@@ -240,15 +278,16 @@ export default function App() {
       <main className="app-main">
         {currentTab === 'training' && <TrainingPanel token={token} me={user} />}
         {currentTab === 'webchat' && <WebChat token={token} me={user} />}
-        {currentTab === 'collections' && <CollectionsPanel token={token} me={user} isCollector={isCollector} />}
-        {currentTab === 'sales' && <SalesClientForm token={token} />}
-        {isSupervisor && currentTab === 'escalations' && <EscalationsQueue token={token} me={user} />}
-        {isSupervisor && currentTab === 'supervisor' && <SupervisorPanel token={token} me={user} />}
-        {isSupervisor && currentTab === 'chat' && <ChatSimulator token={token} />}
-        {isSupervisor && currentTab === 'knowledge' && (
+        {currentTab === 'collections' && <CollectionsPanel token={token} me={user} isCollector={isCobranzas} />}
+        {currentTab === 'sales' && <SalesPanel token={token} me={user} />}
+        {currentTab === 'admin_financing' && <AdminFinancingPanel token={token} me={user} />}
+        {currentTab === 'escalations' && <EscalationsQueue token={token} me={user} />}
+        {isDiego && currentTab === 'supervisor' && <SupervisorPanel token={token} me={user} />}
+        {isDiego && currentTab === 'chat' && <ChatSimulator token={token} />}
+        {currentTab === 'knowledge' && (
           <KnowledgeIngest token={token} me={user} />
         )}
-        {isSupervisor && currentTab === 'improvements' && (
+        {isDiego && currentTab === 'improvements' && (
           interviewStart ? (
             <Interview
               token={token}
@@ -265,7 +304,7 @@ export default function App() {
             />
           )
         )}
-        {isSupervisor && currentTab === 'employees' && <EmployeesPanel token={token} />}
+        {isDiego && currentTab === 'employees' && <EmployeesPanel token={token} />}
       </main>
     </div>
   );

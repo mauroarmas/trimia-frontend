@@ -36,8 +36,8 @@ import {
  * nadie.
  */
 const PERTENENCIA = {
-  PROPIA: { texto: 'Mía', color: '#137333', title: 'De un área que supervisás, o derivado a vos' },
-  SIN_AREA: { texto: 'Sin área', color: '#8a6d0b', title: 'El caso no llegó a rutearse: no le toca a nadie en particular' },
+  PROPIA: { texto: 'Mía', color: '#13736d', title: 'De un área que supervisás, o derivado a vos' },
+  SIN_AREA: { texto: 'Sin área', color: '#0b8a82', title: 'El caso no llegó a rutearse: no le toca a nadie en particular' },
   // "Otra área" es el caso más común pero no el único: un caso de TU área
   // derivado a otra persona también cae acá (FR-011). La columna «Derivado a»
   // de al lado dice cuál de los dos es; el título lo aclara para que la
@@ -924,7 +924,7 @@ export default function EscalationsQueue({ token, me }) {
                           escale, porque los dos se reparten la señal.
                         */}
                         {hayCorregibles && (
-                          <p className="hint" style={{ color: '#8a6d0b', marginTop: 0 }}>
+                          <p className="hint" style={{ color: '#0b8a82', marginTop: 0 }}>
                             ⚠️ En este caso {corregibles.length === 1
                               ? 'hay 1 documento que quedó corto'
                               : `hay ${corregibles.length} documentos que quedaron cortos`}
@@ -1206,7 +1206,7 @@ function ModificarDocumento({
               él es casi siempre perder el resto.
             */}
             {applyMode === 'REEMPLAZAR' && (
-              <p className="hint" style={{ color: '#b45309', marginTop: 4 }}>
+              <p className="hint" style={{ color: '#09b4aa', marginTop: 4 }}>
                 ⚠️ Se va a borrar todo lo que el documento dice hoy y va a quedar
                 solo la respuesta que escribiste arriba. Como esa respuesta
                 contesta una consulta puntual, es probable que no cubra el

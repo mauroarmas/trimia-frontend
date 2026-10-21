@@ -7,7 +7,7 @@ import {
   getEmployee,
   listSectors,
 } from '../api';
-import KnowledgeUpload from './KnowledgeUpload';
+import KnowledgeIngestForm from './KnowledgeIngestForm';
 import KnowledgeDetail from './KnowledgeDetail';
 import KnowledgeHygiene from './KnowledgeHygiene';
 import { motivoDeBloqueo, puedeEscribirEn } from '../areas';
@@ -71,8 +71,7 @@ export default function KnowledgeIngest({ token, me }) {
         <div className="submenu-pills">
           {[
             ['lista', 'Documentos'],
-            ['subir', 'Subir archivo'],
-            ['alta', 'Cargar texto'],
+            ['cargar', 'Cargar conocimiento'],
             ['buscar', 'Probar búsqueda'],
             ['higiene', 'Limpiar base de conocimiento'],
           ].map(([id, label]) => (
@@ -91,8 +90,13 @@ export default function KnowledgeIngest({ token, me }) {
         <KnowledgeList token={token} alcance={alcance} onSelect={setSelectedId} />
       )}
       {view === 'higiene' && <KnowledgeHygiene token={token} />}
-      {view === 'subir' && <KnowledgeUpload token={token} alcance={alcance} />}
-      {view === 'alta' && <TextIngestForm token={token} alcance={alcance} />}
+      {view === 'cargar' && (
+        <KnowledgeIngestForm
+          token={token}
+          alcance={alcance}
+          onIngested={() => setView('lista')}
+        />
+      )}
       {view === 'buscar' && <SearchForm token={token} />}
     </div>
   );
@@ -393,7 +397,7 @@ function ResultRow({ r, alcanza }) {
             se muestran los dos: ver solo el vigente taparía el desfase. */}
         {r.title}
         {r.desincronizado === 'DESFASADO' && r.vigente?.title !== r.title && (
-          <div className="hint" style={{ color: '#b45309' }}>
+          <div className="hint" style={{ color: '#09b4aa' }}>
             hoy se llama «{r.vigente.title}»
           </div>
         )}

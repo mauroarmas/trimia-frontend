@@ -115,7 +115,7 @@ export default function SupervisorPanel({ token, me }) {
         {metrics && (
           <div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, padding: 12 }}>
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7f3', borderRadius: 6, padding: 12 }}>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Conversaciones totales</div>
                 <div style={{ fontSize: 20, fontWeight: 'bold', marginTop: 4 }}>{metrics.conversations?.total ?? 0}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>activas: {metrics.conversations?.active ?? 0}</div>

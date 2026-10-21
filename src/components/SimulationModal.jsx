@@ -121,11 +121,11 @@ export default function SimulationModal({
   const getBandBadge = (band) => {
     switch (band) {
       case 'ACHIEVED':
-        return { label: 'LOGRADO', bg: '#ecfdf5', color: '#059669', border: '#a7f3d0' };
+        return { label: 'LOGRADO', bg: '#ecfdf5', color: '#05968d', border: '#a7f3ee' };
       case 'NEEDS_IMPROVEMENT':
-        return { label: 'A MEJORAR', bg: '#fffbeb', color: '#d97706', border: '#fde68a' };
+        return { label: 'A MEJORAR', bg: '#fffbeb', color: '#06d9cc', border: '#8afdf6' };
       case 'NOT_ACHIEVED':
-        return { label: 'NO LOGRADO', bg: '#fef2f2', color: '#dc2626', border: '#fecaca' };
+        return { label: 'NO LOGRADO', bg: '#fef2f2', color: '#2690dc', border: '#cae8fe' };
       default:
         return { label: band, bg: '#f1f5f9', color: '#475569', border: '#e2e8f0' };
     }
@@ -172,7 +172,7 @@ export default function SimulationModal({
                   padding: '2px 8px',
                   borderRadius: 12,
                   background: mode === 'GUIDED' ? '#ede9fe' : '#e0f2fe',
-                  color: mode === 'GUIDED' ? '#4f46e5' : '#0284c7',
+                  color: mode === 'GUIDED' ? '#46a2e5' : '#0284c7',
                 }}
               >
                 {mode === 'GUIDED' ? 'Checklist en vivo' : 'Sin asistencias'}
@@ -192,7 +192,7 @@ export default function SimulationModal({
                 onClick={handleConclude}
                 disabled={concluding || messages.filter((m) => m.sender === 'EMPLOYEE').length < 2}
                 style={{
-                  background: '#4f46e5',
+                  background: '#46a2e5',
                   color: '#ffffff',
                   padding: '7px 16px',
                   borderRadius: 8,
@@ -279,14 +279,14 @@ export default function SimulationModal({
                 <div
                   style={{
                     background: '#ffffff',
-                    border: '1px solid #bbf7d0',
-                    borderLeft: '5px solid #10b981',
+                    border: '1px solid #bbf7f3',
+                    borderLeft: '5px solid #10b9af',
                     borderRadius: 10,
                     padding: '18px 22px',
                     boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
                   }}
                 >
-                  <h4 style={{ margin: '0 0 8px', fontSize: 15, color: '#065f46', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <h4 style={{ margin: '0 0 8px', fontSize: 15, color: '#065f5a', display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span>🌟</span> Qué hiciste bien
                   </h4>
                   <p style={{ margin: 0, fontSize: 14, color: '#1e293b', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
@@ -298,14 +298,14 @@ export default function SimulationModal({
                 <div
                   style={{
                     background: '#ffffff',
-                    border: '1px solid #fde68a',
-                    borderLeft: '5px solid #f59e0b',
+                    border: '1px solid #8afdf6',
+                    borderLeft: '5px solid #0bf5e7',
                     borderRadius: 10,
                     padding: '18px 22px',
                     boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
                   }}
                 >
-                  <h4 style={{ margin: '0 0 8px', fontSize: 15, color: '#92400e', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <h4 style={{ margin: '0 0 8px', fontSize: 15, color: '#0e928a', display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span>💡</span> Aspectos a mejorar
                   </h4>
                   <p style={{ margin: 0, fontSize: 14, color: '#1e293b', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
@@ -318,13 +318,13 @@ export default function SimulationModal({
                   style={{
                     background: '#ffffff',
                     border: '1px solid #c7d2fe',
-                    borderLeft: '5px solid #6366f1',
+                    borderLeft: '5px solid #63b5f1',
                     borderRadius: 10,
                     padding: '18px 22px',
                     boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
                   }}
                 >
-                  <h4 style={{ margin: '0 0 8px', fontSize: 15, color: '#3730a3', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <h4 style={{ margin: '0 0 8px', fontSize: 15, color: '#3073a3', display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span>⚖️</span> Reglas del negocio y políticas
                   </h4>
                   <p style={{ margin: 0, fontSize: 14, color: '#1e293b', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
@@ -338,7 +338,7 @@ export default function SimulationModal({
                   type="button"
                   onClick={onClose}
                   style={{
-                    background: '#4f46e5',
+                    background: '#46a2e5',
                     color: '#ffffff',
                     padding: '10px 24px',
                     borderRadius: 8,
@@ -378,7 +378,7 @@ export default function SimulationModal({
                       </span>
                       <div
                         style={{
-                          background: isUser ? '#4f46e5' : '#ffffff',
+                          background: isUser ? '#46a2e5' : '#ffffff',
                           color: isUser ? '#ffffff' : '#0f172a',
                           padding: '11px 16px',
                           borderRadius: isUser ? '16px 16px 3px 16px' : '16px 16px 16px 3px',
@@ -435,7 +435,7 @@ export default function SimulationModal({
                   type="submit"
                   disabled={sending || !inputMessage.trim()}
                   style={{
-                    background: '#4f46e5',
+                    background: '#46a2e5',
                     color: '#ffffff',
                     border: 'none',
                     padding: '10px 18px',
@@ -479,7 +479,7 @@ export default function SimulationModal({
                         padding: '12px 14px',
                         borderRadius: 10,
                         background: g.isCompleted ? '#ecfdf5' : '#f8fafc',
-                        border: g.isCompleted ? '1px solid #a7f3d0' : '1px solid #e2e8f0',
+                        border: g.isCompleted ? '1px solid #a7f3ee' : '1px solid #e2e8f0',
                         transition: 'all 0.2s ease',
                       }}
                     >
@@ -492,14 +492,14 @@ export default function SimulationModal({
                             style={{
                               fontSize: 13,
                               fontWeight: 600,
-                              color: g.isCompleted ? '#065f46' : '#334155',
+                              color: g.isCompleted ? '#065f5a' : '#334155',
                               lineHeight: 1.4,
                             }}
                           >
                             {g.description}
                           </div>
                           {g.evidence && (
-                            <div style={{ fontSize: 11, color: '#059669', marginTop: 4, fontStyle: 'italic' }}>
+                            <div style={{ fontSize: 11, color: '#05968d', marginTop: 4, fontStyle: 'italic' }}>
                               "{g.evidence}"
                             </div>
                           )}

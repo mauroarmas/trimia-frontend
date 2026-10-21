@@ -3,10 +3,14 @@ import { login, getMe } from '../api';
 
 // Emails del seed (prisma/seed.ts). La contraseña de dev es única: trimia2026.
 const TEST_USERS = [
-  { label: 'Supervisor (todas las áreas) — Diego Bazán', email: 'diego.bazan@credimision.com' },
-  { label: 'Supervisora (solo Cobranzas) — Silvia Ríos', email: 'silvia.rios@credimision.com' },
-  { label: 'Cobrador — Roberto Sosa', email: 'roberto.sosa@credimision.com' },
-  { label: 'Cobradora Controladora — Marisa Paz', email: 'marisa.paz@credimision.com' },
+  { label: '👑 Supervisor General (Todas las áreas) — Diego Bazán', email: 'diego.bazan@credimision.com' },
+  { label: '🛡️ Supervisora de Cobranzas — Silvia Ríos', email: 'silvia.rios@credimision.com' },
+  { label: '🛍️ Vendedora — Laura Gómez', email: 'laura.gomez@credimision.com' },
+  { label: '💳 Cobrador — Roberto Sosa', email: 'roberto.sosa@credimision.com' },
+  { label: '🔍 Cobradora Controladora — Marisa Paz', email: 'marisa.paz@credimision.com' },
+  { label: '📋 Administrativa (Financiación) — Graciela Medina', email: 'graciela.medina@credimision.com' },
+  { label: '🚚 Logística — Carlos Ruiz', email: 'carlos.ruiz@credimision.com' },
+  { label: '📦 Depósito — Ana Torres', email: 'ana.torres@credimision.com' },
 ];
 
 function TrimiaBrand({ className }) {
@@ -56,11 +60,15 @@ export default function Login({ onLogin, showIntro = false }) {
 
   return (
     <main className={`login-page${showIntro ? ' login-page-with-intro' : ''}`}>
-      <div className="login-water" aria-hidden="true">
-        <span className="login-water-drop login-water-drop-one" />
-        <span className="login-water-drop login-water-drop-two" />
-        <span className="login-water-drop login-water-drop-three" />
-        <span className="login-water-drop login-water-drop-four" />
+      <div className="login-lights" aria-hidden="true">
+        <span className="login-light login-light-one" />
+        <span className="login-light login-light-two" />
+        <span className="login-light login-light-three" />
+        <span className="login-light login-light-four" />
+        <span className="login-light login-light-five" />
+        <span className="login-light login-light-six" />
+        <span className="login-light login-light-seven" />
+        <span className="login-light login-light-eight" />
       </div>
       {showIntro && <TrimiaBrand className="login-intro-brand" />}
       {showEntryAnimation && (
@@ -70,7 +78,7 @@ export default function Login({ onLogin, showIntro = false }) {
       )}
       <section className="login-card">
         <div className="login-form-panel">
-          <img src="/logo.png" alt="TrimIA" className="login-logo" />
+          <img src="/logo-login.png" alt="TrimIA" className="login-logo" />
           <div className="login-heading">
             <h2>Iniciar sesión</h2>
           </div>
@@ -102,7 +110,7 @@ export default function Login({ onLogin, showIntro = false }) {
           {error && <p className="error login-error">{error}</p>}
 
           <details className="login-test-users">
-            <summary>Accesos de prueba</summary>
+            <summary>Accesos de prueba por rol</summary>
             <div className="login-test-users-grid">
               {TEST_USERS.map((u) => (
                 <button
