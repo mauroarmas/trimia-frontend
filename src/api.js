@@ -1175,3 +1175,41 @@ export function getEmployeeSimulations(token, employeeId) {
   return request(`/training/supervisor/employees/${employeeId}/simulations`, { token });
 }
 
+
+
+// ========================================================================
+// Sprint 6 — Integraciones de Ventas (Stock Paljet, CRM, Crédito y Cierre)
+// ========================================================================
+
+/** Consulta catálogo y disponibilidad de stock en Paljet. */
+export function getSalesStock(token, { query, category } = {}) {
+  const params = new URLSearchParams();
+  if (query) params.append('query', query);
+  if (category) params.append('category', category);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return request(`/sales/stock${qs}`, { token });
+}
+
+/** Consulta lista de prospectos comerciales pendientes de contactar. */
+export function getSalesProspects(token, { status } = {}) {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+  return request(`/sales/prospects${qs}`, { token });
+}
+
+/** Verificación crediticia comercial confidencial (OE-10). */
+export function checkCreditCommercial(token, { dni, amount }) {
+  return request('/sales/credit-check', {
+    method: 'POST',
+    token,
+    body: { dni, amount },
+  });
+}
+
+/** Cierre manual de venta auditado en TrimIA (tras emisión en Paljet). */
+export function closeSale(token, { prospectId, purchaseRequestId, finalAmount, modality, notes }) {
+  return request('/sales/close', {
+    method: 'POST',
+    token,
+    body: { prospectId, purchaseRequestId, finalAmount, modality, notes },
+  });
+}
