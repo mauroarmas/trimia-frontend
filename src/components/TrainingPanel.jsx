@@ -6,6 +6,7 @@ import {
   getEmployeeModules,
   getPillAudioStatus,
   getSupervisorModules,
+  listSectors,
   publishPill,
 } from '../api';
 import AudioScriptModal from './AudioScriptModal';
@@ -53,6 +54,9 @@ export default function TrainingPanel({ token, me }) {
   const [supervisorModulePage, setSupervisorModulePage] = useState(1);
   const [newModuleTitle, setNewModuleTitle] = useState('');
   const [newModuleDesc, setNewModuleDesc] = useState('');
+  const [newModuleSectorId, setNewModuleSectorId] = useState('');
+  const [sectors, setSectors] = useState([]);
+  const [selectedAreaFilter, setSelectedAreaFilter] = useState('ALL');
   const [creatingModule, setCreatingModule] = useState(false);
   const [retryingAudioPillId, setRetryingAudioPillId] = useState(null);
 
@@ -92,8 +96,11 @@ export default function TrainingPanel({ token, me }) {
     loadEmployeePath();
     if (isSupervisor) {
       loadSupervisorView();
+      listSectors(token)
+        .then((secs) => setSectors(secs || []))
+        .catch(() => {});
     }
-  }, [loadEmployeePath, loadSupervisorView, isSupervisor]);
+  }, [loadEmployeePath, loadSupervisorView, isSupervisor, token]);
 
   const handleCreateModule = async (e) => {
     e.preventDefault();
@@ -103,10 +110,11 @@ export default function TrainingPanel({ token, me }) {
       await createTrainingModule(token, {
         title: newModuleTitle.trim(),
         description: newModuleDesc.trim() || undefined,
-        sectorId: me.sectorId || undefined,
+        sectorId: newModuleSectorId || undefined,
       });
       setNewModuleTitle('');
       setNewModuleDesc('');
+      setNewModuleSectorId('');
       loadSupervisorView();
       loadEmployeePath();
     } catch (err) {
@@ -175,24 +183,30 @@ export default function TrainingPanel({ token, me }) {
     return () => clearInterval(interval);
   }, [isSupervisor, supervisorTab, supervisorModules, loadSupervisorView]);
 
+  // Filtrado por área (para supervisores)
+  const filteredModules = modules.filter((m) => {
+    if (selectedAreaFilter === 'ALL') return true;
+    return m.sectorId === selectedAreaFilter;
+  });
+
   // Cálculo de estadísticas de avance del empleado
-  const totalPills = modules.reduce((acc, m) => acc + (m.pills?.length || 0), 0);
-  const completedOrExemptedPills = modules.reduce(
+  const totalPills = filteredModules.reduce((acc, m) => acc + (m.pills?.length || 0), 0);
+  const completedOrExemptedPills = filteredModules.reduce(
     (acc, m) =>
       acc +
       (m.pills?.filter((p) => p.isCompleted || p.isExempted || p.status === 'EXEMPTED_BY_DIAGNOSTIC').length || 0),
     0
   );
-  const anyExempted = modules.some((m) =>
+  const anyExempted = filteredModules.some((m) =>
     m.pills?.some((p) => p.isExempted || p.status === 'EXEMPTED_BY_DIAGNOSTIC')
   );
   const progressPercent = totalPills > 0
     ? Math.round((completedOrExemptedPills / totalPills) * 100)
     : 0;
-  const modulePageCount = Math.max(1, Math.ceil(modules.length / modulePageSize));
+  const modulePageCount = Math.max(1, Math.ceil(filteredModules.length / modulePageSize));
   const safeModulePage = Math.min(modulePage, modulePageCount);
   const moduleStartIndex = (safeModulePage - 1) * modulePageSize;
-  const visibleModules = modules.slice(moduleStartIndex, moduleStartIndex + modulePageSize);
+  const visibleModules = filteredModules.slice(moduleStartIndex, moduleStartIndex + modulePageSize);
   const supervisorModulePageCount = Math.max(1, Math.ceil(supervisorModules.length / modulePageSize));
   const safeSupervisorModulePage = Math.min(supervisorModulePage, supervisorModulePageCount);
   const supervisorModuleStartIndex = (safeSupervisorModulePage - 1) * modulePageSize;
@@ -274,15 +288,25 @@ export default function TrainingPanel({ token, me }) {
       {!supervisorTab && (
         <div className="training-path">
           {/* Barra de progreso global */}
-          <div className="card training-progress-card" style={{ marginBottom: 18 }}>
+          <div className="card training-progress-card">
             <div className="training-progress-heading">
-              <span style={{ fontWeight: 600 }}>Progreso General de Capacitación</span>
-              <span className="hint training-progress-stat">
-                {completedOrExemptedPills} de {totalPills} lecciones completadas
-                {totalPills > 0 && <strong>{progressPercent}%</strong>}
-              </span>
+              <div className="training-progress-copy">
+                <span className="training-progress-kicker">Tu avance</span>
+                <h3 className="training-progress-title">Progreso general de capacitación</h3>
+                <span className="training-progress-stat">
+                  {completedOrExemptedPills} de {totalPills} lecciones completadas
+                </span>
+              </div>
+              <strong className="training-progress-percent">{progressPercent}%</strong>
             </div>
-            <div className="training-progress-track">
+            <div
+              className="training-progress-track"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progressPercent}
+              aria-label="Progreso general de capacitación"
+            >
               <div
                 className="training-progress-fill"
                 style={{
@@ -291,18 +315,60 @@ export default function TrainingPanel({ token, me }) {
               />
             </div>
             {anyExempted && (
-              <p className="hint" style={{ marginTop: 8, fontSize: 12, color: 'var(--success)' }}>
+              <p className="training-progress-note">
                 🌟 Tienes lecciones eximidas por tu diagnóstico inicial habilitadas para libre repaso.
               </p>
             )}
           </div>
 
           {loading && <p style={{ textAlign: 'center', padding: 20 }}>Cargando ruta formativa...</p>}
-          {error && <p className="error">{error}</p>}
+          {error && (
+            <div className="training-load-error" role="alert">
+              <div className="training-load-error-copy">
+                <strong>No se pudo cargar tu ruta formativa</strong>
+                <span>
+                  {error === 'Failed to fetch'
+                    ? 'No hay conexión con el servidor. Verificá que el backend esté en marcha.'
+                    : error}
+                </span>
+              </div>
+              <button type="button" className="secondary" onClick={loadEmployeePath}>
+                Reintentar
+              </button>
+            </div>
+          )}
 
           {!loading && !error && modules.length === 0 && (
             <div className="card" style={{ textAlign: 'center', padding: '30px 20px' }}>
-              <p className="hint">No hay módulos de capacitación asignados a tu sector por el momento.</p>
+              <p className="hint">No hay módulos de capacitación asignados por el momento.</p>
+            </div>
+          )}
+
+          {/* Filtro por área para supervisores */}
+          {isSupervisor && sectors.length > 0 && !loading && modules.length > 0 && (
+            <div className="submenu-bar" style={{ marginBottom: 16 }}>
+              <div className="submenu-pills">
+                <button
+                  type="button"
+                  className={`submenu-pill${selectedAreaFilter === 'ALL' ? ' active' : ''}`}
+                  onClick={() => { setSelectedAreaFilter('ALL'); setModulePage(1); }}
+                >
+                  Todas las áreas ({modules.length})
+                </button>
+                {sectors.map((s) => {
+                  const count = modules.filter((m) => m.sectorId === s.id).length;
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      className={`submenu-pill${selectedAreaFilter === s.id ? ' active' : ''}`}
+                      onClick={() => { setSelectedAreaFilter(s.id); setModulePage(1); }}
+                    >
+                      {s.name} ({count})
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -316,7 +382,12 @@ export default function TrainingPanel({ token, me }) {
                   <div className="training-module-title-row">
                     <div className="training-module-title-copy">
                       <span className="training-module-kicker">Módulo {mIdx + 1}</span>
-                      <h3>{m.title}</h3>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <h3>{m.title}</h3>
+                        <span className="badge status-info" style={{ fontSize: 11 }}>
+                          {m.sectorName || 'General / Transversal'}
+                        </span>
+                      </div>
                     </div>
                     <span className="training-module-count">{m.pills?.length || 0} temas</span>
                   </div>
@@ -450,6 +521,18 @@ export default function TrainingPanel({ token, me }) {
               <h3 className="training-admin-title">Nuevo Módulo Formativo</h3>
               <form onSubmit={handleCreateModule} className="training-admin-form">
                 <div className="training-admin-field">
+                  <label>Área / Sector de Destino</label>
+                  <select
+                    value={newModuleSectorId}
+                    onChange={(e) => setNewModuleSectorId(e.target.value)}
+                  >
+                    <option value="">Transversal (Todas las áreas)</option>
+                    {sectors.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="training-admin-field">
                 <label>Título del Módulo</label>
                 <input
                   type="text"
@@ -517,14 +600,19 @@ export default function TrainingPanel({ token, me }) {
 
           {/* Listado de Módulos y Píldoras del Supervisor */}
           <section className="training-supervisor-modules">
-            <h3 className="training-supervisor-section-title">Módulos de tu Sector y Estado de Píldoras</h3>
+            <h3 className="training-supervisor-section-title">Módulos y Estado de Píldoras (Todas las Áreas)</h3>
             <div className="training-supervisor-module-list">
               {visibleSupervisorModules.map((m) => (
                 <article key={m.id} className="card training-supervisor-module">
                   <div className="training-supervisor-module-heading">
                     <div>
                       <span className="training-module-kicker">Módulo de capacitación</span>
-                      <h4>{m.title}</h4>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <h4>{m.title}</h4>
+                        <span className="badge status-info" style={{ fontSize: 11 }}>
+                          {m.sector?.name || 'General / Transversal'}
+                        </span>
+                      </div>
                     </div>
                     <span className="training-supervisor-module-count">{m.pills?.length || 0} píldoras</span>
                   </div>
