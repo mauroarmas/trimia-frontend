@@ -74,14 +74,15 @@ export default function SalesClientForm({ token }) {
   const total = quotas.reduce((sum, q) => sum + (Number(q.amount) || 0), 0);
 
   return (
-    <div className="card" style={{ marginTop: 12 }}>
-      {/* Qué hace el alta está en el botón «Info» de la barra de Ventas. */}
-      <h3>Alta de cliente</h3>
+    <section className="card sales-client-card" aria-labelledby="sales-client-title">
+      <header className="sales-form-heading">
+        <h3 id="sales-client-title">Alta de cliente</h3>
+      </header>
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error sales-form-feedback" role="alert">{error}</p>}
 
       {created && (
-        <div className="success-msg" style={{ marginBottom: 12 }}>
+        <div className="success-msg sales-form-feedback" role="status">
           Cliente <b>{created.name}</b> dado de alta con {created.quotas?.length ?? 0} cuota
           {created.quotas?.length === 1 ? '' : 's'}.
           {created.recoveredProofs > 0 && (
@@ -94,76 +95,113 @@ export default function SalesClientForm({ token }) {
         </div>
       )}
 
-      <form onSubmit={handleSubmit}>
-        <div className="field-row">
-          <div className="field">
-            <label>Nombre</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Comercio Don Pedro" />
+      <form className="sales-client-form" onSubmit={handleSubmit}>
+        <section className="sales-form-section" aria-labelledby="sales-client-data-title">
+          <h4 id="sales-client-data-title" className="sales-form-section-title">Datos del cliente</h4>
+          <div className="field-row sales-client-fields">
+            <div className="field">
+              <label htmlFor="sales-client-name">Nombre <span aria-hidden="true">*</span></label>
+              <input id="sales-client-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Comercio Don Pedro" required />
+            </div>
+            <div className="field">
+              <label htmlFor="sales-client-phone">Teléfono <span aria-hidden="true">*</span></label>
+              <input id="sales-client-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="3865505362" required />
+            </div>
+            <div className="field">
+              <label htmlFor="sales-client-dni">DNI <span className="sales-optional-label">Opcional</span></label>
+              <input id="sales-client-dni" value={dni} onChange={(e) => setDni(e.target.value)} placeholder="30111222" />
+            </div>
           </div>
-          <div className="field">
-            <label>Teléfono</label>
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="3865505362" />
+          <p className="sales-form-hint">
+            El teléfono se normaliza en el backend: podés escribirlo con o sin +54, 9 o 15.
+          </p>
+        </section>
+
+        <section className="sales-form-section sales-quotas-section" aria-labelledby="sales-quotas-title">
+          <h4 id="sales-quotas-title" className="sales-form-section-title">Plan de cuotas</h4>
+          <div className="sales-quotas-table-wrap">
+            <table className="sales-quotas-table">
+              <thead>
+                <tr>
+                  <th scope="col">N.º</th>
+                  <th scope="col">Monto</th>
+                  <th scope="col">Vencimiento</th>
+                  <th scope="col"><span className="sr-only">Acciones</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {quotas.map((q, i) => (
+                  <tr key={i}>
+                    <td data-label="Cuota">
+                      <span className="sales-quota-number">{i + 1}</span>
+                    </td>
+                    <td data-label="Monto">
+                      <div className="sales-currency-field">
+                        <span aria-hidden="true">$</span>
+                        <input
+                          type="number"
+                          min="1"
+                          step="0.01"
+                          value={q.amount}
+                          onChange={(e) => updateQuota(i, 'amount', e.target.value)}
+                          placeholder="15000"
+                          aria-label={`Monto de la cuota ${i + 1}`}
+                          required
+                        />
+                      </div>
+                    </td>
+                    <td data-label="Vencimiento">
+                      <input
+                        type="date"
+                        value={q.dueDate}
+                        onChange={(e) => updateQuota(i, 'dueDate', e.target.value)}
+                        aria-label={`Vencimiento de la cuota ${i + 1}`}
+                        required
+                      />
+                    </td>
+                    <td data-label="Acciones">
+                      {quotas.length > 1 && (
+                        <button
+                          type="button"
+                          className="sales-quota-remove"
+                          onClick={() => removeQuota(i)}
+                          aria-label={`Quitar cuota ${i + 1}`}
+                          title={`Quitar cuota ${i + 1}`}
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+                          </svg>
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div className="sales-quotas-toolbar">
+              <button type="button" className="secondary sales-add-quota" onClick={addQuota}>
+                <span aria-hidden="true">+</span> Agregar cuota
+              </button>
+              <div className="sales-quotas-total">
+                <span>{quotas.length} {quotas.length === 1 ? 'cuota' : 'cuotas'}</span>
+                <strong>Total del plan <b>${total.toLocaleString('es-AR')}</b></strong>
+              </div>
+            </div>
           </div>
-          <div className="field">
-            <label>DNI (opcional)</label>
-            <input value={dni} onChange={(e) => setDni(e.target.value)} placeholder="30111222" />
-          </div>
-        </div>
-        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: -4 }}>
-          El teléfono se normaliza en el backend: podés escribirlo con o sin +54, 9 o 15.
-        </p>
+        </section>
 
-        <h4 style={{ marginTop: 12 }}>Plan de cuotas</h4>
-        <table>
-          <thead>
-            <tr>
-              <th>#</th><th>Monto</th><th>Vencimiento</th><th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {quotas.map((q, i) => (
-              <tr key={i}>
-                <td>{i + 1}</td>
-                <td>
-                  <input
-                    type="number"
-                    min="1"
-                    step="0.01"
-                    value={q.amount}
-                    onChange={(e) => updateQuota(i, 'amount', e.target.value)}
-                    placeholder="15000"
-                  />
-                </td>
-                <td>
-                  <input
-                    type="date"
-                    value={q.dueDate}
-                    onChange={(e) => updateQuota(i, 'dueDate', e.target.value)}
-                  />
-                </td>
-                <td>
-                  {quotas.length > 1 && (
-                    <button type="button" className="secondary" onClick={() => removeQuota(i)}>
-                      Quitar
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12 }}>
-          <button type="button" className="secondary" onClick={addQuota}>+ Agregar cuota</button>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            Total del plan: <b>${total.toLocaleString('es-AR')}</b>
-          </span>
-        </div>
-
-        <button type="submit" disabled={busy} style={{ marginTop: 12 }}>
-          {busy ? 'Dando de alta...' : 'Dar de alta cliente'}
-        </button>
+        <footer className="sales-form-actions sales-client-actions">
+          <button type="submit" className="button primary sales-form-submit" disabled={busy}>
+            {!busy && (
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="m5 12 4 4L19 6" />
+              </svg>
+            )}
+            {busy ? 'Dando de alta...' : 'Dar de alta cliente'}
+          </button>
+        </footer>
       </form>
-    </div>
+    </section>
   );
 }

@@ -1,20 +1,12 @@
 import { useState, useEffect } from 'react';
 import SalesClientForm from './SalesClientForm';
-import InfoNotes, { InfoToggle } from './InfoNotes';
+import { InfoToggle } from './InfoNotes';
 import {
   getSalesStock,
   getSalesProspects,
   checkCreditCommercial,
   closeSale,
 } from '../api';
-
-const SUBTAB_TITULO = {
-  prospects: 'Clientes por contactar',
-  stock: 'Consultar stock en Paljet',
-  credit_check: 'Simulación de crédito (Comercial)',
-  close_sale: 'Registrar cierre de venta',
-  new_client: 'Alta de cliente en cuotas',
-};
 
 const INFO_POR_SUBTAB = {
   prospects: [
@@ -26,12 +18,14 @@ const INFO_POR_SUBTAB = {
       'Existencias en depósito en tiempo real. Si un producto no tiene stock, se sugieren hasta 2 sustitutos con stock (RF09).'],
   ],
   credit_check: [
-    ['Secreto comercial (OE-10).',
-      'El vendedor consulta si un cliente califica para venta en cuotas. Por confidencialidad, sólo recibe el dictamen comercial sin acceder al informe bancario detallado.'],
+    [
+      '🛡️ Principio de Secreto Comercial (OE-10).',
+      'Este panel muestra únicamente el dictamen comercial aplicable. El informe financiero confidencial y las deudas detalladas del BCRA permanecen bajo resguardo de Administración.',
+    ],
   ],
   close_sale: [
     ['Cierre manual (Tarea 6.9).',
-      'Una vez que el vendedor emitió la factura en Paljet a mano, asienta el cierre en TrimIA para auditar fecha y responsable.'],
+      'Asentá en TrimIA la venta acordada y facturada manualmente en Paljet. Referencia: Tarea 6.9.'],
   ],
   new_client: [
     ['Alta de cliente.',
@@ -204,8 +198,19 @@ export default function SalesPanel({ token, me }) {
     setTimeout(() => setContactedMsg(''), 6000);
   }
 
+  useEffect(() => {
+    if (!mostrarInfo) return undefined;
+
+    function handleInfoKeyDown(e) {
+      if (e.key === 'Escape') setMostrarInfo(false);
+    }
+
+    document.addEventListener('keydown', handleInfoKeyDown);
+    return () => document.removeEventListener('keydown', handleInfoKeyDown);
+  }, [mostrarInfo]);
+
   return (
-    <div>
+    <div className="sales-panel">
       <div className="page-header">
         <div>
           <h2 className="page-title">Panel de Ventas</h2>
@@ -215,7 +220,7 @@ export default function SalesPanel({ token, me }) {
         </div>
       </div>
 
-      <div className="submenu-bar" style={{ marginBottom: 20 }}>
+      <div className="submenu-bar sales-submenu-bar">
         <div className="submenu-pills">
           <button
             type="button"
@@ -253,18 +258,29 @@ export default function SalesPanel({ token, me }) {
             📝 Alta de cuotas
           </button>
         </div>
-        <div className="info-bar-actions">
+        <div className="sales-info-anchor">
           <InfoToggle open={mostrarInfo} onToggle={() => setMostrarInfo((v) => !v)} />
+          {mostrarInfo && (
+            <section
+              className="sales-info-popover"
+              role="dialog"
+              aria-labelledby="sales-info-title"
+            >
+              <button
+                type="button"
+                className="sales-info-close"
+                aria-label="Cerrar información"
+                onClick={() => setMostrarInfo(false)}
+              >
+                ×
+              </button>
+              <span className="sales-info-kicker">Ayuda de esta sección</span>
+              <h3 id="sales-info-title">{INFO_POR_SUBTAB[activeSubtab][0][0].replace(/\.$/, '')}</h3>
+              <p>{INFO_POR_SUBTAB[activeSubtab][0][1]}</p>
+            </section>
+          )}
         </div>
       </div>
-
-      {mostrarInfo && (
-        <InfoNotes
-          title={SUBTAB_TITULO[activeSubtab]}
-          notes={INFO_POR_SUBTAB[activeSubtab]}
-          onClose={() => setMostrarInfo(false)}
-        />
-      )}
 
       {contactedMsg && <p className="success-msg" style={{ marginBottom: 16 }}>{contactedMsg}</p>}
 
@@ -434,45 +450,40 @@ export default function SalesPanel({ token, me }) {
 
       {/* Subtab 3: Simulación Crediticia Confidencial */}
       {activeSubtab === 'credit_check' && (
-        <div className="card" style={{ maxWidth: 640, margin: '0 auto' }}>
-          <h3>Consulta de Aptitud Crediticia Comercial</h3>
-          <p className="hint" style={{ marginBottom: 16 }}>
-            Verificá si el cliente califica para venta financiada antes de comprometer cuotas.
-          </p>
+        <section className="card credit-check-card" aria-labelledby="credit-check-title">
+          <header className="credit-check-heading">
+            <span className="credit-check-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M12 3.5 19 6v5.2c0 4.5-2.9 7.7-7 9.3-4.1-1.6-7-4.8-7-9.3V6l7-2.5Z" />
+                <path d="m9 12 2 2 4-4" />
+              </svg>
+            </span>
+            <div>
+              <h3 id="credit-check-title">Consulta de Aptitud Crediticia Comercial</h3>
+              <p>Verificá si el cliente califica para venta financiada antes de comprometer cuotas.</p>
+            </div>
+          </header>
 
-          <div
-            style={{
-              padding: 12,
-              borderRadius: 6,
-              backgroundColor: 'var(--bg-accent, #f0fdf4)',
-              border: '1px solid var(--border-accent, #bbf7d0)',
-              marginBottom: 16,
-              fontSize: 13,
-            }}
-          >
-            🛡️ <strong>Principio de Secreto Comercial (OE-10):</strong> Este panel muestra únicamente
-            el dictamen comercial aplicable. El informe financiero confidencial y las deudas detalladas
-            del BCRA permanecen bajo resguardo de Administración.
-          </div>
-
-          <form onSubmit={handleCreditCheck}>
-            <div style={{ marginBottom: 12 }}>
-              <label>DNI o CUIT del Cliente *</label>
+          <form className="credit-check-form" onSubmit={handleCreditCheck}>
+            <div className="credit-check-field">
+              <label htmlFor="credit-check-dni">DNI o CUIT del Cliente <span aria-hidden="true">*</span></label>
               <input
+                id="credit-check-dni"
                 type="text"
                 placeholder="Ej. 32123458 (sin puntos)"
                 value={creditDni}
                 onChange={(e) => setCreditDni(e.target.value)}
                 required
               />
-              <span className="hint" style={{ fontSize: 11 }}>
+              <span className="hint credit-check-hint">
                 Tip para pruebas: Terminación 8/0 = Aprobado, 4/6 = Condicionado 20%, 1/9 = Rechazado.
               </span>
             </div>
 
-            <div style={{ marginBottom: 16 }}>
-              <label>Monto Estimado Solicitado ($)</label>
+            <div className="credit-check-field">
+              <label htmlFor="credit-check-amount">Monto Estimado Solicitado ($)</label>
               <input
+                id="credit-check-amount"
                 type="number"
                 placeholder="Ej. 250000"
                 value={creditAmount}
@@ -480,20 +491,26 @@ export default function SalesPanel({ token, me }) {
               />
             </div>
 
-            {creditError && <p className="error-msg" style={{ marginBottom: 12 }}>{creditError}</p>}
+            {creditError && (
+              <p className="error-msg credit-check-error" role="alert">
+                {creditError}
+              </p>
+            )}
 
-            <button type="submit" className="button primary" disabled={creditBusy} style={{ width: '100%' }}>
-              {creditBusy ? 'Consultando Riesgo Online...' : '💳 Verificar Dictamen Crediticio'}
+            <button type="submit" className="button primary credit-check-submit" disabled={creditBusy}>
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="3.5" y="5.5" width="17" height="13" rx="2" />
+                <path d="M3.5 10h17" />
+              </svg>
+              {creditBusy ? 'Consultando Riesgo Online...' : 'Verificar Dictamen Crediticio'}
             </button>
           </form>
 
           {creditResult && (
             <div
+              className="credit-check-result"
               style={{
-                marginTop: 20,
-                padding: 16,
-                borderRadius: 8,
-                border: '2px solid',
+                border: '1px solid',
                 borderColor:
                   creditResult.verdict === 'APPROVED'
                     ? '#16a34a'
@@ -526,69 +543,90 @@ export default function SalesPanel({ token, me }) {
               </span>
             </div>
           )}
-        </div>
+        </section>
       )}
 
       {/* Subtab 4: Cierre Manual de Venta */}
       {activeSubtab === 'close_sale' && (
-        <div className="card" style={{ maxWidth: 640, margin: '0 auto' }}>
-          <h3>Registro y Auditoría de Cierre de Venta (Tarea 6.9)</h3>
-          <p className="hint" style={{ marginBottom: 16 }}>
-            Asentá en TrimIA la venta acordada y facturada manualmente en Paljet.
-          </p>
-
-          <form onSubmit={handleCloseSale}>
-            <div style={{ marginBottom: 12 }}>
-              <label>ID del Prospecto (Opcional)</label>
-              <input
-                type="text"
-                placeholder="ID de prospecto o dejar vacío"
-                value={closeProspectId}
-                onChange={(e) => setCloseProspectId(e.target.value)}
-              />
+        <section className="card sales-close-card" aria-labelledby="sales-close-title">
+          <header className="sales-form-heading">
+            <div>
+              <span className="sales-form-eyebrow">Registro y auditoría</span>
+              <h3 id="sales-close-title">Cierre de venta</h3>
             </div>
+          </header>
 
-            <div style={{ marginBottom: 12 }}>
-              <label>Monto Final de la Operación ($) *</label>
-              <input
-                type="number"
-                placeholder="Ej. 420000"
-                value={closeAmount}
-                onChange={(e) => setCloseAmount(e.target.value)}
-                required
-              />
-            </div>
+          <form className="sales-close-form" onSubmit={handleCloseSale}>
+            <section className="sales-form-section" aria-labelledby="sales-operation-title">
+              <h4 id="sales-operation-title" className="sales-form-section-title">Datos de la operación</h4>
+              <div className="sales-close-fields">
+                <div>
+                  <label htmlFor="sales-close-prospect">ID del prospecto <span className="sales-optional-label">Opcional</span></label>
+                  <input
+                    id="sales-close-prospect"
+                    type="text"
+                    placeholder="Ej. 10245 o dejalo vacío"
+                    value={closeProspectId}
+                    onChange={(e) => setCloseProspectId(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="sales-close-amount">Monto final de la operación <span aria-hidden="true">*</span></label>
+                  <div className="sales-currency-field">
+                    <span aria-hidden="true">$</span>
+                    <input
+                      id="sales-close-amount"
+                      type="number"
+                      placeholder="420000"
+                      value={closeAmount}
+                      onChange={(e) => setCloseAmount(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="sales-close-modality">
+                  <label htmlFor="sales-close-modality">Modalidad de pago <span aria-hidden="true">*</span></label>
+                  <select
+                    id="sales-close-modality"
+                    value={closeModality}
+                    onChange={(e) => setCloseModality(e.target.value)}
+                  >
+                    <option value="CASH">Contado efectivo / Transferencia</option>
+                    <option value="FINANCED">Venta financiada (Cuotas semanales)</option>
+                  </select>
+                </div>
+              </div>
+            </section>
 
-            <div style={{ marginBottom: 12 }}>
-              <label>Modalidad de Pago *</label>
-              <select
-                value={closeModality}
-                onChange={(e) => setCloseModality(e.target.value)}
-              >
-                <option value="CASH">Contado Efectivo / Transferencia</option>
-                <option value="FINANCED">Venta Financiada (Cuotas Semanales)</option>
-              </select>
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
-              <label>Comprobante y Observaciones en Paljet *</label>
+            <section className="sales-form-section sales-proof-section" aria-labelledby="sales-proof-title">
+              <h4 id="sales-proof-title" className="sales-form-section-title">Comprobante en Paljet</h4>
+              <label htmlFor="sales-close-notes">Comprobante y observaciones <span aria-hidden="true">*</span></label>
               <textarea
+                id="sales-close-notes"
                 rows={3}
                 placeholder="Ej. Factura A-0001-00049281 emitida en Paljet. Se coordinó entrega para el jueves."
                 value={closeNotes}
                 onChange={(e) => setCloseNotes(e.target.value)}
                 required
               />
-            </div>
+            </section>
 
-            {closeError && <p className="error-msg" style={{ marginBottom: 12 }}>{closeError}</p>}
-            {closeSuccess && <p className="success-msg" style={{ marginBottom: 12 }}>{closeSuccess}</p>}
+            {closeError && <p className="error-msg sales-form-feedback" role="alert">{closeError}</p>}
+            {closeSuccess && <p className="success-msg sales-form-feedback" role="status">{closeSuccess}</p>}
 
-            <button type="submit" className="button primary" disabled={closeBusy} style={{ width: '100%' }}>
-              {closeBusy ? 'Guardando cierre...' : '✅ Confirmar Cierre de Venta'}
-            </button>
+            <footer className="sales-form-actions">
+              <span><span aria-hidden="true">*</span> Campos obligatorios</span>
+              <button type="submit" className="button primary sales-form-submit" disabled={closeBusy}>
+                {!closeBusy && (
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="m5 12 4 4L19 6" />
+                  </svg>
+                )}
+                {closeBusy ? 'Guardando cierre...' : 'Confirmar cierre de venta'}
+              </button>
+            </footer>
           </form>
-        </div>
+        </section>
       )}
 
       {/* Subtab 5: Alta de cliente en cuotas */}
