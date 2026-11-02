@@ -335,7 +335,7 @@ function SourcePanel({ source, token }) {
   if (!source) return null;
 
   async function descargar(fileId, filename) {
-    const res = await fetch(`http://localhost:3000/knowledge/files/${fileId}/download`, {
+    const res = await fetch(`/knowledge/files/${fileId}/download`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) return alert('El original ya no está disponible.');
