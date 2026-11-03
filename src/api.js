@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE ?? '';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_BASE ?? '').replace(/\/+$/, '');
 
 /**
  * Error de API con el cuerpo del backend adjunto.
@@ -265,7 +265,7 @@ export function listPaymentProofs(token, params = {}) {
 }
 
 export function getPaymentProofImage(token, id) {
-  return fetch(`http://localhost:3000/collections/proofs/${id}/image`, {
+  return fetch(`${API_BASE}/collections/proofs/${id}/image`, {
     method: 'GET',
     headers: { 'Authorization': `Bearer ${token}` },
   });

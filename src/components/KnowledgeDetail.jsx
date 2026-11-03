@@ -7,6 +7,7 @@ import {
   reindexKnowledgeDoc,
   previewAiEdit,
   applyAiEdit,
+  downloadKnowledgeFile,
 } from '../api';
 import { motivoDeBloqueo, puedeEscribirEn } from '../areas';
 import InfoNotes, { InfoToggle } from './InfoNotes';
@@ -335,9 +336,7 @@ function SourcePanel({ source, token }) {
   if (!source) return null;
 
   async function descargar(fileId, filename) {
-    const res = await fetch(`/knowledge/files/${fileId}/download`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await downloadKnowledgeFile(token, fileId);
     if (!res.ok) return alert('El original ya no está disponible.');
     const url = URL.createObjectURL(await res.blob());
     const a = document.createElement('a');
