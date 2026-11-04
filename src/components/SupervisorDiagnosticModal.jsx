@@ -69,7 +69,7 @@ export default function SupervisorDiagnosticModal({ token, employeeId, employeeN
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span className="hint">Estado Diagnóstico</span>
                 <strong>
-                  {data.hasActiveDiagnostic ? (
+                  {data.hasCompletedDiagnostic ? (
                     <span className="badge" style={{ backgroundColor: 'var(--success)', color: '#fff' }}>Completado</span>
                   ) : (
                     <span className="badge">No Rendido / Reseteado</span>
@@ -123,8 +123,16 @@ export default function SupervisorDiagnosticModal({ token, employeeId, employeeN
               </p>
             )}
 
+            {data.lastSession?.answers?.length > 0 && <section className="card">
+              <h4>Respuestas enviadas</h4>
+              {data.lastSession.answers.map((answer) => <div key={answer.pillId + ':' + answer.questionId} style={{ marginBottom: 10 }}>
+                <strong>{answer.question || ('Pregunta ' + answer.questionId)}</strong>
+                <p>{answer.options?.[answer.selectedOptionIndex] || ('Opción ' + (answer.selectedOptionIndex + 1))} · {answer.isCorrect ? 'Correcta' : 'A repasar'}</p>
+              </div>)}
+            </section>}
+
             {/* Bloque de Reinicio */}
-            {data.hasActiveDiagnostic && (
+            {data.hasCompletedDiagnostic && (
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 16 }}>
                 {!confirmReset ? (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

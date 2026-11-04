@@ -26,23 +26,10 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
   const [loadingScript, setLoadingScript] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [activeLineIndex, setActiveLineIndex] = useState(-1);
-  const [voices, setVoices] = useState([]);
-  const isPlayingRef = useRef(false);
-  const currentLineIndexRef = useRef(0);
-
-  // Pre-cargar voces nativas del navegador
-  useEffect(() => {
-    if (!('speechSynthesis' in window)) return;
-    const updateVoices = () => {
-      const v = window.speechSynthesis.getVoices();
-      if (v && v.length > 0) setVoices(v);
-    };
-    updateVoices();
-    window.speechSynthesis.onvoiceschanged = updateVoices;
-    return () => {
-      window.speechSynthesis.onvoiceschanged = null;
-    };
-  }, []);
+  const playbackStateRef = useRef('IDLE');
+  const reportBusyRef = useRef(false);
+  const acknowledgedRef = useRef(0);
+  const [audioNotice, setAudioNotice] = useState('');
 
   // Pre-cargar el guión de diálogo en cuanto se abre el modal para que esté listo al pulsar Play
   useEffect(() => {
@@ -61,151 +48,6 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
     };
   }, [token, pillId]);
 
-  // Detener la síntesis de voz del navegador si se desmonta o cierra el modal
-  useEffect(() => {
-    return () => {
-      isPlayingRef.current = false;
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
-    };
-  }, []);
-
-  const getSpeakerVoices = () => {
-    const list =
-      voices.length > 0
-        ? voices
-        : 'speechSynthesis' in window
-        ? window.speechSynthesis.getVoices()
-        : [];
-    const es = list.filter((v) => v.lang && v.lang.toLowerCase().startsWith('es'));
-    let v1 = es[0] || list[0] || null;
-    let v2 = es.length > 1 ? es[1] : list.length > 1 ? list[1] : v1;
-    if (v1 && v2 && v1.name === v2.name && list.length > 1) {
-      const other = list.find((v) => v.name !== v1.name);
-      if (other) v2 = other;
-    }
-    return { voice1: v1, voice2: v2 };
-  };
-
-  const stopNarration = () => {
-    isPlayingRef.current = false;
-    setIsPlaying(false);
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-  };
-
-  const speakLineAt = (index, lines) => {
-    if (!('speechSynthesis' in window)) return;
-    if (!isPlayingRef.current) return;
-    if (!lines || lines.length === 0) return;
-
-    if (index >= lines.length) {
-      currentLineIndexRef.current = 0;
-      setActiveLineIndex(-1);
-      return;
-    }
-
-    currentLineIndexRef.current = index;
-    setActiveLineIndex(index);
-
-    const item = lines[index];
-    const isSpk1 = item.speaker === 'SPEAKER_1';
-    const { voice1, voice2 } = getSpeakerVoices();
-
-    const utterance = new SpeechSynthesisUtterance(item.text);
-    utterance.lang = 'es-ES';
-    utterance.rate = 1.0;
-    utterance.pitch = isSpk1 ? 0.95 : 1.25; // Tono diferenciado para cada locutor
-    if (isSpk1 && voice1) utterance.voice = voice1;
-    if (!isSpk1 && voice2) utterance.voice = voice2;
-
-    utterance.onend = () => {
-      if (!isPlayingRef.current) return;
-      speakLineAt(index + 1, lines);
-    };
-
-    utterance.onerror = () => {
-      if (!isPlayingRef.current) return;
-      speakLineAt(index + 1, lines);
-    };
-
-    window.speechSynthesis.speak(utterance);
-  };
-
-  const startNarration = async (fromIndex = null) => {
-    if (!('speechSynthesis' in window)) {
-      alert('Tu navegador no soporta síntesis de voz nativa.');
-      return;
-    }
-
-    window.speechSynthesis.cancel();
-    isPlayingRef.current = true;
-    setIsPlaying(true);
-
-    let lines = scriptDialogue;
-    if (!lines || lines.length === 0) {
-      try {
-        const res = await getPillAudioScript(token, pillId);
-        lines = res?.dialogue || [];
-        setScriptDialogue(lines);
-      } catch {
-        lines = [];
-      }
-    }
-
-    if (!lines || lines.length === 0) {
-      stopNarration();
-      return;
-    }
-
-    let idx = fromIndex !== null ? fromIndex : currentLineIndexRef.current;
-    if (idx < 0 || idx >= lines.length) {
-      idx = 0;
-    }
-
-    speakLineAt(idx, lines);
-  };
-
-  const handleAudioPlay = () => {
-    if (!isPlayingRef.current) {
-      if (audioRef.current) {
-        audioRef.current.volume = 0;
-        if (totalDuration > 0 && scriptDialogue?.length) {
-          const frac = audioRef.current.currentTime / totalDuration;
-          const targetIdx = Math.min(
-            scriptDialogue.length - 1,
-            Math.floor(frac * scriptDialogue.length),
-          );
-          currentLineIndexRef.current = targetIdx;
-        }
-      }
-      startNarration(currentLineIndexRef.current);
-    }
-  };
-
-  const handleAudioPause = () => {
-    if (isPlayingRef.current) {
-      stopNarration();
-    }
-  };
-
-  const handleAudioSeeked = () => {
-    if (audioRef.current && totalDuration > 0 && scriptDialogue?.length) {
-      const frac = audioRef.current.currentTime / totalDuration;
-      const targetIdx = Math.min(
-        scriptDialogue.length - 1,
-        Math.floor(frac * scriptDialogue.length),
-      );
-      currentLineIndexRef.current = targetIdx;
-      if (isPlayingRef.current) {
-        window.speechSynthesis.cancel();
-        speakLineAt(targetIdx, scriptDialogue);
-      }
-    }
-  };
-
   useEffect(() => {
     let mounted = true;
     getEmployeePill(token, pillId)
@@ -215,6 +57,7 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
         setIsAudioCompleted(Boolean(data.isAudioCompleted));
         setPlaybackSeconds(data.playbackProgressSeconds || 0);
         lastReportedTimeRef.current = data.playbackProgressSeconds || 0;
+        acknowledgedRef.current = data.playbackProgressSeconds || 0;
         setTotalDuration(data.audioDurationSeconds || 0);
         setLoading(false);
       })
@@ -244,45 +87,54 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
     setShowScript(!showScript);
   };
 
-  // Manejo de eventos de reproducción de audio
+  async function reportAudio(current) {
+    if (reportBusyRef.current) return false;
+    reportBusyRef.current = true;
+    try {
+      const res = await reportPlaybackProgress(token, pillId, current);
+      acknowledgedRef.current = res.playbackProgressSeconds;
+      lastReportedTimeRef.current = current;
+      setPlaybackSeconds(res.playbackProgressSeconds);
+      setAudioNotice('');
+      if (res.isAudioCompleted) { setIsAudioCompleted(true); onProgressUpdated?.(); }
+      return true;
+    } catch (err) {
+      setAudioNotice(err.message || 'No se pudo guardar el avance de escucha.');
+      if (audioRef.current) audioRef.current.currentTime = acknowledgedRef.current;
+      return false;
+    } finally { reportBusyRef.current = false; }
+  }
+
+  const handleAudioPlay = async () => {
+    if (playbackStateRef.current === 'PLAYING') { setIsPlaying(true); return; }
+    if (playbackStateRef.current === 'STARTING' || !audioRef.current) return;
+    playbackStateRef.current = 'STARTING';
+    audioRef.current.pause();
+    // Anclar el inicio en el servidor antes de reproducir, también al reanudar.
+    const ok = await reportAudio(Math.floor(audioRef.current.currentTime));
+    if (!ok || !audioRef.current) { playbackStateRef.current = 'IDLE'; return; }
+    playbackStateRef.current = 'PLAYING';
+    try { await audioRef.current.play(); setIsPlaying(true); }
+    catch { playbackStateRef.current = 'IDLE'; setAudioNotice('Presioná reproducir para retomar el audio.'); }
+  };
+  const handleAudioPause = async () => {
+    if (playbackStateRef.current === 'STARTING') return;
+    playbackStateRef.current = 'IDLE'; setIsPlaying(false);
+    if (audioRef.current) await reportAudio(Math.floor(audioRef.current.currentTime));
+  };
   const handleTimeUpdate = async () => {
     if (!audioRef.current) return;
     const current = Math.floor(audioRef.current.currentTime);
-    const duration = Math.floor(audioRef.current.duration) || totalDuration;
-    if (duration > 0 && totalDuration === 0) {
-      setTotalDuration(duration);
-    }
-
-    setPlaybackSeconds(current);
-
-    // Reportar avance cada 5 segundos de reproducción efectiva
-    if (Math.abs(current - lastReportedTimeRef.current) >= 5) {
-      lastReportedTimeRef.current = current;
-      try {
-        const res = await reportPlaybackProgress(token, pillId, current);
-        if (res?.isAudioCompleted && !isAudioCompleted) {
-          setIsAudioCompleted(true);
-          if (onProgressUpdated) onProgressUpdated();
-        }
-      } catch (err) {
-        // Silencioso o log en consola para no interrumpir el flujo de audio
-        console.warn('Error reportando progreso de audio:', err);
-      }
-    }
+    const duration = audioRef.current.duration || totalDuration;
+    if (scriptDialogue?.length && duration > 0) setActiveLineIndex(Math.min(scriptDialogue.length - 1, Math.floor(current / duration * scriptDialogue.length)));
+    if (playbackStateRef.current === 'PLAYING' && Math.abs(current - lastReportedTimeRef.current) >= 5) await reportAudio(current);
   };
-
+  const handleAudioSeeked = () => {
+    if (playbackStateRef.current === 'PLAYING' && audioRef.current) void reportAudio(Math.floor(audioRef.current.currentTime));
+  };
   const handleAudioEnded = async () => {
-    if (!audioRef.current) return;
-    const finalTime = Math.floor(audioRef.current.currentTime);
-    try {
-      const res = await reportPlaybackProgress(token, pillId, finalTime);
-      if (res?.isAudioCompleted) {
-        setIsAudioCompleted(true);
-        if (onProgressUpdated) onProgressUpdated();
-      }
-    } catch (err) {
-      console.warn('Error reportando finalización de audio:', err);
-    }
+    playbackStateRef.current = 'IDLE'; setIsPlaying(false);
+    if (audioRef.current) await reportAudio(Math.floor(audioRef.current.currentTime));
   };
 
   const handleSelectOption = (qIdx, optIdx) => {
@@ -470,6 +322,7 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
                     ref={audioRef}
                     controls
                     preload="metadata"
+                    onLoadedMetadata={() => { if (audioRef.current) audioRef.current.currentTime = acknowledgedRef.current; }}
                     src={getAudioStreamUrl(pill.id, token)}
                     onPlay={handleAudioPlay}
                     onPause={handleAudioPause}
@@ -565,6 +418,7 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
               </div>
             )}
 
+            {audioNotice && <p className="hint" role="status">{audioNotice}</p>}
             {/* Contenido Teórico */}
             <div
               className="card"
@@ -576,7 +430,9 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
                 marginBottom: 20,
               }}
             >
-              {pill.content}
+              {!hasAudio || isAudioCompleted || pill.isExempted || pill.isCompleted
+                ? pill.content
+                : 'El resumen se habilita al escuchar al menos el 80% del audio. Podés seguir la transcripción durante la reproducción.'}
             </div>
 
             {/* Cuestionario de Verificación */}

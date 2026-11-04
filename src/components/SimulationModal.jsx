@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   startSimulation,
+  getActiveSimulation,
   sendSimulationMessage,
   concludeSimulation,
 } from '../api';
@@ -17,6 +18,7 @@ export default function SimulationModal({
   const currentPillId = pill?.id || pillId;
   const currentPillTitle = pill?.title || pillTitle || 'Práctica Pedagógica';
   const [session, setSession] = useState(null);
+  const [resumable, setResumable] = useState(null);
   const [messages, setMessages] = useState([]);
   const [goals, setGoals] = useState([]);
   const [feedback, setFeedback] = useState(null);
@@ -43,6 +45,8 @@ export default function SimulationModal({
           if (isMounted) setError('No se especificó la lección formativa.');
           return;
         }
+        const active = await getActiveSimulation(token, currentPillId, mode);
+        if (active) { if (isMounted) setResumable(active); return; }
         const data = await startSimulation(token, currentPillId, mode);
         if (isMounted) {
           setSession(data);
@@ -60,9 +64,17 @@ export default function SimulationModal({
     return () => { isMounted = false; };
   }, [token, currentPillId, mode]);
 
+  const chooseSession = async (resume) => {
+    setLoading(true); setError('');
+    try {
+      const data = resume ? resumable : await startSimulation(token, currentPillId, mode);
+      setSession(data); setMessages(data.messages || []); setGoals(data.goals || []); setFeedback(data.feedback || null); setResumable(null);
+    } catch (err) { setError(err.message); } finally { setLoading(false); }
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!inputMessage.trim() || sending || !session || feedback) return;
+    if (inputMessage.trim().length < 2 || sending || concluding || !session || feedback) return;
 
     const userText = inputMessage.trim();
     setInputMessage('');
@@ -91,6 +103,8 @@ export default function SimulationModal({
         setGoals(res.updatedGoals);
       }
     } catch (err) {
+      setMessages((prev) => prev.filter((m) => m.id !== tempUserMsg.id));
+      setInputMessage(userText);
       setError(err.message || 'Error al enviar el mensaje');
     } finally {
       setSending(false);
@@ -190,7 +204,7 @@ export default function SimulationModal({
               <button
                 type="button"
                 onClick={handleConclude}
-                disabled={concluding || messages.filter((m) => m.sender === 'EMPLOYEE').length < 2}
+                disabled={sending || concluding || messages.filter((m) => m.sender === 'EMPLOYEE').length < 2}
                 style={{
                   background: '#46a2e5',
                   color: '#ffffff',
@@ -227,6 +241,13 @@ export default function SimulationModal({
             <p style={{ fontSize: 14, color: '#64748b', fontWeight: 500 }}>
               Preparando al cliente simulado y el escenario de práctica...
             </p>
+          </div>
+        ) : resumable ? (
+          <div style={{ padding: 32 }}>
+            <p>Tenés una práctica en curso: {resumable.scenarioTitle}. Podés retomar la conversación o comenzar otra.</p>
+            {error && <p className="error">{error}</p>}
+            <button onClick={() => chooseSession(true)}>Reanudar práctica</button>{' '}
+            <button className="secondary" onClick={() => chooseSession(false)}>Iniciar otra</button>
           </div>
         ) : error && !session ? (
           <div style={{ padding: 32, textAlign: 'center' }}>
@@ -290,7 +311,7 @@ export default function SimulationModal({
                     <span>🌟</span> Qué hiciste bien
                   </h4>
                   <p style={{ margin: 0, fontSize: 14, color: '#1e293b', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
-                    {feedback.whatWentWell}
+                    {feedback.whatWentWellBand && <small className="badge">{getBandBadge(feedback.whatWentWellBand).label}</small>}<br />{feedback.whatWentWell}
                   </p>
                 </div>
 
@@ -309,7 +330,7 @@ export default function SimulationModal({
                     <span>💡</span> Aspectos a mejorar
                   </h4>
                   <p style={{ margin: 0, fontSize: 14, color: '#1e293b', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
-                    {feedback.toImprove}
+                    {feedback.toImproveBand && <small className="badge">{getBandBadge(feedback.toImproveBand).label}</small>}<br />{feedback.toImprove}
                   </p>
                 </div>
 
@@ -328,7 +349,7 @@ export default function SimulationModal({
                     <span>⚖️</span> Reglas del negocio y políticas
                   </h4>
                   <p style={{ margin: 0, fontSize: 14, color: '#1e293b', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
-                    {feedback.businessRules}
+                    {feedback.businessRulesBand && <small className="badge">{getBandBadge(feedback.businessRulesBand).label}</small>}<br />{feedback.businessRules}
                   </p>
                 </div>
               </div>
@@ -433,7 +454,7 @@ export default function SimulationModal({
                 />
                 <button
                   type="submit"
-                  disabled={sending || !inputMessage.trim()}
+                  disabled={sending || inputMessage.trim().length < 2}
                   style={{
                     background: '#46a2e5',
                     color: '#ffffff',

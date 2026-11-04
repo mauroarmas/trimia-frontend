@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   enqueueAudioGeneration,
   generatePillAudioScript,
@@ -17,7 +17,7 @@ export default function AudioScriptModal({ token, pill, onClose, onScriptUpdated
   const [dialogue, setDialogue] = useState([]);
   const [estimatedDurationSeconds, setEstimatedDurationSeconds] = useState(96);
 
-  const loadScript = async () => {
+  const loadScript = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -40,11 +40,11 @@ export default function AudioScriptModal({ token, pill, onClose, onScriptUpdated
     } finally {
       setLoading(false);
     }
-  };
+  }, [token, pill.id]);
 
   useEffect(() => {
     loadScript();
-  }, [pill.id]);
+  }, [loadScript]);
 
   const handleGenerateAIScript = async () => {
     setGenerating(true);
@@ -117,7 +117,7 @@ export default function AudioScriptModal({ token, pill, onClose, onScriptUpdated
       alert('Debes generar o agregar un guion antes de sintetizar audio.');
       return;
     }
-    if (!window.confirm('¿Deseas enviar este guion a la cola de síntesis TTS (BullMQ)?')) {
+    if (!window.confirm('¿Guardar los cambios de este guion y generar su audio?')) {
       return;
     }
 
@@ -125,6 +125,8 @@ export default function AudioScriptModal({ token, pill, onClose, onScriptUpdated
     setError(null);
     setNotice(null);
     try {
+      const saved = await updatePillAudioScript(token, pill.id, { dialogue, estimatedDurationSeconds: Number(estimatedDurationSeconds) || 90 });
+      setDialogue(saved.dialogue);
       await enqueueAudioGeneration(token, pill.id);
       setNotice('¡Síntesis de voz encolada con éxito! El audio estará listo en unos momentos.');
       if (onScriptUpdated) onScriptUpdated();
@@ -169,7 +171,7 @@ export default function AudioScriptModal({ token, pill, onClose, onScriptUpdated
                 id="audio-script-duration"
                 type="number"
                 min="30"
-                max="600"
+                max="300"
                 step="1"
                 value={estimatedDurationSeconds}
                 onChange={(e) => setEstimatedDurationSeconds(e.target.value)}

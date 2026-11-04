@@ -7,7 +7,7 @@ export default function DiagnosticQuizModal({ token, onClose, onComplete }) {
   const [alreadyCompleted, setAlreadyCompleted] = useState(false);
   const [quizData, setQuizData] = useState(null);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [selectedAnswers, setSelectedAnswers] = useState({}); // { [questionId]: optionIndex }
+  const [selectedAnswers, setSelectedAnswers] = useState({}); // { [questionKey(question)]: optionIndex }
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
   const [secondsRemaining, setSecondsRemaining] = useState(300); // 5 minutos
@@ -52,14 +52,15 @@ export default function DiagnosticQuizModal({ token, onClose, onComplete }) {
     return () => clearInterval(interval);
   }, [loading, alreadyCompleted, result, quizData]);
 
+  const questionKey = (question) => question.pillId + ':' + question.questionId;
   const questions = quizData?.questions || [];
   const currentQ = questions[currentIndex];
-  const allAnswered = questions.length > 0 && questions.every((q) => selectedAnswers[q.questionId] !== undefined);
+  const allAnswered = questions.length > 0 && questions.every((q) => selectedAnswers[questionKey(q)] !== undefined);
 
-  const handleSelectOption = (questionId, optionIndex) => {
+  const handleSelectOption = (question, optionIndex) => {
     setSelectedAnswers((prev) => ({
       ...prev,
-      [questionId]: optionIndex,
+      [questionKey(question)]: optionIndex,
     }));
   };
 
@@ -71,7 +72,7 @@ export default function DiagnosticQuizModal({ token, onClose, onComplete }) {
       const answers = questions.map((q) => ({
         pillId: q.pillId,
         questionId: q.questionId,
-        selectedOptionIndex: selectedAnswers[q.questionId],
+        selectedOptionIndex: selectedAnswers[questionKey(q)],
       }));
       const res = await submitDiagnostic(token, answers);
       setResult(res);
@@ -168,7 +169,7 @@ export default function DiagnosticQuizModal({ token, onClose, onComplete }) {
 
                   <div className="diagnostic-options">
                     {currentQ.options.map((option, idx) => {
-                      const isSelected = selectedAnswers[currentQ.questionId] === idx;
+                      const isSelected = selectedAnswers[questionKey(currentQ)] === idx;
                       return (
                         <label
                           key={idx}
@@ -176,9 +177,9 @@ export default function DiagnosticQuizModal({ token, onClose, onComplete }) {
                         >
                           <input
                             type="radio"
-                            name={`q_${currentQ.questionId}`}
+                            name={questionKey(currentQ)}
                             checked={isSelected}
-                            onChange={() => handleSelectOption(currentQ.questionId, idx)}
+                            onChange={() => handleSelectOption(currentQ, idx)}
                           />
                           <span>{option}</span>
                         </label>
@@ -201,7 +202,7 @@ export default function DiagnosticQuizModal({ token, onClose, onComplete }) {
                     {currentIndex < questions.length - 1 ? (
                       <button
                         onClick={() => setCurrentIndex((prev) => prev + 1)}
-                        disabled={selectedAnswers[currentQ.questionId] === undefined}
+                        disabled={selectedAnswers[questionKey(currentQ)] === undefined}
                       >
                         Siguiente →
                       </button>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import SalesConversationModal from './SalesConversationModal';
 import SalesClientForm from './SalesClientForm';
 import { InfoToggle } from './InfoNotes';
 import {
@@ -6,6 +7,7 @@ import {
   getSalesProspects,
   checkCreditCommercial,
   closeSale,
+  salesProspectAction,
 } from '../api';
 
 const INFO_POR_SUBTAB = {
@@ -15,7 +17,7 @@ const INFO_POR_SUBTAB = {
   ],
   stock: [
     ['Catálogo Paljet.',
-      'Existencias en depósito en tiempo real. Si un producto no tiene stock, se sugieren hasta 2 sustitutos con stock (RF09).'],
+      'Existencias según la última actualización de la fuente de prueba. Si un producto no tiene stock, se sugieren hasta 2 sustitutos con stock (RF09).'],
   ],
   credit_check: [
     [
@@ -36,6 +38,7 @@ const INFO_POR_SUBTAB = {
 export default function SalesPanel({ token, me }) {
   const [activeSubtab, setActiveSubtab] = useState('prospects');
   const [mostrarInfo, setMostrarInfo] = useState(false);
+  const [contactProspect, setContactProspect] = useState(null);
   const [contactedMsg, setContactedMsg] = useState('');
 
   // 1. Estado para Prospects (CRM)
@@ -151,8 +154,8 @@ export default function SalesPanel({ token, me }) {
     e.preventDefault();
     setCloseError('');
     setCloseSuccess('');
-    if (!closeAmount || !closeNotes.trim()) {
-      setCloseError('Monto final y notas del comprobante son obligatorios.');
+    if (!closeProspectId.trim() || Number(closeAmount) <= 0 || !closeNotes.trim()) {
+      setCloseError('Indicá un prospecto, monto positivo y comprobante para registrar el cierre.');
       return;
     }
 
@@ -176,9 +179,16 @@ export default function SalesPanel({ token, me }) {
     }
   }
 
-  function handleTakeProspect(p) {
-    setContactedMsg(`Iniciando contacto con ${p.name || p.nombreApellido} (${p.phone || p.telefono}). Podés enviarle WhatsApp o llamarlo.`);
-    setTimeout(() => setContactedMsg(''), 6000);
+  async function handleTakeProspect(p) {
+    if (!p.conversationId) { setContactedMsg('Este prospecto todavía no tiene una conversación en TrimIA.'); return; }
+    try { await salesProspectAction(token,p.id,'takeover'); setContactProspect(p); }
+    catch (err) { setContactedMsg(err.message); }
+  }
+  async function handleFollowUp(p) {
+    const message = prompt('Seguimiento comercial para CRM (no incluyas informes de crédito ni notas internas):');
+    if (!message?.trim()) return;
+    try { const updated = await salesProspectAction(token,p.id,'followup',message.trim()); setContactedMsg(updated.syncStatus === 'PENDING' ? 'Seguimiento guardado en TrimIA; pendiente de sincronización.' : 'Seguimiento guardado.'); await loadProspects(); }
+    catch (err) { setContactedMsg(err.message); }
   }
 
   useEffect(() => {
@@ -194,11 +204,12 @@ export default function SalesPanel({ token, me }) {
 
   return (
     <div className="sales-panel">
+      {contactProspect && <SalesConversationModal token={token} me={me} prospect={contactProspect} onClose={() => { setContactProspect(null); loadProspects(); }} />}
       <div className="page-header">
         <div>
           <h2 className="page-title">Panel de Ventas</h2>
           <p className="page-subtitle">
-            Atención comercial de clientes derivados del bot, consulta de stock en tiempo real y alta de ventas.
+            Atención comercial de clientes derivados del bot, consulta de stock según su última actualización y alta de ventas.
           </p>
         </div>
       </div>
@@ -316,6 +327,14 @@ export default function SalesPanel({ token, me }) {
                       <div><strong>🔍 Interés:</strong> {product}</div>
                       <div style={{ marginTop: 6, color: 'var(--text-muted)' }}>
                         <em>"{notes}"</em>
+                        {p.handoff && <dl>
+                          <dt>Producto</dt><dd>{p.handoff.producto}</dd>
+                          {p.handoff.precioEstimado != null && <><dt>Precio consultado</dt><dd>${p.handoff.precioEstimado.toLocaleString('es-AR')}</dd></>}
+                          {p.handoff.modalidad && <><dt>Modalidad</dt><dd>{p.handoff.modalidad === 'CASH' ? 'Contado' : 'Financiado'}</dd></>}
+                          {p.handoff.estadoCredito && <><dt>Dictamen comercial</dt><dd>{p.handoff.estadoCredito}</dd></>}
+                          <dt>Motivo de derivación</dt><dd>{p.handoff.motivoAlerta}</dd>
+                          {p.handoff.observaciones && <><dt>Observaciones</dt><dd>{p.handoff.observaciones}</dd></>}
+                        </dl>}
                       </div>
                     </div>
                   </div>
@@ -334,16 +353,8 @@ export default function SalesPanel({ token, me }) {
                       >
                         Cerrar venta
                       </button>
-                      <a
-                        href={`https://wa.me/${phone}?text=${encodeURIComponent(`¡Hola ${name}! Te contacto de Credimisión sobre tu consulta por el ${product}. ¿Cómo estás?`)}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="button primary"
-                        style={{ padding: '4px 10px', fontSize: 12, textDecoration: 'none' }}
-                        onClick={() => handleTakeProspect(p)}
-                      >
-                        💬 WhatsApp
-                      </a>
+                      <button type="button" className="button secondary" onClick={() => handleFollowUp(p)}>Seguimiento</button>
+                      <button type="button" className="button primary" onClick={() => handleTakeProspect(p)}>Retomar en TrimIA</button>
                     </div>
                   </div>
                 </div>
@@ -545,11 +556,12 @@ export default function SalesPanel({ token, me }) {
               <h4 id="sales-operation-title" className="sales-form-section-title">Datos de la operación</h4>
               <div className="sales-close-fields">
                 <div>
-                  <label htmlFor="sales-close-prospect">ID del prospecto <span className="sales-optional-label">Opcional</span></label>
+                  <label htmlFor="sales-close-prospect">ID del prospecto <span aria-hidden="true">*</span></label>
                   <input
                     id="sales-close-prospect"
                     type="text"
-                    placeholder="Ej. 10245 o dejalo vacío"
+                    placeholder="Seleccioná el prospecto desde Clientes por contactar"
+                    required
                     value={closeProspectId}
                     onChange={(e) => setCloseProspectId(e.target.value)}
                   />

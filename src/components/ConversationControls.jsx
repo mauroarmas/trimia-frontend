@@ -63,6 +63,8 @@ export default function ConversationControls({
   me,
   onRefresh,
   hideReplyAndNotes = false,
+  hideNotes = false,
+  actions,
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -100,7 +102,7 @@ export default function ConversationControls({
 
   function handleTakeover() {
     setRespondio(false);
-    run(() => takeoverConversation(token, conversation.id));
+    run(() => (actions?.takeover ?? takeoverConversation)(token, conversation.id));
   }
 
   function handleRelease() {
@@ -119,14 +121,14 @@ export default function ConversationControls({
     ) {
       return;
     }
-    run(() => releaseConversation(token, conversation.id));
+    run(() => (actions?.release ?? releaseConversation)(token, conversation.id));
   }
 
   function handleReply(e) {
     e.preventDefault();
     if (!replyText.trim()) return;
     run(async () => {
-      await replyManually(token, conversation.id, replyText);
+      await (actions?.reply ?? replyManually)(token, conversation.id, replyText);
       setReplyText('');
       setRespondio(true);
     });
@@ -183,7 +185,7 @@ export default function ConversationControls({
         </form>
       )}
 
-      {!hideReplyAndNotes && (
+      {!hideReplyAndNotes && !hideNotes && (
         <>
           <h4 style={{ marginBottom: 6 }}>Notas internas ({conversation.internalNotes?.length ?? 0})</h4>
           <ul className="notes-list">
