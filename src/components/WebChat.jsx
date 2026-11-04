@@ -264,7 +264,7 @@ export default function WebChat({ token, me }) {
     try {
       const res = await sendWebMessage(token, text);
       setText('');
-      setEsperandoRespuesta(true);
+      setEsperandoRespuesta(!enManosDeUnaPersona);
       if (res.conversationId !== convId) {
         localStorage.setItem(claveConv, res.conversationId);
         setConvId(res.conversationId);
@@ -307,6 +307,7 @@ export default function WebChat({ token, me }) {
         <h3>Chat con el asistente</h3>
         <InfoToggle open={mostrarInfo} onToggle={() => setMostrarInfo((v) => !v)} />
       </div>
+      <p className="hint">Conversás como vos mismo: {me?.name || me?.email}. El asistente te reconoce como empleado y puede usar conocimiento interno.</p>
       {mostrarInfo && (
         <InfoNotes
           title="Chat con el asistente"

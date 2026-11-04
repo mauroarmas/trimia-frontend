@@ -33,36 +33,6 @@ const INFO_POR_SUBTAB = {
   ],
 };
 
-const INITIAL_DEMO_PROSPECTS = [
-  {
-    id: 'pr-1',
-    name: 'Martín Benítez',
-    phone: '5493865123456',
-    status: 'NUEVO',
-    productInterest: 'Horno Convector 4 bandejas 60x40',
-    notes: 'Consultó por plan financiado en 12 cuotas semanales. Envió fotos del local.',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'pr-2',
-    name: 'Carolina Gómez',
-    phone: '5493865987654',
-    status: 'EN_CONTACTO',
-    productInterest: 'Freidora Industrial 30 Lts automática',
-    notes: 'Pregunta si la conexión de gas es para envasado o natural.',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'pr-3',
-    name: 'Esteban Morales',
-    phone: '5493865443322',
-    status: 'CALIFICA',
-    productInterest: 'Cortadora de fiambre 330mm acero inox',
-    notes: 'Quiere coordinar una visita presencial para probar la máquina.',
-    createdAt: new Date().toISOString(),
-  },
-];
-
 export default function SalesPanel({ token, me }) {
   const [activeSubtab, setActiveSubtab] = useState('prospects');
   const [mostrarInfo, setMostrarInfo] = useState(false);
@@ -71,12 +41,15 @@ export default function SalesPanel({ token, me }) {
   // 1. Estado para Prospects (CRM)
   const [prospects, setProspects] = useState([]);
   const [loadingProspects, setLoadingProspects] = useState(false);
+  const [prospectsError, setProspectsError] = useState('');
 
   // 2. Estado para Stock (Paljet)
   const [stockItems, setStockItems] = useState([]);
   const [stockSearch, setStockSearch] = useState('');
   const [stockCategory, setStockCategory] = useState('');
   const [loadingStock, setLoadingStock] = useState(false);
+  const [stockError, setStockError] = useState('');
+  const [stockCategories, setStockCategories] = useState([]);
 
   // 3. Estado para Consulta Crediticia (OE-10)
   const [creditDni, setCreditDni] = useState('');
@@ -99,26 +72,34 @@ export default function SalesPanel({ token, me }) {
     if (activeSubtab === 'prospects') {
       loadProspects();
     }
-  }, [activeSubtab]);
+  }, [activeSubtab, token]);
 
   // Cargar stock
   useEffect(() => {
     if (activeSubtab === 'stock') {
       loadStock();
     }
-  }, [activeSubtab, stockCategory]);
+  }, [activeSubtab, stockCategory, token]);
+
+  useEffect(() => {
+    let current = true;
+    getSalesStock(token)
+      .then((items) => {
+        if (current) setStockCategories([...new Set(items.map((item) => item.category))].sort());
+      })
+      .catch(() => {});
+    return () => { current = false; };
+  }, [token]);
 
   async function loadProspects() {
     setLoadingProspects(true);
+    setProspectsError('');
     try {
       const data = await getSalesProspects(token);
-      if (Array.isArray(data) && data.length > 0) {
-        setProspects(data);
-      } else {
-        setProspects(INITIAL_DEMO_PROSPECTS);
-      }
-    } catch {
-      setProspects(INITIAL_DEMO_PROSPECTS);
+      setProspects(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setProspects([]);
+      setProspectsError(err.message);
     } finally {
       setLoadingProspects(false);
     }
@@ -126,6 +107,7 @@ export default function SalesPanel({ token, me }) {
 
   async function loadStock() {
     setLoadingStock(true);
+    setStockError('');
     try {
       const data = await getSalesStock(token, {
         query: stockSearch,
@@ -135,7 +117,8 @@ export default function SalesPanel({ token, me }) {
         setStockItems(data);
       }
     } catch (err) {
-      console.error('Error al cargar stock:', err);
+      setStockItems([]);
+      setStockError(err.message);
     } finally {
       setLoadingStock(false);
     }
@@ -287,6 +270,8 @@ export default function SalesPanel({ token, me }) {
       {/* Subtab 1: Clientes por contactar */}
       {activeSubtab === 'prospects' && (
         <div className="card">
+          {prospectsError && <p className="error" role="alert">{prospectsError}</p>}
+          {!loadingProspects && !prospectsError && prospects.length === 0 && <p className="hint">No hay clientes por contactar.</p>}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <div>
               <h3>Prospectos comerciales derivados por el Asistente</h3>
@@ -371,10 +356,12 @@ export default function SalesPanel({ token, me }) {
       {/* Subtab 2: Consultar stock */}
       {activeSubtab === 'stock' && (
         <div className="card">
+          {stockError && <p className="error" role="alert">{stockError}</p>}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <div>
               <h3>Inventario y Disponibilidad en Paljet</h3>
-              <p className="hint">Muestra existencias reales y enlaces oficiales de Credimisión (RF09).</p>
+              <p className="hint">{stockItems.some((item) => item.source === 'SIMULATED') ? 'Catálogo simulado de Paljet para pruebas. No representa existencias comerciales reales.' : 'Disponibilidad informada por Paljet.'}</p>
+              {stockItems.length > 0 && <p className="hint">Última actualización: {new Date(stockItems[0].lastUpdated).toLocaleString('es-AR')}</p>}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <input
@@ -391,10 +378,7 @@ export default function SalesPanel({ token, me }) {
                 style={{ maxWidth: 160 }}
               >
                 <option value="">Todas las categorías</option>
-                <option value="BALANZAS">Balanzas</option>
-                <option value="CORTADORAS">Cortadoras</option>
-                <option value="GASTRONOMIA">Gastronomía</option>
-                <option value="REFRIGERACION">Refrigeración</option>
+                {stockCategories.map((category) => <option key={category} value={category}>{category === 'SMART_TV' ? 'Smart TV' : category}</option>)}
               </select>
               <button type="button" className="button secondary" onClick={loadStock} disabled={loadingStock}>
                 🔍 Buscar
@@ -426,20 +410,20 @@ export default function SalesPanel({ token, me }) {
                       </div>
                     )}
                   </td>
-                  <td>{item.category}</td>
-                  <td><strong style={{ color: 'var(--success, #16a34a)' }}>${Number(item.cashPrice).toLocaleString()}</strong></td>
-                  <td>${Number(item.listPrice).toLocaleString()}</td>
+                  <td>{item.category === 'SMART_TV' ? 'Smart TV' : item.category}</td>
+                  <td>{item.cashPrice == null ? 'No informado' : `$${Number(item.cashPrice).toLocaleString('es-AR')}`}</td>
+                  <td>{item.listPrice == null ? 'No informado' : `$${Number(item.listPrice).toLocaleString('es-AR')}`}</td>
                   <td>
                     {item.stock > 0 ? (
-                      <span className="badge status-active">{item.stock} unidades</span>
+                      <span className={`badge ${item.stock === 1 ? 'status-warning' : 'status-active'}`}>{item.stock} {item.stock === 1 ? 'unidad · Bajo stock' : 'unidades · Disponible'}</span>
                     ) : (
-                      <span className="badge status-error">Sin stock (RF09)</span>
+                      <span className="badge status-error">0 unidades · Sin stock</span>
                     )}
                   </td>
                   <td>
-                    <a href={item.urlCredimision} target="_blank" rel="noreferrer" style={{ fontSize: 13 }}>
+                    {item.urlCredimision ? <a href={item.urlCredimision} target="_blank" rel="noreferrer" style={{ fontSize: 13 }}>
                       🌐 Ver en página
-                    </a>
+                    </a> : 'No informado'}
                   </td>
                 </tr>
               ))}

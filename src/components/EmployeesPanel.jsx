@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { listEmployees, listSectors, setSupervisedAreas } from '../api';
+import { listEmployees, listSectors, setSupervisedAreas, createEmployee, updateEmployee, deactivateEmployee } from '../api';
 import { esGerente } from '../areas';
 import InfoNotes, { InfoToggle } from './InfoNotes';
 import SupervisorDiagnosticModal from './SupervisorDiagnosticModal';
@@ -23,7 +23,7 @@ const FILTROS = [
  * documentos puede modificar—, así que si no se puede tocar desde acá, no se puede
  * probar nada de eso.
  */
-export default function EmployeesPanel({ token }) {
+export default function EmployeesPanel({ token, me }) {
   const [employees, setEmployees] = useState([]);
   const [sectors, setSectors] = useState([]);
   const [editando, setEditando] = useState(null);
@@ -33,6 +33,20 @@ export default function EmployeesPanel({ token }) {
   const [loading, setLoading] = useState(false);
   const [filtro, setFiltro] = useState('todos');
   const [mostrarInfo, setMostrarInfo] = useState(false);
+  const [formEmployee, setFormEmployee] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+
+  async function changeActive(employee) {
+    if (!window.confirm(`${employee.isActive ? 'Desactivar' : 'Reactivar'} a ${employee.name} (${employee.email})?`)) return;
+    setBusyId(employee.id);
+    setError('');
+    try {
+      if (employee.isActive) await deactivateEmployee(token, employee.id);
+      else await updateEmployee(token, employee.id, { isActive: true });
+      await load();
+    } catch (err) { setError(err.message); }
+    finally { setBusyId(null); }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -105,6 +119,7 @@ export default function EmployeesPanel({ token }) {
           ))}
         </nav>
         <div className="info-bar-actions">
+          <button type="button" onClick={() => setFormEmployee({})}>Nuevo empleado</button>
           <InfoToggle open={mostrarInfo} onToggle={() => setMostrarInfo((v) => !v)} />
           <button type="button" className="btn-pill-action" onClick={load} disabled={loading}>
             <span>🔄</span>
@@ -135,6 +150,7 @@ export default function EmployeesPanel({ token }) {
       )}
 
       {error && <p className="error">{error}</p>}
+      {formEmployee && <EmployeeForm key={formEmployee.id ?? 'new'} token={token} employee={formEmployee} sectors={sectors} onClose={() => setFormEmployee(null)} onSaved={() => { setFormEmployee(null); load(); }} />}
 
       {editando && (
         <AsignarAreas
@@ -189,6 +205,7 @@ export default function EmployeesPanel({ token }) {
                           <div>
                             <strong className="knowledge-doc-title">{e.name}</strong>
                             <span className="knowledge-doc-summary">{e.email}</span>
+                            <span className="knowledge-doc-summary">{e.phone}</span>
                             {!e.isActive && <span className="knowledge-readonly">Dado de baja</span>}
                           </div>
                         </div>
@@ -219,6 +236,8 @@ export default function EmployeesPanel({ token }) {
                       </td>
                       <td className="knowledge-row-action">
                         <div className="employees-actions">
+                          <button type="button" className="secondary" onClick={() => setFormEmployee(e)}>Editar empleado</button>
+                          <button type="button" className="secondary" disabled={busyId === e.id || e.id === me?.id} onClick={() => changeActive(e)}>{e.isActive ? 'Desactivar' : 'Reactivar'}</button>
                           <button
                             type="button"
                             className="secondary"
@@ -278,6 +297,40 @@ function iniciales(nombre = '') {
     .slice(0, 2)
     .map((p) => p[0].toUpperCase())
     .join('');
+}
+
+function EmployeeForm({ token, employee, sectors, onClose, onSaved }) {
+  const [form, setForm] = useState({ name: employee.name ?? '', email: employee.email ?? '', phone: employee.phone ?? '', password: '', role: employee.role ?? 'EMPLEADO', sectorId: employee.sectorId ?? sectors[0]?.id ?? '', isController: employee.isController ?? false });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const field = (name) => ({ value: form[name], onChange: (e) => setForm({ ...form, [name]: e.target.value }) });
+  async function save(event) {
+    event.preventDefault();
+    setBusy(true);
+    setError('');
+    const body = { ...form, name: form.name.trim(), email: form.email.trim(), phone: form.phone.trim() };
+    if (!body.password) delete body.password;
+    try {
+      if (employee.id) await updateEmployee(token, employee.id, body);
+      else await createEmployee(token, body);
+      onSaved();
+    } catch (err) { setError(err.message); }
+    finally { setBusy(false); }
+  }
+  return <section className="card">
+    <h3>{employee.id ? `Editar a ${employee.name}` : 'Nuevo empleado'}</h3>
+    <form onSubmit={save}>
+      <div className="field"><label htmlFor="employee-name">Nombre</label><input id="employee-name" required {...field('name')} /></div>
+      <div className="field"><label htmlFor="employee-email">Email</label><input id="employee-email" type="email" required {...field('email')} /></div>
+      <div className="field"><label htmlFor="employee-phone">Teléfono de WhatsApp</label><input id="employee-phone" type="tel" required {...field('phone')} /></div>
+      <div className="field"><label htmlFor="employee-password">{employee.id ? 'Nueva contraseña (opcional)' : 'Contraseña'}</label><input id="employee-password" type="password" autoComplete="new-password" minLength={8} required={!employee.id} {...field('password')} /></div>
+      <div className="field"><label htmlFor="employee-role">Rol</label><select id="employee-role" {...field('role')}><option value="EMPLEADO">Empleado</option><option value="SUPERVISOR">Supervisor</option></select></div>
+      <div className="field"><label htmlFor="employee-sector">Sector</label><select id="employee-sector" required {...field('sectorId')}><option value="">Elegir…</option>{sectors.map((sector) => <option key={sector.id} value={sector.id}>{sector.name}</option>)}</select></div>
+      <label><input type="checkbox" checked={form.isController} onChange={(e) => setForm({ ...form, isController: e.target.checked })} /> Cobrador controlador</label>
+      {error && <p className="error" role="alert">{error}</p>}
+      <div className="knowledge-form-actions"><button type="button" className="secondary" onClick={onClose} disabled={busy}>Cancelar</button><button type="submit" disabled={busy}>{busy ? 'Guardando…' : 'Guardar empleado'}</button></div>
+    </form>
+  </section>;
 }
 
 /** Selección múltiple de áreas. La lista reemplaza a la anterior: sirve para quitar. */

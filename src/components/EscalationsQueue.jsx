@@ -86,7 +86,7 @@ export default function EscalationsQueue({ token, me }) {
   const [teachAgent, setTeachAgent] = useState(false);
   const [knowledgeTitle, setKnowledgeTitle] = useState('');
   const [knowledgeCategory, setKnowledgeCategory] = useState('');
-  const [knowledgeAudience, setKnowledgeAudience] = useState('');
+  const [knowledgeAudience, setKnowledgeAudience] = useState('INTERNO');
   const [knowledgeAgentType, setKnowledgeAgentType] = useState('');
   const [delegateTo, setDelegateTo] = useState('');
   const [actionBusy, setActionBusy] = useState(false);
@@ -195,7 +195,7 @@ export default function EscalationsQueue({ token, me }) {
     setTeachAgent(false);
     setKnowledgeTitle('');
     setKnowledgeCategory('');
-    setKnowledgeAudience('');
+    setKnowledgeAudience('INTERNO');
     setKnowledgeAgentType('');
     setDelegateTo('');
     setCandidates(null);
@@ -972,9 +972,8 @@ export default function EscalationsQueue({ token, me }) {
                         </div>
                         <div className="field-row">
                           <div className="field">
-                            <label>Audiencia (opcional)</label>
-                            <select value={knowledgeAudience} onChange={(e) => setKnowledgeAudience(e.target.value)}>
-                              <option value="">— sin especificar —</option>
+                            <label>Audiencia</label>
+                            <select required value={knowledgeAudience} onChange={(e) => setKnowledgeAudience(e.target.value)}>
                               <option value="PUBLICO">Público (para clientes)</option>
                               <option value="INTERNO">Interno (solo equipo)</option>
                             </select>

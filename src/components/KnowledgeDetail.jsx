@@ -74,6 +74,7 @@ export default function KnowledgeDetail({ token, id, alcance, onClose, onChanged
   }
 
   async function handleToggleActive() {
+    if (!window.confirm(`¿${doc.isActive ? 'Desactivar' : 'Activar'} el documento "${doc.title}"? Cambiará su disponibilidad para el asistente.`)) return;
     await setKnowledgeActive(token, id, !doc.isActive);
     await load();
     onChanged?.();

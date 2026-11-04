@@ -16,6 +16,8 @@ import {
   assignCollector,
 } from '../api';
 import ActivityFeed from './ActivityFeed';
+import ReminderConfig from './ReminderConfig';
+import { formatCalendarDate, formatProofDate } from '../date';
 
 const QUOTA_STATUS_LABELS = {
   PENDING: 'Pendiente',
@@ -88,6 +90,7 @@ export default function CollectionsPanel({ token, me, isCollector }) {
   }, [proofStatus]);
 
   async function handleAcceptProof(proofId) {
+    if (!window.confirm('¿Aceptar este comprobante? Quedará pendiente de verificación bancaria.')) return;
     try {
       await acceptPaymentProof(token, proofId);
       setSelectedProof(null);
@@ -98,6 +101,7 @@ export default function CollectionsPanel({ token, me, isCollector }) {
   }
 
   async function handleRejectProof(proofId, reason) {
+    if (!window.confirm(`¿Rechazar este comprobante por ${REJECTION_LABELS[reason] ?? reason}? Se notificará al cliente.`)) return;
     try {
       await rejectPaymentProof(token, proofId, reason);
       setSelectedProof(null);
@@ -108,6 +112,7 @@ export default function CollectionsPanel({ token, me, isCollector }) {
   }
 
   async function handleManualHandling(proofId, note) {
+    if (!window.confirm('¿Pasar este comprobante a manejo manual y pausar el asistente?')) return;
     try {
       await markProofManualHandling(token, proofId, note);
       setSelectedProof(null);
@@ -118,6 +123,7 @@ export default function CollectionsPanel({ token, me, isCollector }) {
   }
 
   async function handleVerifyImpact(proofId, status, observation) {
+    if (!window.confirm(status === 'CONFIRMED' ? '¿Confirmar que el pago impactó? La cuota se marcará como pagada.' : '¿Registrar que el pago no impactó?')) return;
     try {
       await verifyPaymentImpact(token, proofId, { impactStatus: status, observation });
       setSelectedProof(null);
@@ -140,6 +146,7 @@ export default function CollectionsPanel({ token, me, isCollector }) {
   async function handleMarkQuotaManual(quotaId) {
     const note = window.prompt('Nota (opcional):', '');
     if (note === null) return;
+    if (!window.confirm('¿Marcar esta cuota para manejo manual? Se detendrán sus recordatorios.')) return;
     try {
       await markQuotaManual(token, quotaId, note || undefined);
       await loadAll();
@@ -166,6 +173,7 @@ export default function CollectionsPanel({ token, me, isCollector }) {
       setError('El motivo es obligatorio para escalar un caso.');
       return;
     }
+    if (!window.confirm('¿Escalar este caso al supervisor? El asistente quedará en espera.')) return;
     setError('');
     setSuccessMsg('');
     try {
@@ -260,6 +268,7 @@ export default function CollectionsPanel({ token, me, isCollector }) {
           <button className={`submenu-pill${tab === 'reminders' ? ' active' : ''}`} onClick={() => setTab('reminders')}>
             Recordatorios Enviados
           </button>
+          {(me.role === 'SUPERVISOR' || isController) && <button className={`submenu-pill${tab === 'reminder-config' ? ' active' : ''}`} onClick={() => setTab('reminder-config')}>Configuración de recordatorios</button>}
           <button className={`submenu-pill${tab === 'activity' ? ' active' : ''}`} onClick={() => setTab('activity')}>
             Registro de Actividad
           </button>
@@ -306,7 +315,7 @@ export default function CollectionsPanel({ token, me, isCollector }) {
                   <tr key={p.id}>
                     <td>{p.quota?.client?.name ?? 'N/A'}</td>
                     <td>${p.extractedAmount ?? '?'}</td>
-                    <td>{p.extractedDate ? new Date(p.extractedDate).toLocaleDateString() : '—'}</td>
+                    <td>{formatProofDate(p.extractedDate)}</td>
                     <td>{p.extractedBank ?? '—'}</td>
                     {proofStatus === 'MANUAL_HANDLING' && (
                       <td>{p.manualHandlingNote ?? '—'}</td>
@@ -423,13 +432,15 @@ export default function CollectionsPanel({ token, me, isCollector }) {
         </div>
       )}
 
+      {tab === 'reminder-config' && <ReminderConfig token={token} />}
+
       {selectedProof && (
         <div className="card" style={{ marginTop: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <h4 style={{ margin: 0 }}>Comprobante: {selectedProof.quota?.client?.name}</h4>
             <button className="secondary" onClick={() => setSelectedProof(null)}>Cerrar</button>
           </div>
-          <p><b>Monto:</b> ${selectedProof.extractedAmount ?? '?'} | <b>Fecha:</b> {selectedProof.extractedDate} | <b>Banco:</b> {selectedProof.extractedBank}</p>
+          <p><b>Monto:</b> ${selectedProof.extractedAmount ?? '?'} | <b>Fecha:</b> {formatProofDate(selectedProof.extractedDate)} | <b>Banco:</b> {selectedProof.extractedBank}</p>
           <p>
             <b>Status:</b> <span className={`badge ${statusBadgeColor(selectedProof.status)}`}>{selectedProof.status}</span>
             {selectedProof.rejectionReason && (
@@ -472,9 +483,10 @@ export default function CollectionsPanel({ token, me, isCollector }) {
           {selectedProof.status === 'PENDING_REVIEW' && (
             <div className="panel-section">
               <h4>Revisar comprobante</h4>
+              {(!Number.isFinite(Number(selectedProof.extractedAmount)) || Number(selectedProof.extractedAmount) <= 0) && <p className="error">El monto debe ser válido y mayor a cero para aceptar el comprobante. Podés rechazarlo o revisarlo mediante manejo manual.</p>}
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => handleAcceptProof(selectedProof.id)}>✓ Aceptar</button>
-                <select onChange={(e) => e.target.value && handleRejectProof(selectedProof.id, e.target.value)} defaultValue="">
+                <button onClick={() => handleAcceptProof(selectedProof.id)} disabled={!Number.isFinite(Number(selectedProof.extractedAmount)) || Number(selectedProof.extractedAmount) <= 0}>✓ Aceptar</button>
+                <select onChange={(e) => { const reason = e.target.value; e.target.value = ''; if (reason) handleRejectProof(selectedProof.id, reason); }} defaultValue="">
                   <option value="">Rechazar por...</option>
                   <option value="PAST_DATE">Fecha anterior</option>
                   <option value="WRONG_CBU">CBU incorrecto</option>
@@ -497,7 +509,7 @@ export default function CollectionsPanel({ token, me, isCollector }) {
             <div className="panel-section">
               <h4>Verificar impacto bancario</h4>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => handleVerifyImpact(selectedProof.id, 'CONFIRMED', '')}>✓ Confirmado</button>
+                <button disabled={!Number.isFinite(Number(selectedProof.extractedAmount)) || Number(selectedProof.extractedAmount) <= 0} title={Number(selectedProof.extractedAmount) > 0 ? undefined : 'El monto debe ser mayor a cero'} onClick={() => handleVerifyImpact(selectedProof.id, 'CONFIRMED', '')}>✓ Confirmado</button>
                 <button className="secondary" onClick={() => {
                   const obs = window.prompt('Observación:', '');
                   if (obs !== null) handleVerifyImpact(selectedProof.id, 'MISSING', obs);
@@ -514,10 +526,19 @@ export default function CollectionsPanel({ token, me, isCollector }) {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <h4 style={{ margin: 0 }}>
-                Historial — {clients.find((c) => c.id === selectedClient)?.name}
+                Historial — {clients.find((c) => c.id === selectedClient)?.name} · {clients.find((c) => c.id === selectedClient)?.phone}
               </h4>
               <button className="secondary" onClick={() => setSelectedClient(null)}>Cerrar</button>
             </div>
+
+            {clients.find((c) => c.id === selectedClient)?.accountSummary && (() => {
+              const summary = clients.find((c) => c.id === selectedClient).accountSummary;
+              return <dl className="client-account-summary">
+                <div><dt>Cuotas vencidas</dt><dd>{summary.overdueQuotaCount}</dd></div>
+                <div><dt>Estado del cliente</dt><dd>{{ SIN_DEUDA: 'Sin deuda', EN_MORA: 'En mora', AL_DIA: 'Al día' }[summary.status] ?? summary.status}</dd></div>
+                <div><dt>Total adeudado</dt><dd>${Number(summary.totalDebt).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</dd></div>
+              </dl>;
+            })()}
 
             {/* POST /collections/quotas/:id/manual (Historia 5) y
                 POST /collections/quotas/:id/request-proof (Fig 3) — la
@@ -533,7 +554,7 @@ export default function CollectionsPanel({ token, me, isCollector }) {
               <tbody>
                 {(clients.find((c) => c.id === selectedClient)?.quotas ?? []).map((q) => (
                   <tr key={q.id}>
-                    <td>{new Date(q.dueDate).toLocaleDateString()}</td>
+                    <td>{formatCalendarDate(q.dueDate)}</td>
                     <td>${q.amount}</td>
                     <td><span className={`badge ${statusBadgeColor(q.status)}`}>{QUOTA_STATUS_LABELS[q.status] ?? q.status}</span></td>
                     <td>{q.manualHandlingNote ?? '—'}</td>
