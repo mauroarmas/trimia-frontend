@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { listFinancingRequests, reviewFinancingRequest, getFinancingRequest, correctFinancingRequest, cancelFinancingRequest, retryFinancingNotice } from '../api';
 import PageHero from './PageHero';
 const LABELS = { PENDING_REVIEW: 'Pendiente', APPROVED: 'Aprobada', APPROVED_WITH_CONDITIONS: 'Con condiciones', UNAVAILABLE: 'No disponible', REJECTED: 'Rechazada', DRAFT: 'Borrador', CANCELLED: 'Cancelada', PENDING: 'Pendiente', SENDING: 'En proceso', ACCEPTED: 'Aceptado', FAILED: 'Fallido', UNCERTAIN: 'Resultado incierto: requiere atención' };
@@ -7,6 +7,7 @@ const money = value => value == null ? 'Sin importe' : Number(value).toLocaleStr
 const noticeLabel = n => n.status === 'ACCEPTED' && n.transportMode === 'simulated' ? 'Aceptado en simulación' : LABELS[n.status];
 export default function AdminFinancingPanel({ token, me }) {
   const [rows, setRows] = useState([]);
+  const detailRequest = useRef(0);
   const [detail, setDetail] = useState(null);
   const [filter, setFilter] = useState('PENDING_REVIEW');
   const [note, setNote] = useState('');
@@ -16,8 +17,20 @@ export default function AdminFinancingPanel({ token, me }) {
   const [feedback, setFeedback] = useState('');
   const load = useCallback(async () => { try { setRows(await listFinancingRequests(token)); } catch(e) { setError(e.message); } }, [token]);
   useEffect(() => { load(); }, [load]);
-  async function open(id) { setEditing(null); setNote(''); try { setDetail(await getFinancingRequest(token, id)); } catch(e) { setError(e.message); } }
-  async function refresh() { await load(); if (detail) await open(detail.request.id); }
+  async function open(id) {
+    const request = ++detailRequest.current;
+    setEditing(null); setNote('');
+    try {
+      const result = await getFinancingRequest(token, id);
+      if (request === detailRequest.current) setDetail(result);
+    } catch(e) { if (request === detailRequest.current) setError(e.message); }
+  }
+  async function refresh() {
+    const request = detailRequest.current;
+    const id = detail?.request.id;
+    await load();
+    if (id && request === detailRequest.current) await open(id);
+  }
   async function mutate(action, success) {
     setBusy(true); setError(''); setFeedback('');
     try { await action(); await refresh(); setFeedback(success); }
@@ -48,7 +61,7 @@ export default function AdminFinancingPanel({ token, me }) {
       {rows.filter(r => filter === 'ALL' || r.status === filter).map(r => <tr key={r.id}><td><strong>{r.inputSnapshot?.name ?? r.client.name}</strong><div>DNI: {r.inputSnapshot?.dni ?? r.client.dni ?? 'Sin confirmar'} · {r.client.phone}</div></td><td>{r.productSummary}</td><td>{money(r.amount)}</td><td>{LABELS[r.status]}</td><td>{r.notice ? noticeLabel(r.notice) : 'Sin aviso'}</td><td><button className="secondary" onClick={() => open(r.id)}>Revisar</button></td></tr>)}
     </tbody></table>{rows.length === 0 && <p>No hay solicitudes registradas.</p>}</div></section>
     {selected && <section className="card financing-detail">
-      <div className="page-header"><h3>{snapshot?.name ?? selected.client.name}</h3><button className="secondary" onClick={() => { setDetail(null); setEditing(null); }}>Cerrar</button></div>
+      <div className="page-header"><h3>{snapshot?.name ?? selected.client.name}</h3><button className="secondary" onClick={() => { detailRequest.current++; setDetail(null); setEditing(null); }}>Cerrar</button></div>
       <p>DNI revisado: {snapshot?.dni ?? selected.client.dni ?? 'Sin confirmar'} · Teléfono: {selected.client.phone}</p>
       <p>{selected.productSummary} · {money(selected.amount)} · {LABELS[selected.status]}</p>
       {snapshot && (snapshot.name !== selected.client.name || snapshot.dni !== selected.client.dni) && <p>La ficha actual del cliente puede diferir de los datos históricos de este pedido.</p>}
