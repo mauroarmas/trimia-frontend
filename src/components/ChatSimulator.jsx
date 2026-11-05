@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { simulateMessage, getConversation, openConversationStream } from '../api';
 import InfoNotes, { InfoToggle } from './InfoNotes';
+import PageHero from './PageHero';
 
 const esperaDeReintento = (intentos) => Math.min(1000 * 2 ** intentos, 15000);
 
@@ -169,10 +170,12 @@ export default function ChatSimulator({ token }) {
 
   return (
     <div>
-      <div className="info-heading-row">
-        <h3>Simulador de chat</h3>
-        <InfoToggle open={mostrarInfo} onToggle={() => setMostrarInfo((v) => !v)} />
-      </div>
+      <PageHero
+        kicker="Canal conversacional"
+        title="Simulador de Chat"
+        description="Prueba el comportamiento conversacional simulando interacciones desde cualquier número de cliente o empleado."
+        action={<InfoToggle open={mostrarInfo} onToggle={() => setMostrarInfo((v) => !v)} />}
+      />
       {mostrarInfo && (
         <InfoNotes
           title="Simulador de chat"

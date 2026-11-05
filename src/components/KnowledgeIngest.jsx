@@ -13,6 +13,7 @@ import KnowledgeHygiene from './KnowledgeHygiene';
 import Improvements from './Improvements';
 import Interview from './Interview';
 import InfoNotes, { InfoToggle } from './InfoNotes';
+import PageHero from './PageHero';
 import { motivoDeBloqueo, puedeEscribirEn } from '../areas';
 
 const AGENT_TYPES = ['ORCHESTRATOR', 'SALES', 'COLLECTIONS', 'LOGISTICS', 'DEPOSITS', 'ADMIN'];
@@ -169,23 +170,18 @@ export default function KnowledgeIngest({
 
   return (
     <div className="knowledge-page">
-      <section className="knowledge-hero">
-        <div className="knowledge-hero-layout">
-          <div>
-            <span className="knowledge-hero-kicker">Gestión de documentos y calidad RAG</span>
-            <h2 className="knowledge-hero-title">Base de Conocimiento</h2>
-            <p className="knowledge-hero-description">
-              Lo que cargues acá es lo que el asistente usa para responder. Mantené los documentos
-              al día, probá cómo los encuentra y limpiá duplicados para que las respuestas sean precisas.
-            </p>
-          </div>
-          {view !== 'cargar' && (
+      <PageHero
+        kicker="Gestión de documentos y calidad RAG"
+        title="Base de Conocimiento"
+        description="Lo que cargues acá es lo que el asistente usa para responder. Mantené los documentos al día, probá cómo los encuentra y limpiá duplicados para que las respuestas sean precisas."
+        action={
+          view !== 'cargar' && (
             <button type="button" className="knowledge-hero-action" onClick={() => setView('cargar')}>
               Cargar conocimiento <span aria-hidden="true">↗</span>
             </button>
-          )}
-        </div>
-      </section>
+          )
+        }
+      />
 
       <div className="submenu-bar">
         <nav className="submenu-pills" aria-label="Secciones de la base de conocimiento">

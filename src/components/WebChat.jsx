@@ -18,6 +18,7 @@ import {
   puedeEscribirEn,
 } from '../areas';
 import InfoNotes, { InfoToggle } from './InfoNotes';
+import PageHero from './PageHero';
 
 /**
  * Dónde se recuerda la conversación entre recargas.
@@ -302,12 +303,13 @@ export default function WebChat({ token, me }) {
     !!ultimoMensaje && !enManosDeUnaPersona && esInformeDeBajaConfianza(ultimoMensaje);
 
   return (
-    <div className="card">
-      <div className="info-heading-row">
-        <h3>Chat con el asistente</h3>
-        <InfoToggle open={mostrarInfo} onToggle={() => setMostrarInfo((v) => !v)} />
-      </div>
-      <p className="hint">Conversás como vos mismo: {me?.name || me?.email}. El asistente te reconoce como empleado y puede usar conocimiento interno.</p>
+    <div className="webchat-page">
+      <PageHero
+        kicker="Asistente virtual"
+        title="Chat con el Asistente"
+        description={`Conversás como ${me?.name || me?.email}. El asistente te reconoce como empleado y responde consultas con conocimiento interno.`}
+        action={<InfoToggle open={mostrarInfo} onToggle={() => setMostrarInfo((v) => !v)} />}
+      />
       {mostrarInfo && (
         <InfoNotes
           title="Chat con el asistente"
@@ -319,6 +321,7 @@ export default function WebChat({ token, me }) {
           ]}
         />
       )}
+      <div className="card">
 
       {/* 409: el backend no puede resolver la identidad conversacional sin
           teléfono. El mensaje viene accionable desde el backend. */}
@@ -445,6 +448,7 @@ export default function WebChat({ token, me }) {
           </span>
         )}
       </form>
+    </div>
     </div>
   );
 }

@@ -2469,7 +2469,8 @@ body {
   white-space: nowrap;
 }
 
-/* Hero */
+/* Hero unificado para todas las páginas del sidebar */
+.page-hero,
 .knowledge-hero {
   position: relative;
   isolation: isolate;
@@ -2483,6 +2484,8 @@ body {
   box-shadow: 0 12px 28px rgba(47, 110, 163, 0.2);
 }
 
+.page-hero::before,
+.page-hero::after,
 .knowledge-hero::before,
 .knowledge-hero::after {
   position: absolute;
@@ -2493,6 +2496,7 @@ body {
   pointer-events: none;
 }
 
+.page-hero::before,
 .knowledge-hero::before {
   top: -126px;
   right: 11%;
@@ -2501,6 +2505,7 @@ body {
   box-shadow: 0 0 0 34px rgba(255, 255, 255, 0.035), 0 0 0 70px rgba(255, 255, 255, 0.025);
 }
 
+.page-hero::after,
 .knowledge-hero::after {
   right: 42%;
   bottom: -142px;
@@ -2509,6 +2514,7 @@ body {
   background: rgba(255, 255, 255, 0.035);
 }
 
+.page-hero-layout,
 .knowledge-hero-layout {
   display: flex;
   align-items: center;
@@ -2516,6 +2522,7 @@ body {
   gap: 24px;
 }
 
+.page-hero-kicker,
 .knowledge-hero-kicker {
   display: inline-flex;
   align-items: center;
@@ -2528,6 +2535,7 @@ body {
   text-transform: uppercase;
 }
 
+.page-hero-kicker::before,
 .knowledge-hero-kicker::before {
   width: 14px;
   height: 2px;
@@ -2535,6 +2543,7 @@ body {
   content: '';
 }
 
+.page-hero-title,
 .knowledge-hero-title {
   margin: 0 0 8px;
   color: #fff;
@@ -2543,6 +2552,7 @@ body {
   letter-spacing: -0.025em;
 }
 
+.page-hero-description,
 .knowledge-hero-description {
   max-width: 680px;
   margin: 0;
@@ -2551,6 +2561,16 @@ body {
   line-height: 1.65;
 }
 
+.page-hero-actions,
+.knowledge-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+
+.page-hero .page-hero-action,
+.page-hero .knowledge-hero-action,
 .knowledge-hero .knowledge-hero-action {
   display: inline-flex;
   flex: 0 0 auto;
@@ -2565,10 +2585,32 @@ body {
   font-weight: 700;
   white-space: nowrap;
   box-shadow: 0 5px 14px rgba(37, 47, 88, 0.2);
+  cursor: pointer;
   transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
 
+.page-hero .page-hero-action:hover:not(:disabled),
+.page-hero .knowledge-hero-action:hover:not(:disabled),
 .knowledge-hero .knowledge-hero-action:hover:not(:disabled) {
+  transform: translateY(-2px);
+  background: #f4faff;
+  color: #2f6ea3;
+  box-shadow: 0 8px 18px rgba(37, 47, 88, 0.25);
+}
+
+.page-hero .knowledge-info-toggle,
+.knowledge-hero .knowledge-info-toggle {
+  background: #fff;
+  color: #388dca;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  font-weight: 700;
+  box-shadow: 0 5px 14px rgba(37, 47, 88, 0.2);
+  cursor: pointer;
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.page-hero .knowledge-info-toggle:hover:not(:disabled),
+.knowledge-hero .knowledge-info-toggle:hover:not(:disabled) {
   transform: translateY(-2px);
   background: #f4faff;
   color: #2f6ea3;
@@ -3534,10 +3576,12 @@ body {
 }
 
 @media (max-width: 760px) {
+  .page-hero,
   .knowledge-hero {
     padding: 22px;
   }
 
+  .page-hero-layout,
   .knowledge-hero-layout {
     align-items: flex-start;
     flex-direction: column;
@@ -3581,10 +3625,13 @@ body {
 }
 
 @media (max-width: 520px) {
+  .page-hero,
   .knowledge-hero {
     padding: 20px 18px;
   }
 
+  .page-hero .page-hero-action,
+  .page-hero .knowledge-hero-action,
   .knowledge-hero .knowledge-hero-action {
     width: 100%;
     justify-content: space-between;
@@ -4373,7 +4420,7 @@ button {
   transition: all 0.15s ease;
 }
 
-button:hover:not(:disabled):not(.secondary):not(.btn-table-action):not(.btn-pill-action):not(.btn-logout-icon):not(.submenu-pill):not(.knowledge-tab):not(.knowledge-hero-action):not(.knowledge-text-button):not(.info-modal-close):not(.sidebar-nav-item):not(.sidebar-toggle):not(.danger) {
+button:hover:not(:disabled):not(.secondary):not(.btn-table-action):not(.btn-pill-action):not(.btn-logout-icon):not(.submenu-pill):not(.knowledge-tab):not(.knowledge-hero-action):not(.page-hero-action):not(.knowledge-text-button):not(.info-modal-close):not(.sidebar-nav-item):not(.sidebar-toggle):not(.danger) {
   background: var(--primary-hover);
   color: #fff;
 }

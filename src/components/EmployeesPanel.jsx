@@ -4,6 +4,7 @@ import { esGerente } from '../areas';
 import InfoNotes, { InfoToggle } from './InfoNotes';
 import SupervisorDiagnosticModal from './SupervisorDiagnosticModal';
 import SupervisorSimulationsModal from './SupervisorSimulationsModal';
+import PageHero from './PageHero';
 
 const FILTROS = [
   ['todos', 'Todos'],
@@ -81,28 +82,22 @@ export default function EmployeesPanel({ token, me }) {
 
   return (
     <div className="knowledge-page employees-page">
-      <section className="knowledge-hero">
-        <div className="knowledge-hero-layout">
+      <PageHero
+        kicker="Equipo y responsabilidades"
+        title="Empleados y áreas"
+        description="Asigná de qué áreas es responsable cada supervisor y seguí el diagnóstico y las simulaciones de cada persona del equipo."
+      >
+        <div className="employees-hero-stats">
           <div>
-            <span className="knowledge-hero-kicker">Equipo y responsabilidades</span>
-            <h2 className="knowledge-hero-title">Empleados y áreas</h2>
-            <p className="knowledge-hero-description">
-              Asigná de qué áreas es responsable cada supervisor y seguí el diagnóstico y las
-              simulaciones de cada persona del equipo.
-            </p>
+            <strong>{conteos.todos}</strong>
+            <span>personas</span>
           </div>
-          <div className="employees-hero-stats">
-            <div>
-              <strong>{conteos.todos}</strong>
-              <span>personas</span>
-            </div>
-            <div>
-              <strong>{sectors.length}</strong>
-              <span>áreas</span>
-            </div>
+          <div>
+            <strong>{sectors.length}</strong>
+            <span>áreas</span>
           </div>
         </div>
-      </section>
+      </PageHero>
 
       <div className="submenu-bar">
         <nav className="submenu-pills" aria-label="Filtrar empleados">

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { getAgentsStatus, getMetrics, getConversations, getConversation, getContactTimeline } from '../api';
 import ConversationControls from './ConversationControls';
 import { statusBadgeClass } from '../statusBadge';
+import PageHero from './PageHero';
 
 export default function SupervisorPanel({ token, me }) {
   const [agents, setAgents] = useState(null);
@@ -53,15 +54,16 @@ export default function SupervisorPanel({ token, me }) {
 
   return (
     <div className="supervisor-panel">
-      <div className="page-header">
-        <div>
-          <h2 className="page-title">Panel del Supervisor</h2>
-          <p className="page-subtitle">Monitoreo en tiempo real de agentes, métricas globales y auditoría de conversaciones.</p>
-        </div>
-        <button className="btn-pill-action" onClick={loadAll} disabled={loading}>
-          <span>🔄</span> {loading ? 'Cargando...' : 'Refrescar'}
-        </button>
-      </div>
+      <PageHero
+        kicker="Gobernanza y control"
+        title="Panel del Supervisor"
+        description="Monitoreo en tiempo real de agentes, métricas globales y auditoría de conversaciones."
+        action={
+          <button className="knowledge-hero-action" onClick={loadAll} disabled={loading}>
+            <span>🔄</span> {loading ? 'Cargando...' : 'Refrescar'}
+          </button>
+        }
+      />
       {error && <p className="error" style={{ marginTop: 12 }}>{error}</p>}
 
       <section className="supervisor-metrics-section" aria-labelledby="supervisor-metrics-title">

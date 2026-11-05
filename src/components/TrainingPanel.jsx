@@ -14,6 +14,7 @@ import DiagnosticQuizModal from './DiagnosticQuizModal';
 import InfoNotes, { InfoToggle } from './InfoNotes';
 import PillStudyModal from './PillStudyModal';
 import SimulationModal from './SimulationModal';
+import PageHero from './PageHero';
 
 /** Qué explica el botón «Info» en cada subpestaña del supervisor. */
 const INFO_RUTA = [
@@ -232,28 +233,19 @@ export default function TrainingPanel({ token, me }) {
   return (
     <div className="training-panel">
       {/* Top Banner de Diagnóstico Inicial */}
-      <div className="card training-diagnostic-banner">
-        <div className="training-diagnostic-layout">
-          <div>
-            <span className="training-diagnostic-kicker">Evaluación inicial</span>
-            <h2 className="training-diagnostic-title">
-              Evaluación Diagnóstica Inicial y Nivelación
-            </h2>
-            <p className="training-diagnostic-description">
-              Evalúa tus conocimientos previos en un test dinámico de 5 minutos. Si obtienes el 100% en los temas de un módulo,
-              quedarás automáticamente eximido para avanzar más rápido en tu ruta formativa.
-            </p>
-          </div>
-          <div>
-            <button
-              onClick={() => setShowDiagnostic(true)}
-              className="training-diagnostic-action"
-            >
-              Rendir Diagnóstico Inicial <span aria-hidden="true">↗</span>
-            </button>
-          </div>
-        </div>
-      </div>
+      <PageHero
+        kicker="Evaluación inicial"
+        title="Evaluación Diagnóstica Inicial y Nivelación"
+        description="Evalúa tus conocimientos previos en un test dinámico de 5 minutos. Si obtienes el 100% en los temas de un módulo, quedarás automáticamente eximido para avanzar más rápido en tu ruta formativa."
+        action={
+          <button
+            onClick={() => setShowDiagnostic(true)}
+            className="knowledge-hero-action"
+          >
+            Rendir Diagnóstico Inicial <span aria-hidden="true">↗</span>
+          </button>
+        }
+      />
 
       {/* Subnavegación si es Supervisor */}
       {isSupervisor && (

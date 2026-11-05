@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import SalesConversationModal from './SalesConversationModal';
 import SalesClientForm from './SalesClientForm';
 import { InfoToggle } from './InfoNotes';
+import PageHero from './PageHero';
 import {
   getSalesStock,
   getSalesProspects,
@@ -205,14 +206,11 @@ export default function SalesPanel({ token, me }) {
   return (
     <div className="sales-panel">
       {contactProspect && <SalesConversationModal token={token} me={me} prospect={contactProspect} onClose={() => { setContactProspect(null); loadProspects(); }} />}
-      <div className="page-header">
-        <div>
-          <h2 className="page-title">Panel de Ventas</h2>
-          <p className="page-subtitle">
-            Atención comercial de clientes derivados del bot, consulta de stock según su última actualización y alta de ventas.
-          </p>
-        </div>
-      </div>
+      <PageHero
+        kicker="Operaciones comerciales"
+        title="Panel de Ventas"
+        description="Atención comercial de clientes derivados del bot, consulta de stock según su última actualización y alta de ventas."
+      />
 
       <div className="submenu-bar sales-submenu-bar">
         <div className="submenu-pills">

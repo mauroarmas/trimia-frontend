@@ -17,6 +17,7 @@ import {
 } from '../api';
 import ActivityFeed from './ActivityFeed';
 import ReminderConfig from './ReminderConfig';
+import PageHero from './PageHero';
 import { formatCalendarDate, formatProofDate } from '../date';
 
 const QUOTA_STATUS_LABELS = {
@@ -220,15 +221,16 @@ export default function CollectionsPanel({ token, me, isCollector }) {
 
   return (
     <div>
-      <div className="page-header">
-        <div>
-          <h2 className="page-title">Panel de Cobranzas</h2>
-          <p className="page-subtitle">Gestión de cartera, validación de comprobantes y seguimiento de cuotas.</p>
-        </div>
-        <button className="btn-pill-action" onClick={loadAll} disabled={loading}>
-          <span>🔄</span> {loading ? 'Cargando...' : 'Refrescar'}
-        </button>
-      </div>
+      <PageHero
+        kicker="Recupero y cartera"
+        title={isCollector ? 'Mi Panel de Cobranzas' : 'Panel de Cobranzas'}
+        description="Gestión de cartera, validación de comprobantes y seguimiento de cuotas."
+        action={
+          <button className="knowledge-hero-action" onClick={loadAll} disabled={loading}>
+            <span>🔄</span> {loading ? 'Cargando...' : 'Refrescar'}
+          </button>
+        }
+      />
       {error && <p className="error">{error}</p>}
       {successMsg && <p className="success-msg">{successMsg}</p>}
 

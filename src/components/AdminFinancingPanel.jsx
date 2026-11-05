@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { listFinancingRequests, reviewFinancingRequest } from '../api';
+import PageHero from './PageHero';
 
 const LABELS = { PENDING_REVIEW: 'Pendiente', APPROVED: 'Aprobada', REJECTED: 'Rechazada', DRAFT: 'Borrador', CANCELLED: 'Cancelada' };
 const money = (amount) => amount == null ? 'Sin monto informado' : Number(amount).toLocaleString('es-AR', { style: 'currency', currency: 'ARS' });
@@ -37,13 +38,22 @@ export default function AdminFinancingPanel({ token, me }) {
     finally { setBusy(false); }
   }
 
-  return <div className="knowledge-page financing-page">
-    <section className="knowledge-hero"><h2>Aprobación de financiación</h2><p>Solicitudes de venta financiada registradas en el sistema.</p></section>
+  return (
+    <div className="knowledge-page financing-page">
+      <PageHero
+        kicker="Crédito y riesgo"
+        title="Aprobación de Financiación"
+        description="Revisión y autorización de solicitudes de compra financiada registradas en el sistema."
+        action={
+          <button className="knowledge-hero-action" onClick={load} disabled={busy}>
+            <span>🔄</span> {busy ? 'Cargando...' : 'Refrescar'}
+          </button>
+        }
+      />
     <div className="submenu-bar">
       <nav className="submenu-pills" aria-label="Filtrar solicitudes">
         {[['PENDING_REVIEW', 'Pendientes'], ['APPROVED', 'Aprobadas'], ['REJECTED', 'Rechazadas'], ['ALL', 'Todas']].map(([value, label]) => <button key={value} className={`submenu-pill${filter === value ? ' active' : ''}`} onClick={() => setFilter(value)}>{label} ({requests.filter((request) => value === 'ALL' || request.status === value).length})</button>)}
       </nav>
-      <button className="secondary" onClick={load} disabled={busy}>Refrescar</button>
     </div>
     {error && <p className="error" role="alert">{error}</p>}
     {feedback && <p className="success-msg" role="status">{feedback}</p>}
@@ -71,5 +81,6 @@ export default function AdminFinancingPanel({ token, me }) {
         <div className="knowledge-form-actions"><button className="secondary knowledge-danger-button" disabled={busy} onClick={() => decide('REJECTED')}>Rechazar financiación</button><button disabled={busy || !(Number(selected.amount) > 0)} onClick={() => decide('APPROVED')}>Aprobar financiación</button></div>
       </> : <p>Un supervisor de Administración o el supervisor general debe aprobar o rechazar esta solicitud.</p>)}
     </section>}
-  </div>;
+  </div>
+  );
 }

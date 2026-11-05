@@ -20,6 +20,7 @@ import {
 import ConversationControls from './ConversationControls';
 import InfoNotes, { InfoToggle } from './InfoNotes';
 import { HygienePairCard } from './KnowledgeHygiene';
+import PageHero from './PageHero';
 import {
   etiquetaDeCandidato,
   motivoDeBloqueo,
@@ -507,12 +508,11 @@ export default function EscalationsQueue({ token, me }) {
     <div className="escalations-queue">
       {!selected && (
         <div className="escalations-list-view">
-      <div className="page-header">
-        <div>
-          <h2 className="page-title">Casos escalados</h2>
-          <p className="page-subtitle">Conversaciones que el asistente derivó a una persona.</p>
-        </div>
-      </div>
+          <PageHero
+            kicker="Atención humana"
+            title="Casos escalados"
+            description="Conversaciones derivadas por el asistente para intervención de supervisores y especialistas por área."
+          />
 
       <div className="submenu-bar">
         <div className="submenu-left-group">
