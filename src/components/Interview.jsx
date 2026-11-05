@@ -1,3 +1,4 @@
+import { internalNoteText } from '../internalNoteText';
 import { useEffect, useRef, useState } from 'react';
 import {
   openInterview,
@@ -549,7 +550,7 @@ function EscalationContext({ caso }) {
                           ? `${n.authorAgentType} (IA)`
                           : (n.authorName ?? 'Alguien del equipo')}
                       </div>
-                      <div style={{ whiteSpace: 'pre-wrap' }}>{n.content}</div>
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{internalNoteText(n)}</div>
                     </div>
                   </li>
                 ))}

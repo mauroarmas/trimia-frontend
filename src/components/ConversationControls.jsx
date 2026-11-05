@@ -1,3 +1,4 @@
+import { internalNoteText } from '../internalNoteText';
 import { useState } from 'react';
 import {
   takeoverConversation,
@@ -341,7 +342,7 @@ export default function ConversationControls({
                               })}
                             </span>
                           </div>
-                          <p>{n.content}</p>
+                          <p style={{ whiteSpace: 'pre-line' }}>{internalNoteText(n)}</p>
                         </div>
                       </li>
                     );

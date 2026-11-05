@@ -11,7 +11,7 @@ export default function FinancingDraftEditor({ token, me, conversation }) {
   const allowed = me?.isGeneralSupervisor || ['Administración', 'Admin'].includes(me?.sectorName ?? me?.sector?.name);
   useEffect(() => {
     let mounted = true; setDraft(null); setError('');
-    if (allowed && conversation?.channel === 'WHATSAPP') getFinancingDraft(token, conversation.id).then(d => { if (mounted) { setDraft(d); setAmount(d.confirmedAmount ?? ''); } }).catch(e => { if (mounted && e.status !== 404) setError(e.message); });
+    if (allowed && ['WHATSAPP', 'WEB'].includes(conversation?.channel)) getFinancingDraft(token, conversation.id).then(d => { if (mounted) { setDraft(d); setAmount(d.confirmedAmount ?? ''); } }).catch(e => { if (mounted && e.status !== 404) setError(e.message); });
     return () => { mounted = false; };
   }, [token, conversation?.id, allowed]);
   if (!allowed || (!draft && !error)) return null;
