@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => {
       allowedHosts: true,
       proxy: {
         '^/(auth|supervisor|health|knowledge|employees|collections|sales|messaging|improvements|interviews|training|conversations|escalations|clients)': {
-          target: 'http://localhost:3000',
+          target: process.env.VITE_DEV_PROXY_TARGET ?? env.VITE_DEV_PROXY_TARGET ?? 'http://localhost:3000',
           changeOrigin: true,
         },
       },

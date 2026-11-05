@@ -1,11 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getEmployeeSimulations } from '../api';
+import { getEmployeeSimulations, getSimulation } from '../api';
 
 export default function SupervisorSimulationsModal({ token, employeeId, employeeName, onClose }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [simulations, setSimulations] = useState([]);
   const [selectedSimulation, setSelectedSimulation] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
+  const [detailError, setDetailError] = useState('');
+  useEffect(() => {
+    if (!selectedId) return;
+    let active = true; setSelectedSimulation(null); setDetailError('');
+    getSimulation(token, selectedId).then((data) => { if (active) setSelectedSimulation(data); }).catch((err) => { if (active) setDetailError(err.message); });
+    return () => { active = false; };
+  }, [token, selectedId]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -14,7 +22,7 @@ export default function SupervisorSimulationsModal({ token, employeeId, employee
       .then((res) => {
         setSimulations(res || []);
         if (res && res.length > 0) {
-          setSelectedSimulation(res[0]);
+          setSelectedId(res[0].id);
         }
         setLoading(false);
       })
@@ -68,13 +76,13 @@ export default function SupervisorSimulationsModal({ token, employeeId, employee
             {/* Lista Lateral de Sesiones */}
             <div style={{ overflowY: 'auto', borderRight: '1px solid var(--border)', paddingRight: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {simulations.map((sim) => {
-                const isSelected = selectedSimulation?.id === sim.id;
-                const bandStyle = getBandBadge(sim.feedback?.band || sim.feedback?.overallBand);
+                const isSelected = selectedId === sim.id;
+                const bandStyle = getBandBadge(sim.band);
 
                 return (
                   <div
                     key={sim.id}
-                    onClick={() => setSelectedSimulation(sim)}
+                    onClick={() => setSelectedId(sim.id)}
                     style={{
                       padding: '10px 12px',
                       borderRadius: 8,
@@ -89,19 +97,19 @@ export default function SupervisorSimulationsModal({ token, employeeId, employee
                         {sim.mode === 'GUIDED' ? '🧭 Guiada' : '🎭 Libre'}
                       </span>
                       <span className="msg-time" style={{ fontSize: 11 }}>
-                        {new Date(sim.startedAt).toLocaleDateString()} {new Date(sim.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(sim.createdAt).toLocaleDateString()} {new Date(sim.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
 
                     <strong style={{ fontSize: 13, display: 'block', color: 'var(--text)', marginBottom: 4 }}>
-                      {sim.pill?.title || 'Píldora Formativa'}
+                      {sim.pillTitle}
                     </strong>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
                       <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                        {sim.messages?.length || 0} mensajes
+                        {sim.summary || sim.scenarioTitle}
                       </span>
-                      {sim.feedback ? (
+                      {sim.band ? (
                         <span
                           className="badge"
                           style={{
@@ -114,7 +122,7 @@ export default function SupervisorSimulationsModal({ token, employeeId, employee
                           {bandStyle.label}
                         </span>
                       ) : (
-                        <span className="badge" style={{ fontSize: 10 }}>En progreso</span>
+                        <span className="badge" style={{ fontSize: 10 }}>{sim.status === 'ABANDONED' ? 'Abandonada' : sim.status === 'COMPLETED' ? 'Concluida' : 'En progreso'}</span>
                       )}
                     </div>
                   </div>
@@ -122,6 +130,8 @@ export default function SupervisorSimulationsModal({ token, employeeId, employee
               })}
             </div>
 
+            {detailError && <p className="error">{detailError}</p>}
+            {selectedId && !selectedSimulation && !detailError && <p>Cargando conversación...</p>}
             {/* Detalle de la Sesión Seleccionada */}
             {selectedSimulation && (
               <div style={{ overflowY: 'auto', paddingRight: 6, display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -174,7 +184,7 @@ export default function SupervisorSimulationsModal({ token, employeeId, employee
                           ✨ Qué hizo bien
                         </div>
                         <p style={{ margin: 0, fontSize: 12, lineHeight: 1.45, color: 'var(--text)' }}>
-                          {selectedSimulation.feedback.whatWentWell}
+                          {selectedSimulation.feedback.whatWentWellBand && <small>{getBandBadge(selectedSimulation.feedback.whatWentWellBand).label}</small>}<br />{selectedSimulation.feedback.whatWentWell}
                         </p>
                       </div>
 
@@ -183,7 +193,7 @@ export default function SupervisorSimulationsModal({ token, employeeId, employee
                           💡 Oportunidades de mejora
                         </div>
                         <p style={{ margin: 0, fontSize: 12, lineHeight: 1.45, color: 'var(--text)' }}>
-                          {selectedSimulation.feedback.toImprove || selectedSimulation.feedback.whatToImprove}
+                          {selectedSimulation.feedback.toImproveBand && <small>{getBandBadge(selectedSimulation.feedback.toImproveBand).label}</small>}<br />{selectedSimulation.feedback.toImprove || selectedSimulation.feedback.whatToImprove}
                         </p>
                       </div>
 
@@ -192,7 +202,7 @@ export default function SupervisorSimulationsModal({ token, employeeId, employee
                           📋 Reglas del negocio
                         </div>
                         <p style={{ margin: 0, fontSize: 12, lineHeight: 1.45, color: 'var(--text)' }}>
-                          {selectedSimulation.feedback.businessRules || selectedSimulation.feedback.businessRulesCompliance}
+                          {selectedSimulation.feedback.businessRulesBand && <small>{getBandBadge(selectedSimulation.feedback.businessRulesBand).label}</small>}<br />{selectedSimulation.feedback.businessRules || selectedSimulation.feedback.businessRulesCompliance}
                         </p>
                       </div>
                     </div>
@@ -222,9 +232,9 @@ export default function SupervisorSimulationsModal({ token, employeeId, employee
                             <div style={{ fontSize: 12, fontWeight: (g.isCompleted !== undefined ? g.isCompleted : g.isAchieved) ? 600 : 400, color: (g.isCompleted !== undefined ? g.isCompleted : g.isAchieved) ? '#166560' : 'var(--text)' }}>
                               {g.description || g.objective}
                             </div>
-                            {g.evaluationNotes && (
+                            {g.evidence && (
                               <div style={{ fontSize: 11, color: '#0da39a', fontStyle: 'italic', marginTop: 2 }}>
-                                Evidencia: {g.evaluationNotes}
+                                Evidencia: {g.evidence}
                               </div>
                             )}
                           </div>
@@ -239,7 +249,7 @@ export default function SupervisorSimulationsModal({ token, employeeId, employee
                   <h5 style={{ margin: '0 0 10px', fontSize: 13 }}>Transcripción de la Conversación</h5>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {selectedSimulation.messages?.map((msg) => {
-                      const isEmployee = msg.sender === 'USER';
+                      const isEmployee = msg.sender === 'EMPLOYEE';
                       return (
                         <div
                           key={msg.id}

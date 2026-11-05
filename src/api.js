@@ -1081,10 +1081,11 @@ export function updatePill(token, id, data) {
 }
 
 /** Publica una píldora en borrador (supervisor). */
-export function publishPill(token, id) {
+export function publishPill(token, id, indexInKnowledge = false) {
   return request(`/training/pills/${id}/publish`, {
     method: 'POST',
     token,
+    body: { indexInKnowledge },
   });
 }
 
@@ -1178,6 +1179,10 @@ export function startSimulation(token, pillId, mode = 'GUIDED') {
   });
 }
 
+export function getActiveSimulation(token, pillId, mode) {
+  return request(`/training/pills/${pillId}/simulations/active?mode=${encodeURIComponent(mode)}`, { token });
+}
+
 /** Envía un mensaje como empleado y recibe la respuesta del cliente simulado. */
 export function sendSimulationMessage(token, sessionId, content) {
   return request(`/training/simulations/${sessionId}/messages`, {
@@ -1242,4 +1247,8 @@ export function closeSale(token, { prospectId, purchaseRequestId, finalAmount, m
     token,
     body: { prospectId, purchaseRequestId, finalAmount, modality, notes },
   });
+}
+
+export function salesProspectAction(token, id, action, message) {
+  return request(`/sales/prospects/${id}/${action}`, { token, method: action === 'conversation' ? 'GET' : 'POST', ...(message !== undefined ? {body:{message}} : {}) });
 }

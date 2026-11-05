@@ -4,12 +4,12 @@ import {
   enqueueAudioGeneration,
   generatePill,
   getEmployeeModules,
-  getPillAudioStatus,
   getSupervisorModules,
   listSectors,
-  publishPill,
+  archivePill,
 } from '../api';
 import AudioScriptModal from './AudioScriptModal';
+import PillDraftModal from './PillDraftModal';
 import DiagnosticQuizModal from './DiagnosticQuizModal';
 import InfoNotes, { InfoToggle } from './InfoNotes';
 import PillStudyModal from './PillStudyModal';
@@ -43,6 +43,7 @@ export default function TrainingPanel({ token, me }) {
   // Modales
   const [showDiagnostic, setShowDiagnostic] = useState(false);
   const [activePillId, setActivePillId] = useState(null);
+  const [draftPill, setDraftPill] = useState(null);
   const [scriptModalPill, setScriptModalPill] = useState(null);
   const [simulationConfig, setSimulationConfig] = useState(null);
 
@@ -144,13 +145,14 @@ export default function TrainingPanel({ token, me }) {
     }
   };
 
-  const handlePublishPill = async (pillId) => {
+  const handleArchivePill = async (pillId) => {
+    if (!window.confirm('¿Archivar esta píldora? Se conserva el progreso histórico.')) return;
     try {
-      await publishPill(token, pillId);
-      loadSupervisorView();
-      loadEmployeePath();
+      await archivePill(token, pillId);
+      await loadSupervisorView();
+      await loadEmployeePath();
     } catch (err) {
-      alert(err.message || 'Error al publicar píldora');
+      alert(err.message || 'No se pudo archivar la píldora');
     }
   };
 
@@ -659,9 +661,11 @@ export default function TrainingPanel({ token, me }) {
                             </button>
                           )}
 
+                          {p.status !== 'ARCHIVED' && <button className="secondary" onClick={() => handleArchivePill(p.id)}>Archivar</button>}
                           {/* Botón Abrir Guion / Síntesis */}
                           <button
                             onClick={() => setScriptModalPill(p)}
+                            disabled={p.status !== 'PUBLISHED'}
                             className="secondary training-script-button"
                             title="Ver o editar guion a 2 voces y sintetizar audio"
                           >
@@ -670,10 +674,10 @@ export default function TrainingPanel({ token, me }) {
 
                           {p.status === 'DRAFT' && (
                             <button
-                              onClick={() => handlePublishPill(p.id)}
+                              onClick={() => setDraftPill(p)}
                               className="training-publish-button"
                             >
-                              Publicar
+                              Revisar / Publicar
                             </button>
                           )}
                         </div>
@@ -780,6 +784,7 @@ export default function TrainingPanel({ token, me }) {
           }}
         />
       )}
+      {draftPill && <PillDraftModal token={token} pill={draftPill} onClose={() => setDraftPill(null)} onSaved={() => { loadSupervisorView(); loadEmployeePath(); }} />}
     </div>
   );
 }
