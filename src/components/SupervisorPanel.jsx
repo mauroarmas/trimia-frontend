@@ -9,62 +9,18 @@ import {
   getContactTimeline,
 } from '../api';
 import ConversationControls from './ConversationControls';
+import ConversationThread, { MessageActorAvatar } from './ConversationThread';
+import {
+  AGENT_META,
+  STATUS_LABELS,
+  formatRelativeTime,
+  contactInitials,
+  resolveMessageActor,
+} from '../conversationHelpers';
 import { statusBadgeClass } from '../statusBadge';
 import PageHero from './PageHero';
 import TokenEconomicsModal from './TokenEconomicsModal';
 import { estimateMetricsEconomics, formatUsd } from '../tokenEconomics';
-
-const AGENT_META = {
-  SALES: {
-    name: 'Ventas',
-    subtitle: 'Catálogo, precios y financiación',
-    accent: '#2563eb',
-    bgSoft: '#eff6ff',
-    borderSoft: '#bfdbfe',
-  },
-  COLLECTIONS: {
-    name: 'Cobranzas',
-    subtitle: 'Cuotas, pagos y comprobantes',
-    accent: '#0d9488',
-    bgSoft: '#f0fdfa',
-    borderSoft: '#99f6e4',
-  },
-  ADMIN: {
-    name: 'Administración',
-    subtitle: 'Políticas y evaluación crediticia',
-    accent: '#7c3aed',
-    bgSoft: '#f5f3ff',
-    borderSoft: '#ddd6fe',
-  },
-  LOGISTICS: {
-    name: 'Logística',
-    subtitle: 'Envíos, entregas y reparto',
-    accent: '#d97706',
-    bgSoft: '#fffbeb',
-    borderSoft: '#fde68a',
-  },
-  DEPOSITS: {
-    name: 'Depósito',
-    subtitle: 'Inventario físico y despacho',
-    accent: '#0284c7',
-    bgSoft: '#f0f9ff',
-    borderSoft: '#bae6fd',
-  },
-  ORCHESTRATOR: {
-    name: 'Recepción',
-    subtitle: 'Clasificación inicial',
-    accent: '#475569',
-    bgSoft: '#f8fafc',
-    borderSoft: '#e2e8f0',
-  },
-};
-
-const STATUS_LABELS = {
-  ACTIVE: 'Activa (IA)',
-  WAITING_HUMAN: 'Esperando humano',
-  HUMAN_HANDLING: 'Control manual',
-  CLOSED: 'Cerrada',
-};
 
 const STATUS_FILTER_PILLS = [
   ['', 'Todas'],
@@ -243,35 +199,6 @@ function AgentIllustration({ agentType }) {
         </svg>
       );
   }
-}
-
-function formatRelativeTime(dateInput) {
-  if (!dateInput) return 'Sin actividad';
-  const date = new Date(dateInput);
-  if (Number.isNaN(date.getTime())) return '—';
-  const diffSec = Math.round((Date.now() - date.getTime()) / 1000);
-  if (diffSec < 60) return 'Hace instantes';
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `Hace ${diffMin} min`;
-  const diffHours = Math.floor(diffMin / 60);
-  if (diffHours < 24) return `Hace ${diffHours} h`;
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays === 1) return 'Ayer';
-  if (diffDays < 7) return `Hace ${diffDays} días`;
-  return date.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
-}
-
-function contactInitials(label) {
-  if (!label) return 'C';
-  const letters = label.replace(/[^a-zA-ZÁÉÍÓÚÑáéíóúñ\s]/g, '').trim();
-  if (letters) {
-    return letters
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((w) => w[0].toUpperCase())
-      .join('');
-  }
-  return label.slice(-2).toUpperCase();
 }
 
 export default function SupervisorPanel({ token, me }) {
@@ -1009,208 +936,6 @@ export default function SupervisorPanel({ token, me }) {
   );
 }
 
-function MessageActorAvatar({ actorType, accent = '#2563eb', bg = '#eff6ff', border = '#bfdbfe' }) {
-  if (actorType === 'CLIENT') {
-    return (
-      <div
-        className="sup-msg-avatar is-client"
-        style={{ backgroundColor: bg, color: accent, borderColor: border }}
-        title="Cliente"
-        aria-hidden="true"
-      >
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" strokeLinecap="round" strokeLinejoin="round" />
-          <circle cx="12" cy="7" r="4" />
-        </svg>
-      </div>
-    );
-  }
-
-  if (actorType === 'EMPLOYEE') {
-    return (
-      <div
-        className="sup-msg-avatar is-employee"
-        style={{ backgroundColor: bg, color: accent, borderColor: border }}
-        title="Empleado interno"
-        aria-hidden="true"
-      >
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-          <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-        </svg>
-      </div>
-    );
-  }
-
-  if (actorType === 'SUPERVISOR') {
-    return (
-      <div
-        className="sup-msg-avatar is-supervisor"
-        style={{ backgroundColor: bg, color: accent, borderColor: border }}
-        title="Supervisor (intervención humana)"
-        aria-hidden="true"
-      >
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1">
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinejoin="round" />
-          <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </div>
-    );
-  }
-
-  // AGENT (IA)
-  return (
-    <div
-      className="sup-msg-avatar is-agent"
-      style={{ backgroundColor: bg, color: accent, borderColor: border }}
-      title="Agente de Inteligencia Artificial"
-      aria-hidden="true"
-    >
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <rect x="3" y="8" width="18" height="12" rx="3" />
-        <path d="M12 4v4" strokeLinecap="round" />
-        <circle cx="12" cy="3" r="1" fill="currentColor" />
-        <circle cx="9" cy="14" r="1.3" fill="currentColor" stroke="none" />
-        <circle cx="15" cy="14" r="1.3" fill="currentColor" stroke="none" />
-      </svg>
-    </div>
-  );
-}
-
-function resolveMessageActor(m, conversation, me) {
-  const isUser = m.role === 'USER';
-  if (isUser) {
-    const isEmployee = conversation?.userType === 'EMPLEADO';
-    if (isEmployee) {
-      return {
-        actorType: 'EMPLOYEE',
-        title: 'Empleado',
-        badge: 'Personal interno',
-        accent: '#d97706',
-        bg: '#fffbeb',
-        border: '#fde68a',
-        side: 'left',
-      };
-    }
-    return {
-      actorType: 'CLIENT',
-      title: conversation?.client?.name || 'Cliente',
-      badge: 'Cliente',
-      accent: '#0284c7',
-      bg: '#f0f9ff',
-      border: '#bae6fd',
-      side: 'left',
-    };
-  }
-
-  // Evaluamos si el mensaje ASSISTANT fue enviado manualmente por un supervisor
-  const events = conversation?.events ?? [];
-  const msgTime = new Date(m.createdAt).getTime();
-
-  const explicitManualEvent = events.find(
-    (ev) =>
-      ev.eventType === 'conversation_manual_reply' &&
-      ev.payload?.messageId === m.id,
-  );
-
-  // Ventanas [takeover, release] registradas en OrchestrationEvent
-  let inTakeoverWindow = false;
-  let takeoverOpenAt = null;
-  for (const ev of events) {
-    const evTime = new Date(ev.createdAt).getTime();
-    if (ev.eventType === 'conversation_takeover') {
-      takeoverOpenAt = evTime;
-    } else if (ev.eventType === 'conversation_release' && takeoverOpenAt != null) {
-      if (msgTime >= takeoverOpenAt - 1000 && msgTime <= evTime + 1000) {
-        inTakeoverWindow = true;
-      }
-      takeoverOpenAt = null;
-    }
-  }
-  if (takeoverOpenAt != null && msgTime >= takeoverOpenAt - 1000) {
-    inTakeoverWindow = true;
-  }
-
-  const inCurrentHandling =
-    conversation?.status === 'HUMAN_HANDLING' &&
-    conversation?.handledAt &&
-    msgTime >= new Date(conversation.handledAt).getTime() - 1000;
-
-  if (explicitManualEvent || inTakeoverWindow || inCurrentHandling) {
-    const supName =
-      conversation?.handledBy?.name ||
-      (conversation?.handledById && conversation?.handledById === me?.id ? me?.name : null);
-    return {
-      actorType: 'SUPERVISOR',
-      title: supName ? `Supervisor · ${supName}` : 'Supervisor',
-      badge: 'Intervención humana',
-      accent: '#7c3aed',
-      bg: '#f5f3ff',
-      border: '#ddd6fe',
-      side: 'right',
-    };
-  }
-
-  const areaKey = m.agentType || conversation?.currentAgent;
-  const areaMeta = areaKey ? AGENT_META[areaKey] : null;
-  return {
-    actorType: 'AGENT',
-    title: areaMeta ? `Agente IA · ${areaMeta.name}` : 'Agente IA',
-    badge: 'Respuesta IA',
-    accent: areaMeta?.accent ?? '#2563eb',
-    bg: areaMeta?.bgSoft ?? '#eff6ff',
-    border: areaMeta?.borderSoft ?? '#bfdbfe',
-    side: 'right',
-  };
-}
-
-function buildConversationFeed(conversation, me) {
-  const items = [];
-  for (const m of conversation?.messages ?? []) {
-    items.push({
-      kind: 'message',
-      id: `msg-${m.id}`,
-      time: new Date(m.createdAt).getTime(),
-      createdAt: m.createdAt,
-      message: m,
-      actor: resolveMessageActor(m, conversation, me),
-    });
-  }
-
-  for (const ev of conversation?.events ?? []) {
-    if (ev.eventType === 'ESCALATED') {
-      items.push({
-        kind: 'milestone',
-        id: `ev-${ev.id}`,
-        time: new Date(ev.createdAt).getTime(),
-        createdAt: ev.createdAt,
-        variant: 'escalated',
-        label: 'El Agente IA derivó la conversación a un supervisor',
-      });
-    } else if (ev.eventType === 'conversation_takeover') {
-      items.push({
-        kind: 'milestone',
-        id: `ev-${ev.id}`,
-        time: new Date(ev.createdAt).getTime(),
-        createdAt: ev.createdAt,
-        variant: 'takeover',
-        label: 'Un supervisor intervino y tomó el control manual',
-      });
-    } else if (ev.eventType === 'conversation_release') {
-      items.push({
-        kind: 'milestone',
-        id: `ev-${ev.id}`,
-        time: new Date(ev.createdAt).getTime(),
-        createdAt: ev.createdAt,
-        variant: 'release',
-        label: 'Control liberado · La atención volvió al Agente IA',
-      });
-    }
-  }
-
-  return items.sort((a, b) => a.time - b.time);
-}
-
 function ConversationDetailModal({ token, me, conversation, onRefresh, onClose }) {
   useEffect(() => {
     function onKey(e) {
@@ -1224,7 +949,6 @@ function ConversationDetailModal({ token, me, conversation, onRefresh, onClose }
     ? AGENT_META[conversation.currentAgent]
     : null;
   const isEmployee = conversation.userType === 'EMPLEADO';
-  const feedItems = buildConversationFeed(conversation, me);
   const displayName = conversation.client?.name || conversation.externalId;
 
   return createPortal(
@@ -1261,73 +985,7 @@ function ConversationDetailModal({ token, me, conversation, onRefresh, onClose }
         </header>
 
         <div className="econ-modal-body sup-conv-modal-body">
-          <div className="sup-chat-thread">
-            {feedItems.length === 0 ? (
-              <p className="hint" style={{ textAlign: 'center', margin: '24px 0' }}>
-                Esta conversación no tiene mensajes todavía.
-              </p>
-            ) : (
-              feedItems.map((item) => {
-                if (item.kind === 'milestone') {
-                  return (
-                    <div
-                      key={item.id}
-                      className={`sup-chat-milestone is-${item.variant}`}
-                    >
-                      <span className="sup-chat-milestone-pill">
-                        {item.variant === 'takeover' && '🛡️ '}
-                        {item.variant === 'release' && '🤖 '}
-                        {item.variant === 'escalated' && '⚠️ '}
-                        {item.label} ·{' '}
-                        {new Date(item.createdAt).toLocaleTimeString('es-AR', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </span>
-                    </div>
-                  );
-                }
-
-                const { message: m, actor } = item;
-                const isLeft = actor.side === 'left';
-
-                return (
-                  <div
-                    key={item.id}
-                    className={`sup-chat-bubble-row ${isLeft ? 'is-user' : 'is-assistant'} actor-${actor.actorType.toLowerCase()}`}
-                  >
-                    <MessageActorAvatar
-                      actorType={actor.actorType}
-                      accent={actor.accent}
-                      bg={actor.bg}
-                      border={actor.border}
-                    />
-                    <div className="sup-chat-bubble">
-                      <div className="sup-chat-meta">
-                        <div className="sup-chat-author-group">
-                          <strong>{actor.title}</strong>
-                          <span
-                            className={`sup-chat-role-tag is-${actor.actorType.toLowerCase()}`}
-                          >
-                            {actor.badge}
-                          </span>
-                        </div>
-                        <time className="sup-chat-time">
-                          {new Date(m.createdAt).toLocaleString('es-AR', {
-                            day: '2-digit',
-                            month: 'short',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </time>
-                      </div>
-                      <p>{m.content}</p>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+          <ConversationThread conversation={conversation} me={me} />
 
           <div className="sup-conv-controls-wrap">
             <FinancingDraftEditor token={token} me={me} conversation={conversation} />

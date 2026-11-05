@@ -18,6 +18,13 @@ import {
   addInternalNote,
 } from '../api';
 import ConversationControls from './ConversationControls';
+import ConversationThread from './ConversationThread';
+import {
+  AGENT_META,
+  contactInitials,
+  formatEscalationReason,
+  formatRelativeTime,
+} from '../conversationHelpers';
 import InfoNotes, { InfoToggle } from './InfoNotes';
 import { HygienePairCard } from './KnowledgeHygiene';
 import PageHero from './PageHero';
@@ -30,41 +37,47 @@ import {
 
 /**
  * Spec 013 — cómo se muestra la pertenencia de un caso.
- *
- * Los **tres** estados se pintan distinto a propósito. `SIN_AREA` no es "no es
- * mío": es un caso que se escaló antes de rutearse, así que no le toca a nadie
- * en particular y cualquiera puede tomarlo. Mostrarlo igual que `AJENA` sería
- * decirle a cada supervisor que es problema de otro — y entonces no lo mira
- * nadie.
+ * `SIN_AREA` se distingue de `AJENA` para que los casos sin rutear no parezcan
+ * responsabilidad de otro supervisor.
  */
-const PERTENENCIA = {
-  PROPIA: { texto: 'Mía', color: '#13736d', title: 'De un área que supervisás, o derivado a vos' },
-  SIN_AREA: { texto: 'Sin área', color: '#0b8a82', title: 'El caso no llegó a rutearse: no le toca a nadie en particular' },
-  // "Otra área" es el caso más común pero no el único: un caso de TU área
-  // derivado a otra persona también cae acá (FR-011). La columna «Derivado a»
-  // de al lado dice cuál de los dos es; el título lo aclara para que la
-  // etiqueta no se lea como una afirmación sobre el área.
-  AJENA: { texto: 'No es tuyo', color: '#5f6368', title: 'De un área que no supervisás, o derivado a otra persona. Podés verlo, responderlo o derivarlo' },
-};
-
 function EtiquetaPertenencia({ valor }) {
   if (valor === 'PROPIA') {
-    return <span className="badge-belonging-mia" title="De un área que supervisás, o derivado a vos">Mía</span>;
+    return (
+      <span
+        className="esc-belonging-pill is-mia"
+        title="De un área que supervisás, o derivado a vos"
+      >
+        Mía
+      </span>
+    );
   }
   if (valor === 'SIN_AREA') {
-    return <span className="badge-belonging-sin-area" title="El caso no llegó a rutearse: no le toca a nadie en particular">Sin área</span>;
+    return (
+      <span
+        className="esc-belonging-pill is-sin-area"
+        title="El caso no llegó a rutearse: cualquiera puede tomarlo"
+      >
+        Sin área
+      </span>
+    );
   }
   if (valor === 'AJENA') {
-    return <span className="badge-belonging-ajena" title="De un área que no supervisás, o derivado a otra persona">No es tuyo</span>;
+    return (
+      <span
+        className="esc-belonging-pill is-ajena"
+        title="De un área que no supervisás, o derivado a otra persona"
+      >
+        Otra área
+      </span>
+    );
   }
-  return <span>—</span>;
+  return null;
 }
 
 export default function EscalationsQueue({ token, me }) {
   const [status, setStatus] = useState('PENDING');
   // Spec 013 — apagado por defecto: el defecto es la cola completa, priorizada
-  // pero sin filtrar. Ocultar lo ajeno dejaría sin cobertura las áreas que no
-  // tienen responsable activo.
+  // pero sin filtrar.
   const [soloMios, setSoloMios] = useState(false);
   const [mostrarInfo, setMostrarInfo] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -90,47 +103,26 @@ export default function EscalationsQueue({ token, me }) {
   const [knowledgeAudience, setKnowledgeAudience] = useState('INTERNO');
   const [knowledgeAgentType, setKnowledgeAgentType] = useState('');
   const [delegateTo, setDelegateTo] = useState('');
+  const [mostrarMasCierres, setMostrarMasCierres] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState('');
 
   /**
    * De qué áreas es responsable quien está resolviendo (spec 005).
-   *
-   * Resolver un caso "enseñándole al agente" **escribe un documento**, así que vale
-   * la misma regla de área que la pantalla de conocimiento. Es la puerta que se
-   * olvida: se llega por la cola de casos, no por la base de conocimiento.
    */
   const [misAreas, setMisAreas] = useState(null);
   const [totalAreas, setTotalAreas] = useState(0);
 
-  // Spec 007: los documentos que quedaron cortos en este caso. `null` = todavía
-  // no se cargó; `[]` es una respuesta normal (el caso escaló sin recuperar
-  // nada, así que no hay nada que corregir).
+  // Spec 007: documentos que quedaron cortos en este caso.
   const [candidates, setCandidates] = useState(null);
-
-  /**
-   * Qué se hace con la respuesta al enseñarla: corregir un documento que ya
-   * existe, o crear uno nuevo.
-   *
-   * El default es MODIFICAR **cuando hay candidatos** (se decide al abrir el
-   * caso, no acá): si el caso escaló porque un documento quedó corto, crear
-   * otro sobre el mismo tema hace que los dos se repartan la señal y ninguno
-   * gane. El default correcto es el que evita eso; crear uno nuevo tiene que
-   * ser una elección, no lo que pasa por no mirar.
-   */
   const [knowledgeMode, setKnowledgeMode] = useState('NUEVO');
   const [targetDocId, setTargetDocId] = useState('');
-  // El documento elegido, ya traído: de acá salen `version` (para que un cambio
-  // ajeno no se pise en silencio) y `content` (para poder ver qué dice hoy
-  // antes de decidir si se le suma o se lo pisa).
   const [targetDoc, setTargetDoc] = useState(null);
   const [loadingDoc, setLoadingDoc] = useState(false);
   const [applyMode, setApplyMode] = useState('AGREGAR');
   const [verActual, setVerActual] = useState(false);
 
-  // Spec 008 (US3): si los documentos consultados en ESTE caso compiten entre
-  // sí. `null` = todavía no se cargó; `[]` es la respuesta normal (no hay
-  // nada que avisar, o nunca se corrió un barrido).
+  // Spec 008 (US3): documentos consultados en este caso que compiten entre sí.
   const [hygieneWarning, setHygieneWarning] = useState(null);
 
   const [suggestion, setSuggestion] = useState(null);
@@ -142,8 +134,6 @@ export default function EscalationsQueue({ token, me }) {
     setError('');
     try {
       const [escRes, empRes] = await Promise.all([
-        // `soloMios` solo viaja cuando está puesto: así la URL de la cola normal
-        // no cambia respecto de antes de la spec 013.
         listEscalations(token, {
           status,
           limit: 100,
@@ -174,8 +164,6 @@ export default function EscalationsQueue({ token, me }) {
         setMisAreas(empleado.areasSupervisadas ?? []);
         setTotalAreas(sectores.length);
       })
-      // Que falle no puede romper la cola: sin esto no se anticipa el bloqueo,
-      // y el backend igual rechaza.
       .catch(() => {});
     return () => {
       vigente = false;
@@ -187,6 +175,7 @@ export default function EscalationsQueue({ token, me }) {
     setDetailLoading(true);
     setSuggestion(null);
     setDiscardReason('');
+    setMostrarMasCierres(false);
     setSelected(escalation);
     setConversation(null);
     setInternalNote('');
@@ -214,26 +203,14 @@ export default function EscalationsQueue({ token, me }) {
       if (requestId !== detailRequestId.current) return;
       setSelected(escDetail);
       setConversation(conv);
-      // Los candidatos se piden aparte: si fallan, el caso igual se puede
-      // resolver como siempre. Es información de más, no un requisito.
       try {
         const cands = await getKnowledgeCandidates(token, escalation.id);
         if (requestId !== detailRequestId.current) return;
         setCandidates(cands);
-        // El default sale del caso, no de una preferencia fija: si hay algo que
-        // quedó corto, lo que conviene es corregir ESO. Solo se preselecciona
-        // si además se puede tocar — ofrecer un modo que va a dar 403 es peor
-        // que no ofrecerlo.
         if (cands.some((c) => c.corregible)) setKnowledgeMode('MODIFICAR');
       } catch {
         if (requestId === detailRequestId.current) setCandidates([]);
       }
-      // Spec 008 (US3): mismo criterio — si falla, el caso se resuelve igual.
-      //
-      // El aviso solo trae títulos (`pairId`, `titleA`, `titleB`, `fusionable`);
-      // para poder REVISAR y FUSIONAR sin salir del caso hace falta la pareja
-      // completa, que ya está en la última corrida `READY` — no se re-detecta
-      // nada, se cruza contra lo que el barrido ya calculó (FR-015).
       try {
         const w = await getEscalationHygieneWarning(token, escalation.id);
         if (requestId !== detailRequestId.current) return;
@@ -241,7 +218,9 @@ export default function EscalationsQueue({ token, me }) {
           const latest = await getLatestHygieneScan(token);
           if (requestId !== detailRequestId.current) return;
           const idsConAviso = new Set(w.pairs.map((p) => p.pairId));
-          setHygieneWarning((latest.pairs ?? []).filter((p) => idsConAviso.has(p.pairId)));
+          setHygieneWarning(
+            (latest.pairs ?? []).filter((p) => idsConAviso.has(p.pairId)),
+          );
         } else {
           setHygieneWarning([]);
         }
@@ -255,15 +234,6 @@ export default function EscalationsQueue({ token, me }) {
     }
   }
 
-  /**
-   * Trae el documento elegido para corregir.
-   *
-   * Hacen falta dos cosas que la lista de candidatos no trae: `version` —para
-   * que un cambio que otro guarde mientras tanto no se pise en silencio— y
-   * `content`, para poder mirar qué dice hoy antes de decidir si se le suma la
-   * respuesta o se lo pisa entero. Se pide al elegir y no al abrir el caso: son
-   * hasta cuatro documentos y casi siempre se toca uno.
-   */
   async function handleSelectTargetDoc(documentId) {
     setTargetDocId(documentId);
     setTargetDoc(null);
@@ -306,11 +276,8 @@ export default function EscalationsQueue({ token, me }) {
 
   async function handleResolve(e) {
     e.preventDefault();
-    // Las dos ramas piden datos distintos, así que se validan por separado. Un
-    // solo chequeo de "faltan campos" mandaría a completar título y categoría a
-    // quien eligió corregir un documento, donde no existen.
     if (teachAgent && corrigiendo && !targetDoc) {
-      setActionError('Elegí qué documento corregir, o pasá a «documento nuevo».');
+      setActionError('Elegí qué documento corregir, o pasá a «Documento nuevo».');
       return;
     }
     if (
@@ -326,18 +293,11 @@ export default function EscalationsQueue({ token, me }) {
     try {
       await resolveEscalation(token, selected.id, {
         message: replyMessage,
-        // Corregir y crear son excluyentes: el backend rechaza pedir las dos.
-        // El checkbox dice "esto queda como conocimiento"; el selector de
-        // adentro decide CÓMO, y de ahí sale cuál de los dos campos viaja.
         teachAgent: teachAgent && !corrigiendo,
         title: knowledgeTitle,
         category: knowledgeCategory,
         audience: knowledgeAudience || undefined,
         agentType: knowledgeAgentType || undefined,
-        // `content` es la respuesta que el supervisor escribió. Con AGREGAR el
-        // backend la suma a lo que el documento ya dice; con REEMPLAZAR la
-        // pone en lugar de todo. La unión se hace allá contra el contenido
-        // vigente, no acá contra el que se trajo hace un rato.
         correctKnowledge:
           teachAgent && corrigiendo && targetDoc
             ? {
@@ -358,10 +318,6 @@ export default function EscalationsQueue({ token, me }) {
     }
   }
 
-  /**
-   * Pide la propuesta y la precarga en el editor. NO resuelve el caso: sigue
-   * PENDING, y lo que se envíe será siempre lo que quede en el textarea.
-   */
   async function handleSuggest() {
     setSuggesting(true);
     setActionError('');
@@ -376,13 +332,12 @@ export default function EscalationsQueue({ token, me }) {
     }
   }
 
-  /** Aprobar y guardar SIN enviar: no le llega nada al usuario. */
   async function handleSaveUnsent() {
     if (!knowledgeTitle.trim() || !knowledgeCategory.trim()) {
       setActionError(
         corrigiendo
-          ? 'Guardar sin enviar siempre crea un documento nuevo, así que pide título y categoría. Pasá el selector a «Documento nuevo» para completarlos, o usá «Enviar y responder» si querés corregir el existente.'
-          : 'Para guardar sin enviar hacen falta título y categoría: la respuesta se incorpora al conocimiento.',
+          ? 'Guardar sin enviar siempre crea un documento nuevo, así que pide título y categoría. Activá «Guardar en la Base de Conocimiento», pasá el selector a «Documento nuevo» y completalos.'
+          : 'Para guardar sin enviar hacen falta título y categoría: activá «Guardar en la Base de Conocimiento» arriba para completarlos.',
       );
       return;
     }
@@ -405,9 +360,14 @@ export default function EscalationsQueue({ token, me }) {
     }
   }
 
-  /** Descartar: sin mensaje y sin ingesta. */
   async function handleDiscard() {
-    if (!confirm('¿Descartar el caso? El usuario no va a recibir respuesta y no se incorpora nada al conocimiento.')) return;
+    if (
+      !confirm(
+        '¿Descartar el caso? El usuario no va a recibir respuesta y no se incorpora nada al conocimiento.',
+      )
+    ) {
+      return;
+    }
     setActionBusy(true);
     setActionError('');
     try {
@@ -439,13 +399,6 @@ export default function EscalationsQueue({ token, me }) {
     }
   }
 
-  /**
-   * En qué área va a quedar el documento si se marca "enseñar al RAG".
-   *
-   * Es la misma cuenta que hace el backend: el agente elegido a mano, y si no se
-   * eligió ninguno, el de la conversación. Por eso "— sin especificar —" NO
-   * significa "documento general": significa "el del caso".
-   */
   const areaDelDocumento =
     knowledgeAgentType || conversation?.currentAgent || null;
   const puedeEnsenar =
@@ -455,19 +408,6 @@ export default function EscalationsQueue({ token, me }) {
       ? ''
       : motivoDeBloqueo(misAreas, totalAreas, areaDelDocumento);
 
-  /**
-   * Corregir y crear se autorizan por áreas DISTINTAS, y aplastarlas en un solo
-   * permiso deja gente afuera de algo que sí puede hacer.
-   *
-   * `puedeEnsenar` mira el área donde iría un documento NUEVO —la del caso, o
-   * la que se elija a mano—. Corregir mira el área DEL DOCUMENTO que se toca,
-   * que la calculó el backend y viene en cada candidato como `corregible`. Un
-   * caso de Cobranzas que recuperó un documento de Ventas se le puede corregir
-   * a quien lleva Ventas, aunque no pueda crear nada en Cobranzas.
-   *
-   * Por eso el checkbox se habilita si se puede hacer CUALQUIERA de las dos, y
-   * cada opción del selector se deshabilita por su cuenta.
-   */
   const corregibles = (candidates ?? []).filter((c) => c.corregible);
   const hayCorregibles = corregibles.length > 0;
   const corrigiendo = knowledgeMode === 'MODIFICAR';
@@ -475,7 +415,9 @@ export default function EscalationsQueue({ token, me }) {
 
   const filteredEscalations = escalations.filter((e) => {
     if (selectedAreaFilter) {
-      const matchArea = (e.pertenencia === selectedAreaFilter) || (e.conversation?.currentAgent === selectedAreaFilter);
+      const matchArea =
+        e.pertenencia === selectedAreaFilter ||
+        e.conversation?.currentAgent === selectedAreaFilter;
       if (!matchArea) return false;
     }
     if (searchTerm.trim()) {
@@ -483,7 +425,12 @@ export default function EscalationsQueue({ token, me }) {
       const matchReason = e.reason?.toLowerCase().includes(term);
       const matchClient = e.conversation?.externalId?.toLowerCase().includes(term);
       const matchChannel = e.conversation?.channel?.toLowerCase().includes(term);
-      const matchAgent = e.conversation?.currentAgent?.toLowerCase().includes(term);
+      const areaName = e.conversation?.currentAgent
+        ? AGENT_META[e.conversation.currentAgent]?.name?.toLowerCase() ?? ''
+        : '';
+      const matchAgent =
+        e.conversation?.currentAgent?.toLowerCase().includes(term) ||
+        areaName.includes(term);
       if (!matchReason && !matchClient && !matchChannel && !matchAgent) return false;
     }
     return true;
@@ -494,15 +441,19 @@ export default function EscalationsQueue({ token, me }) {
   const currentPage = Math.min(page, totalPages);
   const startIdx = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endIdx = Math.min(currentPage * pageSize, totalCount);
-  const paginatedEscalations = filteredEscalations.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  const originalClientMessage = selected && conversation
-    ? [...conversation.messages]
-      .reverse()
-      .find((message) => (
-        message.role === 'USER' &&
-        new Date(message.createdAt) <= new Date(selected.createdAt)
-      ))
-    : null;
+  const paginatedEscalations = filteredEscalations.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
+
+  const hasListFilters = Boolean(searchTerm || selectedAreaFilter || soloMios);
+
+  function clearListFilters() {
+    setSearchTerm('');
+    setSelectedAreaFilter('');
+    setSoloMios(false);
+    setPage(1);
+  }
 
   return (
     <div className="escalations-queue">
@@ -511,651 +462,849 @@ export default function EscalationsQueue({ token, me }) {
           <PageHero
             kicker="Atención humana"
             title="Casos escalados"
-            description="Conversaciones derivadas por el asistente para intervención de supervisores y especialistas por área."
-          />
-
-      <div className="submenu-bar">
-        <div className="submenu-left-group">
-          <div className="submenu-pills">
-            <button
-              className={`submenu-pill${status === 'PENDING' ? ' active' : ''}`}
-              onClick={() => { setStatus('PENDING'); setPage(1); }}
-            >
-              Pendientes
-            </button>
-            <button
-              className={`submenu-pill${status === 'RESOLVED' ? ' active' : ''}`}
-              onClick={() => { setStatus('RESOLVED'); setPage(1); }}
-            >
-              Resueltos
-            </button>
-          </div>
-
-          <label className="filter-checkbox-label">
-            <input
-              type="checkbox"
-              checked={soloMios}
-              onChange={(ev) => setSoloMios(ev.target.checked)}
-            />
-            <span>Ver solo lo mío</span>
-          </label>
-        </div>
-
-        <div className="info-bar-actions">
-          <InfoToggle open={mostrarInfo} onToggle={() => setMostrarInfo((v) => !v)} />
-          <button className="btn-pill-action" onClick={loadQueue} disabled={loading}>
-            <span style={{ fontSize: 14 }}>🔄</span>
-            <span>{loading ? 'Cargando...' : 'Refrescar'}</span>
-          </button>
-        </div>
-      </div>
-
-      {mostrarInfo && (
-        <InfoNotes
-          title="Casos escalados"
-          onClose={() => setMostrarInfo(false)}
-          notes={[
-            ['Pendientes y resueltos.',
-              'Pendientes son las conversaciones que el asistente derivó y todavía esperan '
-              + 'a una persona; resueltos, las que ya se cerraron.'],
-            ['Ver solo lo mío.',
-              'Se ocultan los casos de otras áreas. Los que no tienen área siguen '
-              + 'apareciendo: no le tocan a nadie en particular.'],
-            ['Cerrar un caso.',
-              'Se puede responder al usuario, guardar la respuesta sin enviarla para que '
-              + 'quede como conocimiento, o descartar. Las tres son definitivas: cada '
-              + 'opción se explica al lado de su botón dentro del caso.'],
-          ]}
-        />
-      )}
-
-      {error && <p className="error">{error}</p>}
-
-      <div className="search-filter-card">
-        <div className="search-input-box">
-          <span className="search-icon">🔍</span>
-          <input
-            type="text"
-            className="search-input"
-            placeholder="Buscar por motivo, cliente, canal, área..."
-            value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
-          />
-        </div>
-        <div className="search-divider" />
-        <select
-          className="area-select"
-          value={selectedAreaFilter}
-          onChange={(e) => { setSelectedAreaFilter(e.target.value); setPage(1); }}
-        >
-          <option value="">Todas las áreas</option>
-          <option value="PROPIA">Áreas mías</option>
-          <option value="SIN_AREA">Sin área</option>
-          <option value="AJENA">Otras áreas</option>
-        </select>
-      </div>
-
-      <div className="data-table-card">
-        <table className="custom-data-table">
-          <thead>
-            <tr>
-              <th>MOTIVO</th>
-              <th>CLIENTE</th>
-              <th>CANAL</th>
-              <th>ÁREA</th>
-              <th>CREADO ⌄</th>
-              <th>DELEGADO A</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedEscalations.length === 0 && (
-              <tr>
-                <td colSpan={7} style={{ textAlign: 'center', padding: '32px 16px', color: '#64748b' }}>
-                  Sin casos {status === 'PENDING' ? 'pendientes' : 'resueltos'}{soloMios ? ' que sean tuyos' : ''}.
-                </td>
-              </tr>
-            )}
-            {paginatedEscalations.map((e) => (
-              <tr key={e.id}>
-                <td>
-                  <div style={{ fontWeight: 600, color: '#0f172a' }}>{e.reason}</div>
-                  {e.conversation?.currentAgent && (
-                    <span className="badge-role-tag">{e.conversation.currentAgent}</span>
-                  )}
-                </td>
-                <td>{e.conversation?.externalId}</td>
-                <td>{e.conversation?.channel || 'WEB'}</td>
-                <td><EtiquetaPertenencia valor={e.pertenencia} /></td>
-                <td>{new Date(e.createdAt).toLocaleString()}</td>
-                <td>
-                  {status === 'PENDING' && (
-                    e.delegatedToId
-                      ? (employees.find((emp) => emp.id === e.delegatedToId)?.name ?? e.delegatedToId)
-                      : '—'
-                  )}
-                  {status === 'RESOLVED' && '—'}
-                </td>
-                <td style={{ textAlign: 'right' }}>
-                  <button className="btn-table-action" onClick={() => openCase(e)}>
-                    Ver detalle →
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <div className="table-pagination-footer">
-          <span className="pagination-text">
-            Mostrando {startIdx} a {endIdx} de {totalCount} casos
-          </span>
-          <div className="pagination-controls">
-            <div className="page-btn-group">
-              <button
-                className="page-nav-btn"
-                disabled={currentPage <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                ‹
-              </button>
-              <div className="page-num-active">{currentPage}</div>
-              <button
-                className="page-nav-btn"
-                disabled={currentPage >= totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              >
-                ›
-              </button>
-            </div>
-            <select
-              className="page-size-select"
-              value={pageSize}
-              onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
-            >
-              <option value={10}>10 por página</option>
-              <option value={25}>25 por página</option>
-              <option value={50}>50 por página</option>
-            </select>
-          </div>
-        </div>
-      </div>
-        </div>
-      )}
-
-      {selected && (
-        <div className="escalation-detail-view">
-          <button
-            type="button"
-            className="secondary escalation-back-button"
-            onClick={() => {
-              detailRequestId.current += 1;
-              setSelected(null);
-              setConversation(null);
-              setDetailLoading(false);
-              setActionError('');
-            }}
-          >
-            ← Volver a Casos escalados
-          </button>
-          <div className="page-header">
-            <div>
-              <h2 className="page-title">Detalle del caso</h2>
-              <p className="page-subtitle">{selected.reason}</p>
-            </div>
-          </div>
-
-          <section className="card escalation-info-card">
-            <h3>Información del caso</h3>
-            <dl className="escalation-info-grid">
-              <div><dt>Motivo</dt><dd>{selected.reason}</dd></div>
-              <div><dt>Cliente</dt><dd>{conversation?.externalId ?? selected.conversation?.externalId ?? '—'}</dd></div>
-              <div><dt>Canal</dt><dd>{conversation?.channel ?? selected.conversation?.channel ?? 'WEB'}</dd></div>
-              <div><dt>Área</dt><dd>{conversation?.currentAgent ?? selected.conversation?.currentAgent ?? 'Sin área'}</dd></div>
-              <div><dt>Creado</dt><dd>{new Date(selected.createdAt).toLocaleString()}</dd></div>
-              <div>
-                <dt>Delegado a</dt>
-                <dd>{selected.delegatedToId
-                  ? employees.find((employee) => employee.id === selected.delegatedToId)?.name ?? selected.delegatedToId
-                  : '—'}</dd>
-              </div>
-              <div><dt>Estado</dt><dd>{selected.status === 'PENDING' ? 'Pendiente' : 'Resuelto'}</dd></div>
-            </dl>
-          </section>
-
-          {actionError && <p className="error" style={{ marginTop: 8 }}>{actionError}</p>}
-
-          {detailLoading && <p className="hint">Cargando información del caso…</p>}
-
-          {conversation && (
-            <section className="card escalation-message-card">
-              <h3>Mensaje del cliente</h3>
-              <div className="escalation-original-message">
-                <p>{originalClientMessage?.content ?? 'No hay una consulta original disponible.'}</p>
-                {originalClientMessage && (
-                  <span>{new Date(originalClientMessage.createdAt).toLocaleString()}</span>
-                )}
-              </div>
-              {selected.consultasPosteriores?.length > 0 && (
-                <div className="escalation-follow-up-messages">
-                  <h4>Mensajes recibidos mientras esperaba</h4>
-                  {selected.consultasPosteriores.map((message, index) => (
-                    <div className="escalation-follow-up-message" key={`${message.createdAt}-${index}`}>
-                      <p>{message.content}</p>
-                      <span>{new Date(message.createdAt).toLocaleString()}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <h4 className="escalation-context-title">Conversación reciente</h4>
-              <ul className="msg-list">
-                {conversation.messages.slice(-8).map((m) => (
-                  <li key={m.id}>
-                    <b>{m.role}{m.agentType ? ` (${m.agentType})` : ''}:</b> {m.content}
-                    <div className="msg-time">{new Date(m.createdAt).toLocaleTimeString()}</div>
-                  </li>
-                ))}
-              </ul>
-
-              <ConversationControls
-                token={token}
-                conversation={conversation}
-                me={me}
-                onRefresh={refreshConversation}
-                hideReplyAndNotes
-              />
-            </section>
-          )}
-
-          {/*
-            Spec 008 (US3) — el disparador reactivo. No es un mecanismo nuevo:
-            la misma `HygienePairCard` de "Limpiar base de conocimiento" (US1),
-            con acceso a revisar y fusionar sin salir del caso.
-          */}
-          {hygieneWarning && hygieneWarning.length > 0 && (
-            <div className="panel-section">
-              <strong>Los documentos consultados en este caso se compiten entre sí</strong>
-              <p className="hint">
-                Dos (o más) de los documentos que se consultaron para este turno
-                se solapan por encima del umbral. Conviene revisarlos y, si
-                corresponde, fusionarlos — así no vuelven a repartirse la señal
-                en la próxima consulta parecida.
-              </p>
-              {hygieneWarning.map((pair) => (
-                <HygienePairCard
-                  key={pair.pairId}
-                  token={token}
-                  pair={pair}
-                  onResolved={() => openCase(selected)}
+            description="Conversaciones derivadas por el asistente para revisión o respuesta de un supervisor."
+            action={
+              <>
+                <InfoToggle
+                  open={mostrarInfo}
+                  onToggle={() => setMostrarInfo((v) => !v)}
                 />
-              ))}
-            </div>
+                <button
+                  type="button"
+                  className="knowledge-hero-action"
+                  onClick={loadQueue}
+                  disabled={loading}
+                >
+                  <span aria-hidden="true">↻</span>
+                  <span>{loading ? 'Actualizando…' : 'Actualizar'}</span>
+                </button>
+              </>
+            }
+          />
+
+          {mostrarInfo && (
+            <InfoNotes
+              title="Casos escalados"
+              onClose={() => setMostrarInfo(false)}
+              notes={[
+                [
+                  'Pendientes y resueltos.',
+                  'Pendientes son las conversaciones que el asistente derivó y todavía esperan a una persona; resueltos, las que ya se cerraron.',
+                ],
+                [
+                  'Solo mis áreas.',
+                  'Oculta los casos de otras áreas. Los casos sin área asignada siguen apareciendo porque cualquiera puede tomarlos.',
+                ],
+                [
+                  'Formas de cierre.',
+                  'Podés enviar respuesta al contacto (enseñándole opcionalmente al asistente), guardar solo como conocimiento o descartar el caso.',
+                ],
+              ]}
+            />
           )}
 
-          {selected.status === 'PENDING' && (
-            <section className="card escalation-response-section">
-              <h3>Respuesta al cliente</h3>
+          {error && (
+            <p className="error" style={{ marginBottom: 16 }}>
+              {error}
+            </p>
+          )}
 
-              <div className="escalation-suggestion">
-                <button type="button" className="secondary" onClick={handleSuggest} disabled={suggesting}>
-                  {suggesting ? 'Redactando…' : 'Proponer respuesta con la base de conocimiento'}
-                </button>
-                {suggestion && <SuggestionPanel suggestion={suggestion} />}
+          <section className="sup-conv-section esc-queue-section">
+            {/* Barra de búsqueda y selector de área */}
+            <div className="sup-conv-toolbar">
+              <div className="sup-search-box">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  aria-hidden="true"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="M21 21l-4.35-4.35" strokeLinecap="round" />
+                </svg>
+                <input
+                  type="search"
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setPage(1);
+                  }}
+                  placeholder="Buscar por contacto, motivo o área…"
+                  aria-label="Buscar casos escalados"
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    className="sup-search-clear"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setPage(1);
+                    }}
+                    aria-label="Borrar búsqueda"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
 
-              <form className="escalation-response-form" onSubmit={handleResolve}>
-                {/*
-                  Spec 013 (FR-018) — avisar que el caso no es de tus áreas y que
-                  la respuesta queda registrada como tal.
+              <div className="sup-filter-selects">
+                <select
+                  value={selectedAreaFilter}
+                  onChange={(e) => {
+                    setSelectedAreaFilter(e.target.value);
+                    setPage(1);
+                  }}
+                  aria-label="Filtrar por área o pertenencia"
+                >
+                  <option value="">Todas las áreas</option>
+                  <option value="PROPIA">Mis áreas asignadas</option>
+                  <option value="SIN_AREA">Sin área asignada</option>
+                  <option value="AJENA">Otras áreas</option>
+                  <option value="SALES">Ventas</option>
+                  <option value="COLLECTIONS">Cobranzas</option>
+                  <option value="ADMIN">Administración</option>
+                  <option value="LOGISTICS">Logística</option>
+                  <option value="DEPOSITS">Depósito</option>
+                </select>
 
-                  ⚠️ Es INFORMACIÓN, no una traba (FR-019). Nada de `confirm()`,
-                  ni un checkbox que haya que tildar para enviar: eso
-                  reintroduciría por la puerta de atrás el bloqueo que la spec
-                  descartó a propósito —dejaría clientes esperando a un
-                  responsable que no está— y nadie lo notaría, porque "avisa".
-
-                  Solo para AJENA. Un caso SIN_AREA no le toca a nadie:
-                  responderlo es lo esperado y avisar sería ruido.
-
-                  ⚠️ AJENA tiene DOS causas y no dicen lo mismo (defecto del
-                  2026-08-26): "no es tu área" y "está derivado a otra persona".
-                  El texto único decía "es de otra área" sobre un caso del área
-                  propia que el que estaba mirando había derivado él mismo — una
-                  afirmación falsa, y encima sobre su propia acción. La regla del
-                  backend está bien (FR-011: derivado a otro deja de ser tuyo);
-                  lo que faltaba era decir por cuál de las dos.
-                */}
-                {selected.pertenencia === 'AJENA' && (
-                  <p className="hint escalation-area-warning">
-                    {selected.delegatedToId ? (
-                      <>
-                        Este caso está <strong>derivado a{' '}
-                        {employees.find((emp) => emp.id === selected.delegatedToId)?.name ??
-                          'otra persona'}</strong>
-                        {selected.delegatedById === me?.id && ' — lo derivaste vos'}.
-                        Podés responderlo igual —mejor eso que dejar al cliente
-                        esperando— y va a quedar registrado que lo respondió
-                        alguien que no era el destinatario.
-                      </>
-                    ) : (
-                      <>
-                        Este caso es de <strong>otra área</strong>. Podés responderlo
-                        igual —mejor eso que dejar al cliente esperando— y va a quedar
-                        registrado que lo respondió alguien de otra área.
-                      </>
-                    )}
-                  </p>
+                {hasListFilters && (
+                  <button
+                    type="button"
+                    className="secondary sup-reset-btn"
+                    onClick={clearListFilters}
+                  >
+                    Limpiar ✕
+                  </button>
                 )}
-                <div className="field escalation-reply-field">
-                  <label>Responder manualmente al cliente</label>
-                  <textarea
-                    rows={3}
-                    value={replyMessage}
-                    onChange={(e) => setReplyMessage(e.target.value)}
-                    placeholder="Este mensaje se envía al usuario por WhatsApp/WEB"
-                    required
-                  />
+              </div>
+            </div>
+
+            {/* Píldoras de estado + filtro "Solo mis áreas" + resumen */}
+            <div className="sup-status-pills-row">
+              <div className="esc-pills-left">
+                <div className="submenu-pills">
+                  <button
+                    type="button"
+                    className={`submenu-pill${status === 'PENDING' ? ' active' : ''}`}
+                    onClick={() => {
+                      setStatus('PENDING');
+                      setPage(1);
+                    }}
+                  >
+                    Pendientes
+                  </button>
+                  <button
+                    type="button"
+                    className={`submenu-pill${status === 'RESOLVED' ? ' active' : ''}`}
+                    onClick={() => {
+                      setStatus('RESOLVED');
+                      setPage(1);
+                    }}
+                  >
+                    Resueltos
+                  </button>
                 </div>
-                {/*
-                  El checkbox dice QUÉ se quiere (que esto quede como
-                  conocimiento); el selector de adentro decide CÓMO. Antes el
-                  "cómo" estaba resuelto antes de llegar acá —había que elegir
-                  "Corregir este" en una tabla de arriba, y eso deshabilitaba el
-                  checkbox— así que las dos opciones nunca se veían juntas y
-                  crear un documento nuevo era lo que pasaba por no hacer nada.
-                */}
-                <div className="field escalation-teach-toggle">
+
+                <label className="esc-mine-chip">
                   <input
                     type="checkbox"
-                    id="teachAgent"
-                    checked={teachAgent && puedeEnsenarAlgo}
-                    onChange={(e) => setTeachAgent(e.target.checked)}
-                    disabled={!puedeEnsenarAlgo}
-                    style={{ width: 'auto' }}
+                    checked={soloMios}
+                    onChange={(ev) => {
+                      setSoloMios(ev.target.checked);
+                      setPage(1);
+                    }}
                   />
-                  <label htmlFor="teachAgent" style={{ margin: 0 }}>
-                    Enseñar esta respuesta al RAG (queda como conocimiento reutilizable)
-                  </label>
-                </div>
+                  <span>Ver solo lo mío</span>
+                </label>
+              </div>
 
-                {/* La distinción que no se puede aplastar: RESPONDER no está
-                    restringido por área, ESCRIBIR conocimiento sí. Quien recibe
-                    un caso de otra área puede contestarlo igual; lo único que no
-                    puede es dejar el documento. Deshabilitar el caso entero sería
-                    quitarle algo que sí puede hacer. */}
-                {!puedeEnsenarAlgo && (
-                  <p className="hint" style={{ marginTop: -4 }}>
-                    {motivoNoEnsena} Podés responder el caso igual — lo único que no
-                    podés es dejar la respuesta como conocimiento de esa área.
-                  </p>
-                )}
+              <span className="sup-results-summary">
+                {loading
+                  ? 'Cargando casos…'
+                  : totalCount === 0
+                    ? 'Sin casos para mostrar'
+                    : `Mostrando ${startIdx}–${endIdx} de ${totalCount}`}
+              </span>
+            </div>
 
-                {teachAgent && puedeEnsenarAlgo && (
-                  <div className="escalation-knowledge-fields">
-                    {/*
-                      La primera decisión, antes que cualquier campo: mejorar lo
-                      que hay o agregar algo nuevo. Va primero porque es la que
-                      cambia todo lo de abajo, y porque elegir mal acá es lo que
-                      llena el corpus de documentos que se compiten entre sí.
-                    */}
-                    <div className="field">
-                      <label>¿Qué querés hacer con esta respuesta?</label>
-                      <select
-                        value={knowledgeMode}
-                        onChange={(e) => {
-                          setKnowledgeMode(e.target.value);
-                          setActionError('');
-                        }}
-                      >
-                        <option value="MODIFICAR" disabled={!hayCorregibles}>
-                          Modificar un documento existente
-                          {!hayCorregibles && ' — no hay ninguno que puedas corregir en este caso'}
-                        </option>
-                        <option value="NUEVO" disabled={!puedeEnsenar}>
-                          Documento nuevo
-                          {!puedeEnsenar && ' — no podés crear en esta área'}
-                        </option>
-                      </select>
-                    </div>
+            {/* Tabla limpia y silenciosa */}
+            <div className="sup-table-wrap">
+              <table className="sup-modern-table">
+                <thead>
+                  <tr>
+                    <th>Contacto</th>
+                    <th>Motivo de derivación</th>
+                    <th>Área</th>
+                    <th>Canal</th>
+                    <th>Delegado a</th>
+                    <th>Recibido</th>
+                    <th style={{ textAlign: 'right' }}>Acción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedEscalations.length === 0 && !loading ? (
+                    <tr>
+                      <td colSpan={7} className="sup-empty-cell">
+                        Sin casos {status === 'PENDING' ? 'pendientes' : 'resueltos'}
+                        {soloMios ? ' asignados a tus áreas' : ''}.
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedEscalations.map((e) => {
+                      const contactId = e.conversation?.externalId ?? 'Desconocido';
+                      const agentKey = e.conversation?.currentAgent;
+                      const agentMeta = agentKey ? AGENT_META[agentKey] : null;
+                      const channel = e.conversation?.channel || 'WEB';
+                      const delegatedName =
+                        status === 'PENDING' && e.delegatedToId
+                          ? employees.find((emp) => emp.id === e.delegatedToId)?.name ??
+                            e.delegatedToId
+                          : null;
 
-                    {corrigiendo ? (
-                      <ModificarDocumento
-                        candidates={candidates ?? []}
-                        targetDocId={targetDocId}
-                        targetDoc={targetDoc}
-                        loadingDoc={loadingDoc}
-                        applyMode={applyMode}
-                        verActual={verActual}
-                        onSelect={handleSelectTargetDoc}
-                        onApplyMode={setApplyMode}
-                        onToggleActual={() => setVerActual((v) => !v)}
-                      />
-                    ) : (
-                      <>
-                        {/*
-                          La línea que reemplaza a la tabla que estaba suelta
-                          arriba. Con la tabla fuera del camino, crear un
-                          documento nuevo sobre un tema que YA tiene uno corto
-                          vuelve a ser fácil de hacer sin querer — y es
-                          exactamente lo que hace que la próxima consulta igual
-                          escale, porque los dos se reparten la señal.
-                        */}
-                        {hayCorregibles && (
-                          <p className="hint" style={{ color: '#0b8a82', marginTop: 0 }}>
-                            ⚠️ En este caso {corregibles.length === 1
-                              ? 'hay 1 documento que quedó corto'
-                              : `hay ${corregibles.length} documentos que quedaron cortos`}
-                            . Si el tema es alguno de ellos, conviene
-                            <strong> corregir ese</strong> en vez de crear otro:
-                            dos documentos parecidos se compiten entre sí y las
-                            respuestas salen peor.
-                          </p>
-                        )}
-                        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 0 }}>
-                          Campos para ingestar como conocimiento en el RAG:
-                        </p>
-                        <div className="field">
-                          <label>Título del documento <span style={{ color: 'var(--error)' }}>*</span></label>
-                          <input
-                            value={knowledgeTitle}
-                            onChange={(e) => setKnowledgeTitle(e.target.value)}
-                            placeholder="ej. Financiación de heladeras exhibidoras en cuotas"
-                          />
-                        </div>
-                        <div className="field">
-                          <label>Categoría <span style={{ color: 'var(--error)' }}>*</span></label>
-                          <input
-                            value={knowledgeCategory}
-                            onChange={(e) => setKnowledgeCategory(e.target.value)}
-                            placeholder="ej. productos, financiación, politicas"
-                          />
-                        </div>
-                        <div className="field-row">
-                          <div className="field">
-                            <label>Audiencia</label>
-                            <select required value={knowledgeAudience} onChange={(e) => setKnowledgeAudience(e.target.value)}>
-                              <option value="PUBLICO">Público (para clientes)</option>
-                              <option value="INTERNO">Interno (solo equipo)</option>
-                            </select>
-                          </div>
-                          <div className="field">
-                            <label>Área del documento</label>
-                            <select value={knowledgeAgentType} onChange={(e) => setKnowledgeAgentType(e.target.value)}>
-                              <option value="">
-                                {conversation?.currentAgent
-                                  ? `— la del caso (${conversation.currentAgent}) —`
-                                  : '— sin área (transversal) —'}
-                              </option>
-                              <option value="SALES">Ventas</option>
-                              <option value="COLLECTIONS">Cobranzas</option>
-                              <option value="LOGISTICS">Logística</option>
-                              <option value="DEPOSITS">Depósito</option>
-                              <option value="ADMIN">Administración</option>
-                            </select>
-                          </div>
-                        </div>
-                      </>
-                    )}
-
-                    <div className="escalation-internal-note">
-                      <div className="field">
-                        <label htmlFor="escalation-internal-note">Nota interna (opcional)</label>
-                        <textarea
-                          id="escalation-internal-note"
-                          rows={2}
-                          value={internalNote}
-                          onChange={(event) => {
-                            setInternalNote(event.target.value);
-                            setNoteSaved(false);
-                          }}
-                          placeholder="Observación solo para el equipo interno"
-                        />
-                        <span className="escalation-note-hint">
-                          Se guarda por separado; no se envía al cliente ni se incorpora al RAG.
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        className="secondary"
-                        onClick={handleSaveInternalNote}
-                        disabled={actionBusy || !internalNote.trim() || !conversation}
-                      >
-                        {actionBusy ? 'Guardando…' : 'Guardar nota interna'}
-                      </button>
-                      {noteSaved && <span className="success-msg escalation-note-success">Nota guardada.</span>}
-                    </div>
-                  </div>
-                )}
-
-                <button type="submit" disabled={actionBusy || detailLoading} className="escalation-submit-button">
-                  Enviar y responder
-                </button>
-              </form>
-
-              {/* Los otros dos cierres. Van juntos y con la diferencia
-                  explicada porque las tres acciones son terminales: elegir
-                  mal no se deshace. */}
-              <div className="escalation-close-actions">
-                <h4>Otras formas de cerrar el caso</h4>
-
-                <p className="hint">
-                  <strong>Guardar sin enviar:</strong> no le llega nada al
-                  usuario, pero la respuesta queda como conocimiento para la
-                  próxima vez. Sirve cuando la consulta ya se resolvió por otra
-                  vía (llamó, lo atendieron en el local).
-                  {!puedeEnsenar && (
-                    <>
-                      {' '}
-                      <strong>No disponible acá:</strong> {motivoNoEnsena} Esta
-                      acción es solo escritura, así que sin el área no queda nada
-                      que hacer con ella.
-                    </>
+                      return (
+                        <tr key={e.id}>
+                          <td>
+                            <div className="sup-contact-cell esc-contact-compact">
+                              <div className="sup-contact-avatar" aria-hidden="true">
+                                {contactInitials(contactId)}
+                              </div>
+                              <div className="sup-contact-texts">
+                                <div className="sup-contact-name-row">
+                                  <strong>{contactId}</strong>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <p className="esc-reason-text" title={e.reason}>
+                              {formatEscalationReason(e.reason)}
+                            </p>
+                          </td>
+                          <td>
+                            <div className="esc-area-cell">
+                              {agentMeta ? (
+                                <span
+                                  className="sup-agent-pill"
+                                  style={{
+                                    backgroundColor: agentMeta.bgSoft,
+                                    color: agentMeta.accent,
+                                    borderColor: agentMeta.borderSoft,
+                                  }}
+                                >
+                                  <span
+                                    className="sup-agent-pill-dot"
+                                    style={{ backgroundColor: agentMeta.accent }}
+                                  />
+                                  {agentMeta.name}
+                                </span>
+                              ) : (
+                                <span className="sup-unassigned-label">Sin área</span>
+                              )}
+                              <EtiquetaPertenencia valor={e.pertenencia} />
+                            </div>
+                          </td>
+                          <td>
+                            <span
+                              className={`sup-channel-badge ${
+                                channel === 'WHATSAPP' ? 'is-wa' : 'is-web'
+                              }`}
+                            >
+                              {channel === 'WHATSAPP' ? 'WhatsApp' : 'Web'}
+                            </span>
+                          </td>
+                          <td>
+                            {delegatedName ? (
+                              <span className="esc-delegated-name">{delegatedName}</span>
+                            ) : (
+                              <span className="sup-unassigned-label">—</span>
+                            )}
+                          </td>
+                          <td>
+                            <span
+                              className="esc-time-label"
+                              title={new Date(e.createdAt).toLocaleString('es-AR')}
+                            >
+                              {formatRelativeTime(e.createdAt)}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <button
+                              type="button"
+                              className="secondary sup-action-btn"
+                              onClick={() => openCase(e)}
+                            >
+                              Ver caso →
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
-                </p>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Paginación */}
+            <div className="sup-pagination-bar">
+              <label className="sup-pagesize-label">
+                <span>Mostrar</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setPage(1);
+                  }}
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+                <span>por página</span>
+              </label>
+
+              <div className="sup-page-controls">
                 <button
                   type="button"
                   className="secondary"
-                  onClick={handleSaveUnsent}
-                  disabled={actionBusy || !replyMessage.trim() || !puedeEnsenar}
-                  title={puedeEnsenar ? undefined : motivoNoEnsena}
+                  disabled={currentPage <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
                 >
-                  Guardar sin enviar
+                  ← Anterior
                 </button>
-                <span className="hint" style={{ marginLeft: 8 }}>
-                  Usa el mismo texto y los campos de título/categoría de arriba.
-                  {/*
-                    Solo crea documentos: el endpoint de "guardar sin enviar" no
-                    tiene rama de corrección. Decirlo acá y no dejar que falle
-                    con "faltan título y categoría" —campos que en modo
-                    «Modificar documento» ni siquiera se ven— que es un error
-                    que no explica nada.
-                  */}
-                  {corrigiendo && (
-                    <>
-                      {' '}
-                      <strong>Ojo:</strong> siempre crea un documento nuevo, aunque
-                      arriba hayas elegido modificar uno. Para corregir, respondé
-                      el caso con «Enviar y responder».
-                    </>
-                  )}
+                <span className="sup-page-indicator">
+                  Página <strong>{currentPage}</strong> de <strong>{totalPages}</strong>
                 </span>
-
-                <p className="hint" style={{ marginTop: 16 }}>
-                  <strong>Descartar:</strong> ni respuesta ni conocimiento. Para
-                  una consulta puntual que no amerita una respuesta estándar.
-                </p>
-                <div className="field">
-                  <label>Motivo (opcional, pero queda registrado)</label>
-                  <input
-                    value={discardReason}
-                    onChange={(e) => setDiscardReason(e.target.value)}
-                    placeholder="ej. consulta puntual, ya se resolvió en el local"
-                  />
-                </div>
-                <button type="button" className="secondary" onClick={handleDiscard} disabled={actionBusy}>
-                  Descartar caso
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  Siguiente →
                 </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
 
-                <div className="escalation-delegate">
-                  <h4>Delegar a otro supervisor</h4>
-                  <form onSubmit={handleDelegate}>
-                    <div className="field-row">
-                      <div className="field">
-                        <select value={delegateTo} onChange={(e) => setDelegateTo(e.target.value)}>
-                          <option value="">— elegir supervisor —</option>
-                          {/* Primero quien maneja el área del caso, con ★. Se puede
-                              elegir a otro —responder no está restringido por área—
-                              pero no por no saber quién correspondía. */}
-                          {ordenarCandidatos(
-                            employees.filter((e) => e.id !== me.id),
-                            conversation?.currentAgent ?? null,
-                          ).map((e) => (
-                            <option key={e.id} value={e.id}>
-                              {etiquetaDeCandidato(e, conversation?.currentAgent ?? null)}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <button type="submit" className="secondary" disabled={actionBusy || !delegateTo}>
-                        Delegar
-                      </button>
-                    </div>
-                    {employees.length <= 1 && (
-                      <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                        No hay otros supervisores activos para delegar.
-                      </p>
-                    )}
-                  </form>
+      {/* VISTA DE DETALLE DEL CASO — LIMPIA, CALMA Y EN 2 COLUMNAS */}
+      {selected && (
+        <div className="esc-detail-view">
+          {/* Barra superior y resumen compacto en una sola tarjeta */}
+          <header className="esc-detail-header-card">
+            <div className="esc-detail-topbar">
+              <button
+                type="button"
+                className="secondary esc-back-btn"
+                onClick={() => {
+                  detailRequestId.current += 1;
+                  setSelected(null);
+                  setConversation(null);
+                  setDetailLoading(false);
+                  setActionError('');
+                }}
+              >
+                ← Volver a casos escalados
+              </button>
+
+              <div className="esc-detail-top-meta">
+                <span
+                  className={`esc-status-pill ${
+                    selected.status === 'PENDING' ? 'is-pending' : 'is-resolved'
+                  }`}
+                >
+                  {selected.status === 'PENDING' ? 'Pendiente de resolución' : 'Caso resuelto'}
+                </span>
+                <span className="esc-detail-date">
+                  {new Date(selected.createdAt).toLocaleString('es-AR', {
+                    day: '2-digit',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
+              </div>
+            </div>
+
+            <div className="esc-detail-summary-row">
+              <div className="esc-detail-identity">
+                <div className="sup-contact-avatar esc-detail-avatar" aria-hidden="true">
+                  {contactInitials(
+                    conversation?.client?.name ||
+                      conversation?.externalId ||
+                      selected.conversation?.externalId ||
+                      'C',
+                  )}
+                </div>
+                <div>
+                  <h2>
+                    {conversation?.client?.name ||
+                      conversation?.externalId ||
+                      selected.conversation?.externalId ||
+                      'Contacto'}
+                  </h2>
+                  <p className="esc-detail-reason">
+                    {formatEscalationReason(selected.reason)}
+                  </p>
                 </div>
               </div>
-            </section>
+
+              <div className="esc-detail-chips">
+                {(() => {
+                  const ch =
+                    conversation?.channel ?? selected.conversation?.channel ?? 'WEB';
+                  return (
+                    <span
+                      className={`sup-channel-badge ${
+                        ch === 'WHATSAPP' ? 'is-wa' : 'is-web'
+                      }`}
+                    >
+                      {ch === 'WHATSAPP' ? 'WhatsApp' : 'Chat Web'}
+                    </span>
+                  );
+                })()}
+
+                {(() => {
+                  const ag =
+                    conversation?.currentAgent ?? selected.conversation?.currentAgent;
+                  const meta = ag ? AGENT_META[ag] : null;
+                  return meta ? (
+                    <span
+                      className="sup-agent-pill"
+                      style={{
+                        backgroundColor: meta.bgSoft,
+                        color: meta.accent,
+                        borderColor: meta.borderSoft,
+                      }}
+                    >
+                      <span
+                        className="sup-agent-pill-dot"
+                        style={{ backgroundColor: meta.accent }}
+                      />
+                      {meta.name}
+                    </span>
+                  ) : (
+                    <span className="esc-belonging-pill is-sin-area">Sin área</span>
+                  );
+                })()}
+
+                <EtiquetaPertenencia valor={selected.pertenencia} />
+
+                {selected.delegatedToId && (
+                  <span className="esc-delegated-chip">
+                    Delegado a{' '}
+                    <strong>
+                      {employees.find((emp) => emp.id === selected.delegatedToId)?.name ??
+                        selected.delegatedToId}
+                    </strong>
+                  </span>
+                )}
+              </div>
+            </div>
+          </header>
+
+          {actionError && (
+            <p className="error" style={{ marginBottom: 14 }}>
+              {actionError}
+            </p>
           )}
 
-          {selected.status === 'RESOLVED' && (
-            <div className="panel-section">
-              <p className="success-msg">
-                Resuelto {selected.resolvedAt ? `el ${new Date(selected.resolvedAt).toLocaleString()}` : ''}.
-              </p>
-              <p><b>Respuesta enviada:</b> {selected.resolution}</p>
-              {/*
-                Spec 007 — cómo se capitalizó el conocimiento, si se capitalizó.
-                `resolvedWithAction` es null en el caso de siempre (se creó un
-                documento nuevo con "enseñar al RAG", o no se enseñó nada): ahí
-                no hay nada más que mostrar.
-              */}
-              {selected.resolvedWithAction === 'CORRECTED' && (
-                <p className="hint">
-                  Se corrigió «{selected.resolvedWithDocument?.title}» en vez de
-                  crear un documento nuevo.
-                </p>
+          {detailLoading && !conversation && (
+            <div className="esc-loading-box">Cargando conversación y contexto del caso…</div>
+          )}
+
+          {/* Grilla principal: Conversación a la izquierda, Resolución a la derecha */}
+          <div className="esc-detail-grid">
+            {/* Columna izquierda: Hilo único y limpio de conversación */}
+            <section className="esc-card esc-thread-card">
+              <div className="esc-card-head">
+                <div>
+                  <h3>
+                    Conversación{' '}
+                    {conversation?.messages && (
+                      <span className="sup-count-pill">{conversation.messages.length}</span>
+                    )}
+                  </h3>
+                  <p>Historial completo con el contacto e intervenciones previas.</p>
+                </div>
+                {selected.consultasPosteriores?.length > 0 && (
+                  <span className="esc-waiting-badge">
+                    +{selected.consultasPosteriores.length} mientras esperaba
+                  </span>
+                )}
+              </div>
+
+              {conversation ? (
+                <>
+                  <ConversationThread
+                    conversation={conversation}
+                    me={me}
+                    className="esc-thread-scroll"
+                  />
+                  <ConversationControls
+                    token={token}
+                    conversation={conversation}
+                    me={me}
+                    onRefresh={refreshConversation}
+                    hideReplyAndNotes
+                  />
+                </>
+              ) : (
+                !detailLoading && (
+                  <p className="esc-muted-text">No se pudo cargar el hilo de mensajes.</p>
+                )
               )}
-              {selected.resolvedWithAction === 'REUSED' && (
-                <p className="hint">
-                  El contenido ya existía como «{selected.resolvedWithDocument?.title}»:
-                  no se creó un documento nuevo.
-                </p>
+            </section>
+
+            {/* Columna derecha: Panel enfocado de resolución */}
+            <section className="esc-card esc-resolve-card">
+              {selected.status === 'PENDING' ? (
+                <>
+                  <div className="esc-card-head">
+                    <div>
+                      <h3>Responder y resolver</h3>
+                      <p>Tu respuesta se envía al contacto y cierra este caso pendiente.</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="secondary esc-suggest-btn"
+                      onClick={handleSuggest}
+                      disabled={suggesting}
+                    >
+                      <span aria-hidden="true">✦</span>
+                      <span>{suggesting ? 'Redactando…' : 'Sugerir con IA'}</span>
+                    </button>
+                  </div>
+
+                  {suggestion && <SuggestionPanel suggestion={suggestion} />}
+
+                  {selected.pertenencia === 'AJENA' && (
+                    <div className="esc-calm-notice">
+                      {selected.delegatedToId ? (
+                        <>
+                          Caso derivado a{' '}
+                          <strong>
+                            {employees.find((emp) => emp.id === selected.delegatedToId)
+                              ?.name ?? 'otro supervisor'}
+                          </strong>
+                          {selected.delegatedById === me?.id && ' (por vos)'}. Podés
+                          responderlo igual para no hacer esperar al contacto.
+                        </>
+                      ) : (
+                        <>
+                          Caso correspondiente a <strong>otra área</strong>. Podés
+                          responderlo igual y quedará registrado tu cierre.
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  <form className="esc-resolve-form" onSubmit={handleResolve}>
+                    <textarea
+                      className="conv-ctrl-textarea esc-reply-textarea"
+                      rows={4}
+                      value={replyMessage}
+                      onChange={(e) => setReplyMessage(e.target.value)}
+                      placeholder="Escribí la respuesta para el cliente (se enviará por WhatsApp o Web)…"
+                      required
+                    />
+
+                    <label className="esc-teach-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={teachAgent && puedeEnsenarAlgo}
+                        onChange={(e) => setTeachAgent(e.target.checked)}
+                        disabled={!puedeEnsenarAlgo}
+                      />
+                      <span>
+                        Guardar respuesta en la Base de Conocimiento (enseñar al asistente)
+                      </span>
+                    </label>
+
+                    {!puedeEnsenarAlgo && motivoNoEnsena && (
+                      <p className="esc-subtle-note">
+                        {motivoNoEnsena} Podés responder al contacto normalmente.
+                      </p>
+                    )}
+
+                    {teachAgent && puedeEnsenarAlgo && (
+                      <div className="esc-knowledge-drawer">
+                        <div className="esc-field">
+                          <label>Acción en la Base de Conocimiento</label>
+                          <select
+                            value={knowledgeMode}
+                            onChange={(e) => {
+                              setKnowledgeMode(e.target.value);
+                              setActionError('');
+                            }}
+                          >
+                            <option value="MODIFICAR" disabled={!hayCorregibles}>
+                              Actualizar documento existente
+                              {!hayCorregibles && ' (sin candidatos editables)'}
+                            </option>
+                            <option value="NUEVO" disabled={!puedeEnsenar}>
+                              Crear documento nuevo
+                              {!puedeEnsenar && ' (sin permiso en esta área)'}
+                            </option>
+                          </select>
+                        </div>
+
+                        {corrigiendo ? (
+                          <ModificarDocumento
+                            candidates={candidates ?? []}
+                            targetDocId={targetDocId}
+                            targetDoc={targetDoc}
+                            loadingDoc={loadingDoc}
+                            applyMode={applyMode}
+                            verActual={verActual}
+                            onSelect={handleSelectTargetDoc}
+                            onApplyMode={setApplyMode}
+                            onToggleActual={() => setVerActual((v) => !v)}
+                          />
+                        ) : (
+                          <>
+                            {hayCorregibles && (
+                              <div className="esc-calm-notice is-warn">
+                                Hay {corregibles.length === 1 ? '1 documento relacionado' : `${corregibles.length} documentos relacionados`} que quedaron cortos. Si tratás el mismo tema, conviene actualizarlo en lugar de duplicarlo.
+                              </div>
+                            )}
+
+                            <div className="esc-two-fields">
+                              <div className="esc-field">
+                                <label>Título del documento *</label>
+                                <input
+                                  value={knowledgeTitle}
+                                  onChange={(e) => setKnowledgeTitle(e.target.value)}
+                                  placeholder="Ej. Financiación de heladeras"
+                                />
+                              </div>
+                              <div className="esc-field">
+                                <label>Categoría *</label>
+                                <input
+                                  value={knowledgeCategory}
+                                  onChange={(e) => setKnowledgeCategory(e.target.value)}
+                                  placeholder="Ej. financiación, políticas"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="esc-two-fields">
+                              <div className="esc-field">
+                                <label>Audiencia</label>
+                                <select
+                                  value={knowledgeAudience}
+                                  onChange={(e) => setKnowledgeAudience(e.target.value)}
+                                >
+                                  <option value="PUBLICO">Público (clientes)</option>
+                                  <option value="INTERNO">Interno (equipo)</option>
+                                </select>
+                              </div>
+                              <div className="esc-field">
+                                <label>Área</label>
+                                <select
+                                  value={knowledgeAgentType}
+                                  onChange={(e) => setKnowledgeAgentType(e.target.value)}
+                                >
+                                  <option value="">
+                                    {conversation?.currentAgent
+                                      ? `Área del caso (${AGENT_META[conversation.currentAgent]?.name ?? conversation.currentAgent})`
+                                      : 'General (transversal)'}
+                                  </option>
+                                  <option value="SALES">Ventas</option>
+                                  <option value="COLLECTIONS">Cobranzas</option>
+                                  <option value="LOGISTICS">Logística</option>
+                                  <option value="DEPOSITS">Depósito</option>
+                                  <option value="ADMIN">Administración</option>
+                                </select>
+                              </div>
+                            </div>
+                          </>
+                        )}
+
+                        {/* Nota interna opcional */}
+                        <div className="esc-inline-note-box">
+                          <label htmlFor="escalation-internal-note">
+                            Nota interna opcional (solo equipo)
+                          </label>
+                          <div className="conv-ctrl-note-form">
+                            <input
+                              id="escalation-internal-note"
+                              className="conv-ctrl-note-input"
+                              value={internalNote}
+                              onChange={(ev) => {
+                                setInternalNote(ev.target.value);
+                                setNoteSaved(false);
+                              }}
+                              placeholder="Observación privada sobre esta resolución…"
+                            />
+                            <button
+                              type="button"
+                              className="secondary conv-ctrl-note-btn"
+                              onClick={handleSaveInternalNote}
+                              disabled={actionBusy || !internalNote.trim() || !conversation}
+                            >
+                              Guardar nota
+                            </button>
+                          </div>
+                          {noteSaved && (
+                            <span className="esc-saved-tag">✓ Nota interna guardada</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      className="esc-submit-primary"
+                      disabled={actionBusy || detailLoading}
+                    >
+                      Enviar respuesta y resolver caso
+                    </button>
+                  </form>
+
+                  {/* Pie discreto: Delegar + Otras opciones colapsables */}
+                  <div className="esc-footer-blocks">
+                    <form className="esc-delegate-row" onSubmit={handleDelegate}>
+                      <label htmlFor="esc-delegate-select">Delegar caso:</label>
+                      <select
+                        id="esc-delegate-select"
+                        value={delegateTo}
+                        onChange={(e) => setDelegateTo(e.target.value)}
+                      >
+                        <option value="">Elegir otro supervisor…</option>
+                        {ordenarCandidatos(
+                          employees.filter((e) => e.id !== me?.id),
+                          conversation?.currentAgent ?? null,
+                        ).map((e) => (
+                          <option key={e.id} value={e.id}>
+                            {etiquetaDeCandidato(e, conversation?.currentAgent ?? null)}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="submit"
+                        className="secondary"
+                        disabled={actionBusy || !delegateTo}
+                      >
+                        Delegar
+                      </button>
+                    </form>
+
+                    <div className="esc-alt-closures">
+                      <button
+                        type="button"
+                        className="esc-alt-toggle"
+                        onClick={() => setMostrarMasCierres((v) => !v)}
+                      >
+                        <span>Otras formas de cerrar sin enviar mensaje</span>
+                        <span aria-hidden="true">{mostrarMasCierres ? '▴' : '▾'}</span>
+                      </button>
+
+                      {mostrarMasCierres && (
+                        <div className="esc-alt-drawer">
+                          <div className="esc-alt-option">
+                            <div>
+                              <strong>Guardar solo como conocimiento</strong>
+                              <p>
+                                Útil si ya se atendió por teléfono o en sucursal. No envía mensaje al contacto.
+                                {!puedeEnsenar && motivoNoEnsena ? ` (${motivoNoEnsena})` : ''}
+                                {corrigiendo ? ' · Crea siempre un documento nuevo.' : ''}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              className="secondary"
+                              onClick={handleSaveUnsent}
+                              disabled={actionBusy || !replyMessage.trim() || !puedeEnsenar}
+                            >
+                              Guardar sin enviar
+                            </button>
+                          </div>
+
+                          <div className="esc-alt-option">
+                            <div className="esc-discard-row">
+                              <div>
+                                <strong>Descartar caso</strong>
+                                <p>Cierra el caso sin enviar respuesta ni guardar conocimiento.</p>
+                              </div>
+                              <div className="conv-ctrl-note-form">
+                                <input
+                                  className="conv-ctrl-note-input"
+                                  value={discardReason}
+                                  onChange={(e) => setDiscardReason(e.target.value)}
+                                  placeholder="Motivo opcional (ej. resuelto en sucursal)…"
+                                />
+                                <button
+                                  type="button"
+                                  className="secondary conv-ctrl-note-btn"
+                                  onClick={handleDiscard}
+                                  disabled={actionBusy}
+                                >
+                                  Descartar
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="esc-resolved-box">
+                  <div className="esc-resolved-banner">
+                    <strong>✓ Caso resuelto</strong>
+                    {selected.resolvedAt && (
+                      <span>
+                        {new Date(selected.resolvedAt).toLocaleString('es-AR')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="esc-resolved-answer">
+                    <span>Resolución registrada</span>
+                    <p>{selected.resolution || 'Cerrado sin mensaje al contacto.'}</p>
+                  </div>
+                  {selected.resolvedWithAction === 'CORRECTED' && (
+                    <p className="esc-subtle-note">
+                      Se actualizó el documento «{selected.resolvedWithDocument?.title}».
+                    </p>
+                  )}
+                  {selected.resolvedWithAction === 'REUSED' && (
+                    <p className="esc-subtle-note">
+                      Se reutilizó el documento existente «{selected.resolvedWithDocument?.title}».
+                    </p>
+                  )}
+                </div>
               )}
-            </div>
+            </section>
+          </div>
+
+          {/* Spec 008 (US3): Documentos en competencia */}
+          {hygieneWarning && hygieneWarning.length > 0 && (
+            <section className="esc-card esc-hygiene-card">
+              <div className="esc-card-head">
+                <div>
+                  <h3>Documentos superpuestos detectados en este caso</h3>
+                  <p>
+                    Dos o más documentos consultados compiten entre sí. Podés revisarlos y fusionarlos para mejorar futuras respuestas.
+                  </p>
+                </div>
+              </div>
+              <div className="esc-hygiene-list">
+                {hygieneWarning.map((pair) => (
+                  <HygienePairCard
+                    key={pair.pairId}
+                    token={token}
+                    pair={pair}
+                    onResolved={() => openCase(selected)}
+                  />
+                ))}
+              </div>
+            </section>
           )}
         </div>
       )}
@@ -1163,18 +1312,6 @@ export default function EscalationsQueue({ token, me }) {
   );
 }
 
-/**
- * La rama "corregir un documento que ya existe" del panel de enseñanza.
- *
- * Dos decisiones, en este orden: **cuál** documento y **qué** hacerle. La
- * segunda no se puede tomar bien sin ver la primera, por eso el modo aparece
- * recién con un documento elegido y trae el "ver lo que dice hoy" al lado.
- *
- * Los candidatos que NO se pueden corregir se listan igual, deshabilitados y
- * con el motivo: saber que existe algo cercano es lo que evita duplicarlo, y es
- * distinto de que no haya nada. Esconderlos convertiría "es de otra área" en
- * "no existe", que manda a crear justo el documento que competiría con él.
- */
 function ModificarDocumento({
   candidates,
   targetDocId,
@@ -1187,157 +1324,95 @@ function ModificarDocumento({
   onToggleActual,
 }) {
   return (
-    <>
-      <div className="field">
-        <label>¿Cuál documento?</label>
+    <div className="esc-mod-doc">
+      <div className="esc-field">
+        <label>Documento a actualizar</label>
         <select value={targetDocId} onChange={(e) => onSelect(e.target.value)}>
-          <option value="">— elegí uno —</option>
+          <option value="">Elegí un documento relacionado…</option>
           {candidates.map((c) => (
             <option key={c.id} value={c.id} disabled={!c.corregible}>
-              {c.score.toFixed(1)}% · {c.title}
+              {c.score.toFixed(0)}% similitud · {c.title}
               {!c.corregible && ` — solo lectura (${c.motivoSiNo})`}
             </option>
           ))}
         </select>
-        <p className="hint" style={{ marginTop: 4 }}>
-          El porcentaje es cuánto se pareció a la consulta que escaló: el más
-          alto suele ser el que tendría que haber respondido y no le alcanzó.
-        </p>
       </div>
 
-      {loadingDoc && <p className="hint">Trayendo el documento…</p>}
+      {loadingDoc && <p className="esc-subtle-note">Cargando contenido actual…</p>}
 
       {targetDoc && (
         <>
-          <div className="field">
-            <label>¿Qué hacer con el documento?</label>
-            <select value={applyMode} onChange={(e) => onApplyMode(e.target.value)}>
-              <option value="AGREGAR">Agregar la respuesta al contenido actual</option>
-              <option value="REEMPLAZAR">Reemplazar todo el contenido</option>
-            </select>
-            {/*
-              El aviso es el mismo que en la revisión de entrevistas, y por el
-              mismo motivo: el texto que se está por guardar se escribió para
-              contestar UNA consulta, no para ser el documento entero. Pisar con
-              él es casi siempre perder el resto.
-            */}
-            {applyMode === 'REEMPLAZAR' && (
-              <p className="hint" style={{ color: '#09b4aa', marginTop: 4 }}>
-                ⚠️ Se va a borrar todo lo que el documento dice hoy y va a quedar
-                solo la respuesta que escribiste arriba. Como esa respuesta
-                contesta una consulta puntual, es probable que no cubra el
-                documento entero.
-              </p>
-            )}
+          <div className="esc-mod-row">
+            <div className="esc-field" style={{ flex: 1 }}>
+              <label>Modo de actualización</label>
+              <select value={applyMode} onChange={(e) => onApplyMode(e.target.value)}>
+                <option value="AGREGAR">Sumar esta respuesta al documento actual</option>
+                <option value="REEMPLAZAR">Reemplazar todo el documento</option>
+              </select>
+            </div>
+            <button
+              type="button"
+              className="secondary esc-preview-btn"
+              onClick={onToggleActual}
+            >
+              {verActual ? 'Ocultar texto actual' : 'Ver texto actual'}
+            </button>
           </div>
 
-          <button type="button" className="secondary" onClick={onToggleActual}>
-            {verActual ? 'Ocultar' : 'Ver'} lo que dice hoy
-          </button>
-          {verActual && (
-            <p className="hint" style={{ whiteSpace: 'pre-wrap', marginTop: 6 }}>
-              {targetDoc.content}
-            </p>
+          {applyMode === 'REEMPLAZAR' && (
+            <div className="esc-calm-notice is-warn">
+              Atención: se reemplazará todo el texto actual de «{targetDoc.title}» únicamente por la respuesta escrita arriba.
+            </div>
           )}
 
-          <p className="hint" style={{ marginTop: 8 }}>
-            Al responder el caso se envía el mensaje al cliente <strong>y</strong>{' '}
-            se guarda el cambio sobre «{targetDoc.title}» (versión{' '}
-            {targetDoc.version}). Todavía no se guardó nada.
+          {verActual && (
+            <pre className="esc-doc-preview">{targetDoc.content}</pre>
+          )}
+
+          <p className="esc-subtle-note">
+            Se actualizará «{targetDoc.title}» (v{targetDoc.version}) al enviar la respuesta.
           </p>
         </>
       )}
-    </>
+    </div>
   );
 }
 
-/**
- * Resultado de la propuesta de respuesta (US3).
- *
- * Muestra tres cosas que no son decorativas:
- *
- * - **`audienceUsed`**: la propuesta se redacta con el conocimiento que le
- *   corresponde a QUIEN VA A RECIBIRLA, no al supervisor que la pide. Verlo es
- *   lo que permite notar si algo salió mal.
- * - **las fuentes**: para poder verificar de dónde salió cada afirmación antes
- *   de mandarla, en vez de confiar en el texto porque sí.
- * - **el motivo cuando no hay contexto**: el sistema no inventa una respuesta
- *   sin respaldo; dice por qué no puede y el supervisor la escribe.
- * - **`respaldoDebil`**: la propuesta se redacta desde un umbral MÁS BAJO que
- *   el del agente, así que puede venir apoyada en material que al agente no le
- *   alcanzó para contestar solo. Eso tiene que verse. Si se mostrara igual que
- *   una propuesta fundada, bajar el umbral habría sido cambiar "no redacta
- *   nunca" por "redacta y no avisa", que es peor.
- */
 function SuggestionPanel({ suggestion }) {
   if (!suggestion.hasContext) {
     return (
-      <div className="error" style={{ marginTop: 12 }}>
-        <p><strong>No hay con qué redactar una propuesta.</strong></p>
-        <p className="hint">{suggestion.reason}</p>
-        <p className="hint">
-          Se buscó con audiencia <strong>{suggestion.audienceUsed}</strong>, que
-          es la que le corresponde a esta conversación.
-        </p>
-        {/*
-          Qué quedó cerca, aunque no alcanzara. "No hay nada del tema" y "lo hay
-          al 48%" piden trabajo distinto: cargar de cero, o corregir el que ya
-          está para que gane. Sin esto las dos situaciones se ven iguales.
-        */}
-        {suggestion.sources?.length > 0 && (
-          <>
-            <p className="hint" style={{ marginBottom: 4 }}>
-              Lo más cercano que se encontró — el mejor quedó en{' '}
-              <strong>{suggestion.confidence}%</strong>, demasiado lejos como
-              para redactar con eso:
-            </p>
-            <ul className="hint" style={{ marginTop: 0 }}>
-              {suggestion.sources.map((s) => (
-                <li key={s.documentId}>{s.title} ({s.score}%)</li>
-              ))}
-            </ul>
-          </>
-        )}
+      <div className="esc-suggestion-box is-empty">
+        <strong>Sin respaldo suficiente para redactar automáticamente</strong>
+        <p>{suggestion.reason}</p>
+        <span className="esc-suggestion-meta">
+          Audiencia consultada: <strong>{suggestion.audienceUsed}</strong>
+          {suggestion.sources?.length > 0
+            ? ` · Mejor coincidencia: ${suggestion.confidence}% (${suggestion.sources[0].title})`
+            : ''}
+        </span>
       </div>
     );
   }
 
   return (
     <div
-      className={suggestion.respaldoDebil ? 'error' : 'success-msg'}
-      style={{ marginTop: 12 }}
+      className={`esc-suggestion-box ${
+        suggestion.respaldoDebil ? 'is-weak' : 'is-ready'
+      }`}
     >
-      <p>
-        Propuesta cargada en el mensaje de abajo. <strong>Es editable</strong>:
-        se envía lo que quede escrito ahí, no la propuesta original.
-      </p>
-      {/*
-        El aviso va ARRIBA de las fuentes y con el mismo peso visual que un
-        error, no como una nota al pie: el texto ya está cargado en el textarea
-        y a un clic de enviarse. Quien no lo lea acá no lo lee más.
-      */}
-      {suggestion.respaldoDebil && (
-        <p style={{ marginTop: 8 }}>
-          <strong>⚠️ Respaldo débil ({suggestion.confidence}%).</strong>{' '}
-          {suggestion.reason}
-        </p>
-      )}
-      <p className="hint">
-        Redactada con conocimiento{' '}
-        <span className={`badge ${suggestion.audienceUsed === 'INTERNO' ? 'status-warning' : 'status-idle'}`}>
-          {suggestion.audienceUsed}
-        </span>{' '}
-        — la audiencia de esta conversación, no la tuya.
-      </p>
+      <div className="esc-suggestion-top">
+        <strong>
+          {suggestion.respaldoDebil
+            ? `⚠️ Propuesta con respaldo parcial (${suggestion.confidence}%)`
+            : '✓ Propuesta cargada en el editor (podés editarla antes de enviar)'}
+        </strong>
+        <span className="esc-suggestion-aud">{suggestion.audienceUsed}</span>
+      </div>
+      {suggestion.respaldoDebil && <p>{suggestion.reason}</p>}
       {suggestion.sources?.length > 0 && (
-        <>
-          <p className="hint" style={{ marginBottom: 4 }}>Se usó:</p>
-          <ul className="hint" style={{ marginTop: 0 }}>
-            {suggestion.sources.map((s) => (
-              <li key={s.documentId}>{s.title} ({s.score}%)</li>
-            ))}
-          </ul>
-        </>
+        <span className="esc-suggestion-meta">
+          Fuentes: {suggestion.sources.map((s) => `${s.title} (${s.score}%)`).join(' · ')}
+        </span>
       )}
     </div>
   );
