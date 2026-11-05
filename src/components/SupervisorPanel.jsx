@@ -1,3 +1,4 @@
+import FinancingDraftEditor from './FinancingDraftEditor';
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -1329,6 +1330,7 @@ function ConversationDetailModal({ token, me, conversation, onRefresh, onClose }
           </div>
 
           <div className="sup-conv-controls-wrap">
+            <FinancingDraftEditor token={token} me={me} conversation={conversation} />
             <ConversationControls
               token={token}
               conversation={conversation}

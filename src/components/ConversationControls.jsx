@@ -175,6 +175,12 @@ export default function ConversationControls({
 
   return (
     <div className="conv-ctrl-root">
+      {(conversation.messages ?? []).filter(m => m.outboundCommunication).map(m => {
+        const n = m.outboundCommunication;
+        const labels = { PENDING: 'Pendiente', SENDING: 'En proceso', FAILED: 'Fallido', UNCERTAIN: 'Incierto: requiere atención', ACCEPTED: n.transportMode === 'simulated' ? 'Aceptado en simulación' : 'Aceptado por el canal' };
+        return <p key={n.id}>Aviso de financiación: {labels[n.status]}. No acredita entrega al destinatario.</p>;
+      })}
+
       {/* 1. Barra horizontal de estado y toma/liberación de control */}
       <div className={`conv-ctrl-status-bar${iHoldControl ? ' is-manual' : ''}`}>
         <div className="conv-ctrl-status-left">

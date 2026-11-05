@@ -1255,3 +1255,11 @@ export function closeSale(token, { prospectId, purchaseRequestId, finalAmount, m
 export function salesProspectAction(token, id, action, message) {
   return request(`/sales/prospects/${id}/${action}`, { token, method: action === 'conversation' ? 'GET' : 'POST', ...(message !== undefined ? {body:{message}} : {}) });
 }
+
+// Financiación 020: decisiones versionadas y destino siempre resuelto en backend.
+export const getFinancingRequest = (token, id) => request(`/sales/financing/requests/${id}`, { token });
+export const getFinancingDraft = (token, id) => request(`/sales/financing/conversations/${id}/draft`, { token });
+export const completeFinancingDraft = (token, id, body) => request(`/sales/financing/conversations/${id}/draft`, { method: 'POST', token, body });
+export const correctFinancingRequest = (token, id, body) => request(`/sales/financing/requests/${id}/correct`, { method: 'POST', token, body });
+export const cancelFinancingRequest = (token, id, body) => request(`/sales/financing/requests/${id}/cancel`, { method: 'POST', token, body });
+export const retryFinancingNotice = (token, id, expectedVersion) => request(`/sales/financing/notices/${id}/retry`, { method: 'POST', token, body: { expectedVersion } });
