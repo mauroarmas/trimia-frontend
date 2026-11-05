@@ -27,6 +27,26 @@
 
 * {
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(104, 120, 140, 0.3) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(104, 120, 140, 0.25);
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(47, 110, 163, 0.45);
 }
 
 body {
@@ -641,7 +661,42 @@ body {
   flex-direction: column;
   gap: 3px;
   overflow-y: auto;
+  overflow-x: hidden;
   font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(145, 191, 225, 0.28) transparent;
+}
+
+.sidebar-nav:hover {
+  scrollbar-color: rgba(70, 162, 229, 0.55) transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+  width: 5px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 6px 0;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(145, 191, 225, 0.22);
+  border-radius: 9999px;
+  transition: background 0.15s ease;
+}
+
+.sidebar-nav:hover::-webkit-scrollbar-thumb {
+  background: rgba(145, 191, 225, 0.45);
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(70, 162, 229, 0.75);
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:active {
+  background: #35fff3;
+  box-shadow: 0 0 8px rgba(53, 255, 243, 0.6);
 }
 
 .sidebar-section-label {
