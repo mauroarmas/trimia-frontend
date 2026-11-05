@@ -322,7 +322,7 @@ export default function App() {
         {currentTab === 'admin_financing' && <AdminFinancingPanel token={token} me={user} />}
         {currentTab === 'escalations' && <EscalationsQueue token={token} me={user} />}
         {isDiego && currentTab === 'supervisor' && <SupervisorPanel token={token} me={user} />}
-        {isDiego && currentTab === 'chat' && <ChatSimulator token={token} />}
+        {isDiego && currentTab === 'chat' && <ChatSimulator token={token} me={user} />}
         {currentTab === 'knowledge' && (
           <KnowledgeIngest
             token={token}
