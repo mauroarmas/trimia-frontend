@@ -102,7 +102,10 @@ export function getMetrics(token) {
 }
 
 export function getConversations(token, params = {}) {
-  const qs = new URLSearchParams(params).toString();
+  const cleanParams = Object.fromEntries(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== ''),
+  );
+  const qs = new URLSearchParams(cleanParams).toString();
   return request(`/supervisor/conversations${qs ? `?${qs}` : ''}`, { token });
 }
 
