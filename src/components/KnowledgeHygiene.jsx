@@ -68,6 +68,7 @@ export default function KnowledgeHygiene({ token }) {
   }
 
   async function handleStartScan() {
+    if (!window.confirm('¿Analizar toda la base de conocimiento? Este análisis no borra documentos. Las fusiones se revisan y confirman por separado.')) return;
     setError('');
     try {
       const started = await startHygieneScan(token);
@@ -239,6 +240,7 @@ export function HygienePairCard({ token, pair, onResolved }) {
   }
 
   async function handleApply() {
+    if (!window.confirm('¿Aplicar esta fusión? El documento absorbido se desactivará y el documento conservado cambiará.')) return;
     setBusy(true);
     setError('');
     setConflict(null);

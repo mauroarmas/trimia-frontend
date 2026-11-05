@@ -49,6 +49,9 @@ async function request(path, { method = 'GET', token, body } = {}) {
   const data = isJson ? await res.json().catch(() => null) : null;
 
   if (!res.ok) {
+    if (res.status === 401 && token) {
+      window.dispatchEvent(new CustomEvent('trimia:session-ended', { detail: { token } }));
+    }
     const msg = data?.message || res.statusText || `Error ${res.status}`;
     throw new ApiError(Array.isArray(msg) ? msg.join(', ') : msg, {
       status: res.status,
@@ -64,6 +67,30 @@ export function login(email, password) {
 
 export function getMe(token) {
   return request('/auth/me', { token });
+}
+
+export function logout(token) {
+  return request('/auth/logout', { method: 'POST', token });
+}
+
+export function createEmployee(token, body) {
+  return request('/employees', { method: 'POST', token, body });
+}
+
+export function updateEmployee(token, id, body) {
+  return request(`/employees/${id}`, { method: 'PUT', token, body });
+}
+
+export function deactivateEmployee(token, id) {
+  return request(`/employees/${id}`, { method: 'DELETE', token });
+}
+
+export function listFinancingRequests(token) {
+  return request('/sales/financing/requests', { token });
+}
+
+export function reviewFinancingRequest(token, id, body) {
+  return request(`/sales/financing/requests/${id}/review`, { method: 'POST', token, body });
 }
 
 export function getAgentsStatus(token) {
@@ -689,6 +716,9 @@ export async function openConversationStream(
   });
 
   if (!res.ok) {
+    if (res.status === 401 && token) {
+      window.dispatchEvent(new CustomEvent('trimia:session-ended', { detail: { token } }));
+    }
     const isJson = res.headers.get('content-type')?.includes('application/json');
     const data = isJson ? await res.json().catch(() => null) : null;
     const msg = data?.message || res.statusText || `Error ${res.status}`;

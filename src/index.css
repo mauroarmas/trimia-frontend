@@ -2771,10 +2771,22 @@ body {
   color: #a5630b;
 }
 
-.knowledge-page .badge.status-error {
+.badge.status-error {
   background: #fdecec;
   color: #b4363b;
 }
+
+.client-account-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  padding: 12px;
+  background: #f3f7f8;
+  border-radius: 8px;
+}
+
+.client-account-summary dt { color: #52616a; font-size: 13px; }
+.client-account-summary dd { margin: 4px 0 0; font-weight: 600; }
 
 .knowledge-page .badge.status-idle {
   background: #f1f4f8;

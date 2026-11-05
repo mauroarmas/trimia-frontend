@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Login from './components/Login';
 import SupervisorPanel from './components/SupervisorPanel';
 import ChatSimulator from './components/ChatSimulator';
@@ -11,6 +11,7 @@ import SalesPanel from './components/SalesPanel';
 import AdminFinancingPanel from './components/AdminFinancingPanel';
 import EmployeesPanel from './components/EmployeesPanel';
 import TrainingPanel from './components/TrainingPanel';
+import { logout } from './api';
 
 // Iconos SVG limpios y consistentes para cada módulo
 function NavIcon({ type, className = 'sidebar-nav-icon' }) {
@@ -92,8 +93,34 @@ export default function App() {
   const [tab, setTab] = useState(null);
   const [interviewStart, setInterviewStart] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState('');
 
-  function handleLogout() {
+  useEffect(() => {
+    function endSession(event) {
+      if (event.detail?.token !== token) return;
+      setToken(null);
+      setUser(null);
+      setTab(null);
+      setInterviewStart(null);
+    }
+    window.addEventListener('trimia:session-ended', endSession);
+    return () => window.removeEventListener('trimia:session-ended', endSession);
+  }, [token]);
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    setLogoutError('');
+    try {
+      await logout(token);
+    } catch (err) {
+      if (err.status !== 401) {
+        setLogoutError(`No se pudo cerrar la sesión: ${err.message}. Reintentá.`);
+        setLoggingOut(false);
+        return;
+      }
+    }
+    setLoggingOut(false);
     setShowLogoutIntro(true);
     setToken(null);
     setUser(null);
@@ -196,6 +223,10 @@ export default function App() {
     }
   }
 
+  if (isSupervisor && isAdmin && !visibleTabs.some((item) => item.id === 'admin_financing')) {
+    visibleTabs.unshift({ id: 'admin_financing', label: 'Aprobación Financiación', icon: 'sales' });
+  }
+
   const defaultTab = visibleTabs[0]?.id;
   const currentTab = visibleTabs.some((t) => t.id === tab) ? tab : defaultTab;
 
@@ -271,6 +302,7 @@ export default function App() {
               className="btn-logout-icon"
               title="Cerrar sesión"
               onClick={handleLogout}
+              disabled={loggingOut}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -282,6 +314,7 @@ export default function App() {
 
       {/* Área Principal de Contenido */}
       <main className="app-main">
+        {logoutError && <p className="error" role="alert">{logoutError}</p>}
         {currentTab === 'training' && <TrainingPanel token={token} me={user} />}
         {currentTab === 'webchat' && <WebChat token={token} me={user} />}
         {currentTab === 'collections' && <CollectionsPanel token={token} me={user} isCollector={isCobranzas} />}
@@ -301,7 +334,7 @@ export default function App() {
             onSalirEntrevista={() => setInterviewStart(null)}
           />
         )}
-        {isDiego && currentTab === 'employees' && <EmployeesPanel token={token} />}
+        {isDiego && currentTab === 'employees' && <EmployeesPanel token={token} me={user} />}
       </main>
     </div>
   );

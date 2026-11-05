@@ -163,7 +163,7 @@ export default function KnowledgeIngest({
     ['lista', 'Documentos'],
     ['cargar', 'Cargar conocimiento'],
     ['buscar', 'Probar búsqueda'],
-    ['higiene', 'Limpiar base'],
+    ...(me?.isGeneralSupervisor ? [['higiene', 'Limpiar base']] : []),
     ...(showImprovements ? [['mejorar', 'Mejorar conocimiento']] : []),
   ];
 
@@ -220,7 +220,7 @@ export default function KnowledgeIngest({
       {view === 'lista' && (
         <KnowledgeList token={token} alcance={alcance} onSelect={setSelectedId} />
       )}
-      {view === 'higiene' && <KnowledgeHygiene token={token} />}
+      {view === 'higiene' && me?.isGeneralSupervisor && <KnowledgeHygiene token={token} />}
       {view === 'mejorar' && showImprovements && (
         <Improvements
           token={token}
