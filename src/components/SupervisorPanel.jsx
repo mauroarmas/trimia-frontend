@@ -1260,25 +1260,6 @@ function ConversationDetailModal({ token, me, conversation, onRefresh, onClose }
         </header>
 
         <div className="econ-modal-body sup-conv-modal-body">
-          {/* Leyenda visual de participantes */}
-          <div className="sup-conv-legend-bar">
-            <span className="sup-conv-legend-title">Participantes:</span>
-            <div className="sup-conv-legend-items">
-              <span className="sup-conv-legend-chip">
-                <span className="sup-legend-dot is-client" />
-                {isEmployee ? 'Empleado' : 'Cliente'}
-              </span>
-              <span className="sup-conv-legend-chip">
-                <span className="sup-legend-dot is-agent" />
-                Agente IA ({agentMeta?.name ?? 'General'})
-              </span>
-              <span className="sup-conv-legend-chip">
-                <span className="sup-legend-dot is-supervisor" />
-                Supervisor (Intervención manual)
-              </span>
-            </div>
-          </div>
-
           <div className="sup-chat-thread">
             {feedItems.length === 0 ? (
               <p className="hint" style={{ textAlign: 'center', margin: '24px 0' }}>
