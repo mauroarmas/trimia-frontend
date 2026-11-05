@@ -145,6 +145,12 @@ export default function ConversationControls({
 
   return (
     <div className="panel-section">
+      {(conversation.messages ?? []).filter(m => m.outboundCommunication).map(m => {
+        const n = m.outboundCommunication;
+        const labels = { PENDING: 'Pendiente', SENDING: 'En proceso', FAILED: 'Fallido', UNCERTAIN: 'Incierto: requiere atención', ACCEPTED: n.transportMode === 'simulated' ? 'Aceptado en simulación' : 'Aceptado por el canal' };
+        return <p key={n.id}>Aviso de financiación: {labels[n.status]}. No acredita entrega al destinatario.</p>;
+      })}
+
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <span className={statusBadgeClass(conversation.status)}>{conversation.status}</span>
         {conversation.status === 'HUMAN_HANDLING' && (

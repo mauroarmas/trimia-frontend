@@ -7709,3 +7709,13 @@ label {
     align-self: flex-end;
   }
 }
+
+/* Financiación: extensión funcional de la bandeja existente. */
+.financing-module .knowledge-table-wrap { max-height: 420px; overflow: auto; }
+.financing-module .knowledge-table { width: 100%; border-collapse: collapse; }
+.financing-module .knowledge-table th, .financing-module .knowledge-table td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--border, #dbe3ec); }
+.financing-module .knowledge-table th { position: sticky; top: 0; background: var(--surface, #fff); }
+.financing-module label { display: block; margin: 12px 0; }
+.financing-module label input, .financing-module label textarea { display: block; width: 100%; max-width: 640px; margin-top: 6px; }
+.financing-module .knowledge-form-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.financing-module .financing-detail { overflow-wrap: anywhere; }
