@@ -1008,6 +1008,208 @@ export default function SupervisorPanel({ token, me }) {
   );
 }
 
+function MessageActorAvatar({ actorType, accent = '#2563eb', bg = '#eff6ff', border = '#bfdbfe' }) {
+  if (actorType === 'CLIENT') {
+    return (
+      <div
+        className="sup-msg-avatar is-client"
+        style={{ backgroundColor: bg, color: accent, borderColor: border }}
+        title="Cliente"
+        aria-hidden="true"
+      >
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="12" cy="7" r="4" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (actorType === 'EMPLOYEE') {
+    return (
+      <div
+        className="sup-msg-avatar is-employee"
+        style={{ backgroundColor: bg, color: accent, borderColor: border }}
+        title="Empleado interno"
+        aria-hidden="true"
+      >
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+          <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (actorType === 'SUPERVISOR') {
+    return (
+      <div
+        className="sup-msg-avatar is-supervisor"
+        style={{ backgroundColor: bg, color: accent, borderColor: border }}
+        title="Supervisor (intervención humana)"
+        aria-hidden="true"
+      >
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinejoin="round" />
+          <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+    );
+  }
+
+  // AGENT (IA)
+  return (
+    <div
+      className="sup-msg-avatar is-agent"
+      style={{ backgroundColor: bg, color: accent, borderColor: border }}
+      title="Agente de Inteligencia Artificial"
+      aria-hidden="true"
+    >
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <rect x="3" y="8" width="18" height="12" rx="3" />
+        <path d="M12 4v4" strokeLinecap="round" />
+        <circle cx="12" cy="3" r="1" fill="currentColor" />
+        <circle cx="9" cy="14" r="1.3" fill="currentColor" stroke="none" />
+        <circle cx="15" cy="14" r="1.3" fill="currentColor" stroke="none" />
+      </svg>
+    </div>
+  );
+}
+
+function resolveMessageActor(m, conversation, me) {
+  const isUser = m.role === 'USER';
+  if (isUser) {
+    const isEmployee = conversation?.userType === 'EMPLEADO';
+    if (isEmployee) {
+      return {
+        actorType: 'EMPLOYEE',
+        title: 'Empleado',
+        badge: 'Personal interno',
+        accent: '#d97706',
+        bg: '#fffbeb',
+        border: '#fde68a',
+        side: 'left',
+      };
+    }
+    return {
+      actorType: 'CLIENT',
+      title: conversation?.client?.name || 'Cliente',
+      badge: 'Cliente',
+      accent: '#0284c7',
+      bg: '#f0f9ff',
+      border: '#bae6fd',
+      side: 'left',
+    };
+  }
+
+  // Evaluamos si el mensaje ASSISTANT fue enviado manualmente por un supervisor
+  const events = conversation?.events ?? [];
+  const msgTime = new Date(m.createdAt).getTime();
+
+  const explicitManualEvent = events.find(
+    (ev) =>
+      ev.eventType === 'conversation_manual_reply' &&
+      ev.payload?.messageId === m.id,
+  );
+
+  // Ventanas [takeover, release] registradas en OrchestrationEvent
+  let inTakeoverWindow = false;
+  let takeoverOpenAt = null;
+  for (const ev of events) {
+    const evTime = new Date(ev.createdAt).getTime();
+    if (ev.eventType === 'conversation_takeover') {
+      takeoverOpenAt = evTime;
+    } else if (ev.eventType === 'conversation_release' && takeoverOpenAt != null) {
+      if (msgTime >= takeoverOpenAt - 1000 && msgTime <= evTime + 1000) {
+        inTakeoverWindow = true;
+      }
+      takeoverOpenAt = null;
+    }
+  }
+  if (takeoverOpenAt != null && msgTime >= takeoverOpenAt - 1000) {
+    inTakeoverWindow = true;
+  }
+
+  const inCurrentHandling =
+    conversation?.status === 'HUMAN_HANDLING' &&
+    conversation?.handledAt &&
+    msgTime >= new Date(conversation.handledAt).getTime() - 1000;
+
+  if (explicitManualEvent || inTakeoverWindow || inCurrentHandling) {
+    const supName =
+      conversation?.handledBy?.name ||
+      (conversation?.handledById && conversation?.handledById === me?.id ? me?.name : null);
+    return {
+      actorType: 'SUPERVISOR',
+      title: supName ? `Supervisor · ${supName}` : 'Supervisor',
+      badge: 'Intervención humana',
+      accent: '#7c3aed',
+      bg: '#f5f3ff',
+      border: '#ddd6fe',
+      side: 'right',
+    };
+  }
+
+  const areaKey = m.agentType || conversation?.currentAgent;
+  const areaMeta = areaKey ? AGENT_META[areaKey] : null;
+  return {
+    actorType: 'AGENT',
+    title: areaMeta ? `Agente IA · ${areaMeta.name}` : 'Agente IA',
+    badge: 'Respuesta IA',
+    accent: areaMeta?.accent ?? '#2563eb',
+    bg: areaMeta?.bgSoft ?? '#eff6ff',
+    border: areaMeta?.borderSoft ?? '#bfdbfe',
+    side: 'right',
+  };
+}
+
+function buildConversationFeed(conversation, me) {
+  const items = [];
+  for (const m of conversation?.messages ?? []) {
+    items.push({
+      kind: 'message',
+      id: `msg-${m.id}`,
+      time: new Date(m.createdAt).getTime(),
+      createdAt: m.createdAt,
+      message: m,
+      actor: resolveMessageActor(m, conversation, me),
+    });
+  }
+
+  for (const ev of conversation?.events ?? []) {
+    if (ev.eventType === 'ESCALATED') {
+      items.push({
+        kind: 'milestone',
+        id: `ev-${ev.id}`,
+        time: new Date(ev.createdAt).getTime(),
+        createdAt: ev.createdAt,
+        variant: 'escalated',
+        label: 'El Agente IA derivó la conversación a un supervisor',
+      });
+    } else if (ev.eventType === 'conversation_takeover') {
+      items.push({
+        kind: 'milestone',
+        id: `ev-${ev.id}`,
+        time: new Date(ev.createdAt).getTime(),
+        createdAt: ev.createdAt,
+        variant: 'takeover',
+        label: 'Un supervisor intervino y tomó el control manual',
+      });
+    } else if (ev.eventType === 'conversation_release') {
+      items.push({
+        kind: 'milestone',
+        id: `ev-${ev.id}`,
+        time: new Date(ev.createdAt).getTime(),
+        createdAt: ev.createdAt,
+        variant: 'release',
+        label: 'Control liberado · La atención volvió al Agente IA',
+      });
+    }
+  }
+
+  return items.sort((a, b) => a.time - b.time);
+}
+
 function ConversationDetailModal({ token, me, conversation, onRefresh, onClose }) {
   useEffect(() => {
     function onKey(e) {
@@ -1020,6 +1222,9 @@ function ConversationDetailModal({ token, me, conversation, onRefresh, onClose }
   const agentMeta = conversation.currentAgent
     ? AGENT_META[conversation.currentAgent]
     : null;
+  const isEmployee = conversation.userType === 'EMPLEADO';
+  const feedItems = buildConversationFeed(conversation, me);
+  const displayName = conversation.client?.name || conversation.externalId;
 
   return createPortal(
     <div
@@ -1034,10 +1239,12 @@ function ConversationDetailModal({ token, me, conversation, onRefresh, onClose }
           <div>
             <span className="econ-modal-kicker">
               {conversation.channel === 'WHATSAPP' ? 'Canal WhatsApp' : 'Canal Web'} ·{' '}
-              {agentMeta ? `Área ${agentMeta.name}` : 'Sin agente asignado'}
+              {agentMeta ? `Área ${agentMeta.name}` : 'Sin agente asignado'} ·{' '}
+              {isEmployee ? 'Perfil Empleado' : 'Perfil Cliente'}
             </span>
-            <h2>Conversación con {conversation.externalId}</h2>
+            <h2>Conversación con {displayName}</h2>
             <p>
+              {conversation.client?.name ? `ID/Tel: ${conversation.externalId} · ` : ''}
               Estado actual: {STATUS_LABELS[conversation.status] ?? conversation.status} ·{' '}
               {conversation.messages?.length ?? 0} mensajes registrados
             </p>
@@ -1053,37 +1260,84 @@ function ConversationDetailModal({ token, me, conversation, onRefresh, onClose }
         </header>
 
         <div className="econ-modal-body sup-conv-modal-body">
+          {/* Leyenda visual de participantes */}
+          <div className="sup-conv-legend-bar">
+            <span className="sup-conv-legend-title">Participantes:</span>
+            <div className="sup-conv-legend-items">
+              <span className="sup-conv-legend-chip">
+                <span className="sup-legend-dot is-client" />
+                {isEmployee ? 'Empleado' : 'Cliente'}
+              </span>
+              <span className="sup-conv-legend-chip">
+                <span className="sup-legend-dot is-agent" />
+                Agente IA ({agentMeta?.name ?? 'General'})
+              </span>
+              <span className="sup-conv-legend-chip">
+                <span className="sup-legend-dot is-supervisor" />
+                Supervisor (Intervención manual)
+              </span>
+            </div>
+          </div>
+
           <div className="sup-chat-thread">
-            {(conversation.messages ?? []).length === 0 ? (
+            {feedItems.length === 0 ? (
               <p className="hint" style={{ textAlign: 'center', margin: '24px 0' }}>
                 Esta conversación no tiene mensajes todavía.
               </p>
             ) : (
-              conversation.messages.map((m) => {
-                const isUser = m.role === 'USER';
-                const msgAgent = m.agentType ? AGENT_META[m.agentType]?.name ?? m.agentType : null;
+              feedItems.map((item) => {
+                if (item.kind === 'milestone') {
+                  return (
+                    <div
+                      key={item.id}
+                      className={`sup-chat-milestone is-${item.variant}`}
+                    >
+                      <span className="sup-chat-milestone-pill">
+                        {item.variant === 'takeover' && '🛡️ '}
+                        {item.variant === 'release' && '🤖 '}
+                        {item.variant === 'escalated' && '⚠️ '}
+                        {item.label} ·{' '}
+                        {new Date(item.createdAt).toLocaleTimeString('es-AR', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                  );
+                }
+
+                const { message: m, actor } = item;
+                const isLeft = actor.side === 'left';
+
                 return (
                   <div
-                    key={m.id}
-                    className={`sup-chat-bubble-row${isUser ? ' is-user' : ' is-assistant'}`}
+                    key={item.id}
+                    className={`sup-chat-bubble-row ${isLeft ? 'is-user' : 'is-assistant'} actor-${actor.actorType.toLowerCase()}`}
                   >
+                    <MessageActorAvatar
+                      actorType={actor.actorType}
+                      accent={actor.accent}
+                      bg={actor.bg}
+                      border={actor.border}
+                    />
                     <div className="sup-chat-bubble">
                       <div className="sup-chat-meta">
-                        <strong>
-                          {isUser
-                            ? 'Contacto'
-                            : msgAgent
-                              ? `Asistente · ${msgAgent}`
-                              : 'Respuesta enviada'}
-                        </strong>
-                        <span>
+                        <div className="sup-chat-author-group">
+                          <strong>{actor.title}</strong>
+                          <span
+                            className={`sup-chat-role-tag is-${actor.actorType.toLowerCase()}`}
+                          >
+                            {actor.badge}
+                          </span>
+                        </div>
+                        <time className="sup-chat-time">
                           {new Date(m.createdAt).toLocaleString('es-AR', {
                             day: '2-digit',
                             month: 'short',
                             hour: '2-digit',
                             minute: '2-digit',
                           })}
-                        </span>
+                        </time>
                       </div>
                       <p>{m.content}</p>
                     </div>
@@ -1119,6 +1373,8 @@ function ContactTimelineModal({ data, onClose }) {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  const isEmployee = Boolean(data.contact?.employee);
 
   return createPortal(
     <div
@@ -1162,34 +1418,49 @@ function ContactTimelineModal({ data, onClose }) {
         <div className="econ-modal-body sup-conv-modal-body">
           <div className="sup-chat-thread">
             {data.timeline.map((m, i) => {
-              const isUser = m.role === 'USER';
+              const fakeConv = {
+                userType: isEmployee ? 'EMPLEADO' : 'CLIENTE',
+                currentAgent: m.agentType,
+              };
+              const actor = resolveMessageActor(m, fakeConv, null);
+              const isLeft = actor.side === 'left';
+
               return (
                 <div
                   key={`${m.conversationId}-${i}`}
-                  className={`sup-chat-bubble-row${isUser ? ' is-user' : ' is-assistant'}`}
+                  className={`sup-chat-bubble-row ${isLeft ? 'is-user' : 'is-assistant'} actor-${actor.actorType.toLowerCase()}`}
                 >
+                  <MessageActorAvatar
+                    actorType={actor.actorType}
+                    accent={actor.accent}
+                    bg={actor.bg}
+                    border={actor.border}
+                  />
                   <div className="sup-chat-bubble">
                     <div className="sup-chat-meta">
-                      <span>
+                      <div className="sup-chat-author-group">
                         <span
                           className={`sup-channel-badge ${
                             m.channel === 'WHATSAPP' ? 'is-wa' : 'is-web'
                           }`}
-                          style={{ marginRight: 6 }}
                         >
                           {m.channel === 'WHATSAPP' ? 'WhatsApp' : 'Web'}
                         </span>
-                        <strong>
-                          {isUser
-                            ? 'Contacto'
-                            : `Asistente${
-                                m.agentType
-                                  ? ` · ${AGENT_META[m.agentType]?.name ?? m.agentType}`
-                                  : ''
-                              }`}
-                        </strong>
-                      </span>
-                      <span>{new Date(m.createdAt).toLocaleString('es-AR')}</span>
+                        <strong>{actor.title}</strong>
+                        <span
+                          className={`sup-chat-role-tag is-${actor.actorType.toLowerCase()}`}
+                        >
+                          {actor.badge}
+                        </span>
+                      </div>
+                      <time className="sup-chat-time">
+                        {new Date(m.createdAt).toLocaleString('es-AR', {
+                          day: '2-digit',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </time>
                     </div>
                     <p>{m.content}</p>
                   </div>
