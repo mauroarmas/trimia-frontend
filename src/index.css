@@ -5915,6 +5915,155 @@ button.knowledge-info-toggle.active {
   white-space: nowrap;
 }
 
+/* Dropdown de acciones para Empleados y Áreas */
+.employees-page .knowledge-table-wrap {
+  min-height: 280px;
+  padding-bottom: 60px;
+  overflow-x: auto;
+}
+
+.employees-page .knowledge-row-action {
+  position: relative;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.emp-dropdown-container {
+  position: relative;
+  display: inline-block;
+  text-align: left;
+}
+
+.emp-dropdown-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: all 140ms ease;
+}
+
+.emp-dropdown-trigger:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.emp-dropdown-trigger.is-open {
+  background: #f1f5f9;
+  border-color: #0284c7;
+  color: #0369a1;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
+}
+
+.emp-dropdown-caret {
+  font-size: 10px;
+  transition: transform 150ms ease;
+  color: #64748b;
+  display: inline-block;
+}
+
+.emp-dropdown-trigger.is-open .emp-dropdown-caret {
+  transform: rotate(180deg);
+  color: #0369a1;
+}
+
+.emp-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 0;
+  min-width: 195px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.06);
+  padding: 5px;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: empDropdownFadeIn 120ms ease-out;
+}
+
+@keyframes empDropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.emp-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 11px;
+  border: none;
+  background: transparent;
+  color: #334155;
+  font-size: 12.5px;
+  font-weight: 500;
+  text-align: left;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 100ms ease, color 100ms ease;
+}
+
+.emp-dropdown-item:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.emp-dropdown-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.emp-dropdown-item .emp-item-icon {
+  font-size: 13px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.emp-dropdown-item.is-danger {
+  color: #991b1b;
+}
+
+.emp-dropdown-item.is-danger:hover:not(:disabled) {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.emp-dropdown-item.is-reactivate {
+  color: #0369a1;
+}
+
+.emp-dropdown-item.is-reactivate:hover:not(:disabled) {
+  background: #f0f9ff;
+  color: #0284c7;
+}
+
+.emp-dropdown-divider {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 4px 2px;
+}
+
 .employees-area-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
@@ -6055,7 +6204,7 @@ button {
   transition: all 0.15s ease;
 }
 
-button:hover:not(:disabled):not(.secondary):not(.btn-table-action):not(.btn-pill-action):not(.btn-logout-icon):not(.submenu-pill):not(.knowledge-tab):not(.knowledge-hero-action):not(.page-hero-action):not(.knowledge-text-button):not(.info-modal-close):not(.sidebar-nav-item):not(.sidebar-toggle):not(.danger):not(.sup-kpi-chip-button):not(.econ-modal-close):not(.econ-scenario-btn):not(.sup-search-clear):not(.sup-clear-agent-btn):not(.esc-alt-toggle) {
+button:hover:not(:disabled):not(.secondary):not(.btn-table-action):not(.btn-pill-action):not(.btn-logout-icon):not(.submenu-pill):not(.knowledge-tab):not(.knowledge-hero-action):not(.page-hero-action):not(.knowledge-text-button):not(.info-modal-close):not(.sidebar-nav-item):not(.sidebar-toggle):not(.danger):not(.sup-kpi-chip-button):not(.econ-modal-close):not(.econ-scenario-btn):not(.sup-search-clear):not(.sup-clear-agent-btn):not(.esc-alt-toggle):not(.emp-dropdown-trigger):not(.emp-dropdown-item) {
   background: var(--primary-hover);
   color: #fff;
 }

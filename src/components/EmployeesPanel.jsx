@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { listEmployees, listSectors, setSupervisedAreas, createEmployee, updateEmployee, deactivateEmployee } from '../api';
 import { esGerente } from '../areas';
 import InfoNotes, { InfoToggle } from './InfoNotes';
@@ -12,6 +12,140 @@ const FILTROS = [
   ['empleados', 'Empleados'],
   ['baja', 'Dados de baja'],
 ];
+
+/**
+ * Componente desplegable de acciones por empleado (US3 / calma visual)
+ */
+function EmployeeActionsDropdown({
+  employee,
+  me,
+  busyId,
+  isOpen,
+  onToggle,
+  onClose,
+  onEdit,
+  onChangeActive,
+  onDiagnostic,
+  onSimulations,
+  onChangeAreas,
+}) {
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    function handleClickOutside(event) {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        onClose();
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
+  return (
+    <div className="emp-dropdown-container" ref={containerRef}>
+      <button
+        type="button"
+        className={`emp-dropdown-trigger${isOpen ? ' is-open' : ''}`}
+        onClick={onToggle}
+        aria-expanded={isOpen}
+        aria-haspopup="true"
+        title="Opciones del empleado"
+      >
+        <span>Acciones</span>
+        <span className="emp-dropdown-caret" aria-hidden="true">▾</span>
+      </button>
+
+      {isOpen && (
+        <div className="emp-dropdown-menu" role="menu">
+          <button
+            type="button"
+            role="menuitem"
+            className="emp-dropdown-item"
+            onClick={() => {
+              onClose();
+              onEdit(employee);
+            }}
+          >
+            <span className="emp-item-icon">✏️</span>
+            <span>Editar empleado</span>
+          </button>
+
+          {employee.role === 'SUPERVISOR' && (
+            <button
+              type="button"
+              role="menuitem"
+              className="emp-dropdown-item"
+              onClick={() => {
+                onClose();
+                onChangeAreas(employee);
+              }}
+            >
+              <span className="emp-item-icon">🏢</span>
+              <span>Cambiar áreas</span>
+            </button>
+          )}
+
+          <div className="emp-dropdown-divider" role="separator" />
+
+          <button
+            type="button"
+            role="menuitem"
+            className="emp-dropdown-item"
+            onClick={() => {
+              onClose();
+              onDiagnostic({ id: employee.id, name: employee.name });
+            }}
+          >
+            <span className="emp-item-icon">🎯</span>
+            <span>Diagnóstico</span>
+          </button>
+
+          <button
+            type="button"
+            role="menuitem"
+            className="emp-dropdown-item"
+            onClick={() => {
+              onClose();
+              onSimulations({ id: employee.id, name: employee.name });
+            }}
+          >
+            <span className="emp-item-icon">🎭</span>
+            <span>Simulaciones</span>
+          </button>
+
+          <div className="emp-dropdown-divider" role="separator" />
+
+          <button
+            type="button"
+            role="menuitem"
+            className={`emp-dropdown-item ${employee.isActive ? 'is-danger' : 'is-reactivate'}`}
+            disabled={busyId === employee.id || employee.id === me?.id}
+            onClick={() => {
+              onClose();
+              onChangeActive(employee);
+            }}
+          >
+            <span className="emp-item-icon">{employee.isActive ? '🚫' : '🔄'}</span>
+            <span>{employee.isActive ? 'Desactivar empleado' : 'Reactivar empleado'}</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /**
  * Pantalla de empleados (spec 005, US3).
@@ -36,6 +170,7 @@ export default function EmployeesPanel({ token, me }) {
   const [mostrarInfo, setMostrarInfo] = useState(false);
   const [formEmployee, setFormEmployee] = useState(null);
   const [busyId, setBusyId] = useState(null);
+  const [openDropdownId, setOpenDropdownId] = useState(null);
 
   async function changeActive(employee) {
     if (!window.confirm(`${employee.isActive ? 'Desactivar' : 'Reactivar'} a ${employee.name} (${employee.email})?`)) return;
@@ -230,31 +365,19 @@ export default function EmployeesPanel({ token, me }) {
                         )}
                       </td>
                       <td className="knowledge-row-action">
-                        <div className="employees-actions">
-                          <button type="button" className="secondary" onClick={() => setFormEmployee(e)}>Editar empleado</button>
-                          <button type="button" className="secondary" disabled={busyId === e.id || e.id === me?.id} onClick={() => changeActive(e)}>{e.isActive ? 'Desactivar' : 'Reactivar'}</button>
-                          <button
-                            type="button"
-                            className="secondary"
-                            onClick={() => setDiagnosticEmployee({ id: e.id, name: e.name })}
-                            title="Ver y gestionar evaluación diagnóstica"
-                          >
-                            🎯 Diagnóstico
-                          </button>
-                          <button
-                            type="button"
-                            className="secondary"
-                            onClick={() => setSimulationEmployee({ id: e.id, name: e.name })}
-                            title="Ver historial de simulaciones y devoluciones pedagógicas"
-                          >
-                            🎭 Simulaciones
-                          </button>
-                          {e.role === 'SUPERVISOR' && (
-                            <button type="button" className="secondary" onClick={() => setEditando(e)}>
-                              Cambiar áreas
-                            </button>
-                          )}
-                        </div>
+                        <EmployeeActionsDropdown
+                          employee={e}
+                          me={me}
+                          busyId={busyId}
+                          isOpen={openDropdownId === e.id}
+                          onToggle={() => setOpenDropdownId((curr) => (curr === e.id ? null : e.id))}
+                          onClose={() => setOpenDropdownId(null)}
+                          onEdit={(emp) => setFormEmployee(emp)}
+                          onChangeActive={(emp) => changeActive(emp)}
+                          onDiagnostic={(payload) => setDiagnosticEmployee(payload)}
+                          onSimulations={(payload) => setSimulationEmployee(payload)}
+                          onChangeAreas={(emp) => setEditando(emp)}
+                        />
                       </td>
                     </tr>
                   );

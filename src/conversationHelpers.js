@@ -241,3 +241,4 @@ export function buildConversationFeed(conversation, me) {
 
   return items.sort((a, b) => a.time - b.time);
 }
+

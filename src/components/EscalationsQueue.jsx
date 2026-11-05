@@ -42,14 +42,7 @@ import {
  */
 function EtiquetaPertenencia({ valor }) {
   if (valor === 'PROPIA') {
-    return (
-      <span
-        className="esc-belonging-pill is-mia"
-        title="De un área que supervisás, o derivado a vos"
-      >
-        Mía
-      </span>
-    );
+    return null;
   }
   if (valor === 'SIN_AREA') {
     return (
