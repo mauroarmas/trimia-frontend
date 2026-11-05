@@ -58,7 +58,7 @@ function leerSesionGuardada(userId) {
 export default function ChatSimulator({ token, me }) {
   const sesionInicial = leerSesionGuardada(me?.id);
 
-  const [phone, setPhone] = useState(sesionInicial?.phone ?? '5493764000000');
+  const [phone, setPhone] = useState(() => sesionInicial?.phone ?? generarTelefonoPrueba());
   const [convId, setConvId] = useState(sesionInicial?.convId ?? null);
   const [mostrarInfo, setMostrarInfo] = useState(false);
   const [text, setText] = useState('');
@@ -73,7 +73,7 @@ export default function ChatSimulator({ token, me }) {
   const [avisoCierre, setAvisoCierre] = useState('');
 
   const ultimoIdRef = useRef(null);
-  const activePhoneRef = useRef(sesionInicial?.phone ?? '5493764000000');
+  const activePhoneRef = useRef(phone);
   const sendingRef = useRef(false);
   const viewportRef = useRef(null);
   const textareaRef = useRef(null);
