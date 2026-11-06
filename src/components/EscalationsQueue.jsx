@@ -21,6 +21,7 @@ import {
 } from '../api';
 import ConversationControls from './ConversationControls';
 import FinancingDraftEditor from './FinancingDraftEditor';
+import CommercialCasePanel from './CommercialCasePanel';
 import ConversationThread from './ConversationThread';
 import {
   AGENT_META,
@@ -70,7 +71,7 @@ function EtiquetaPertenencia({ valor }) {
   return null;
 }
 
-export default function EscalationsQueue({ token, me }) {
+export default function EscalationsQueue({ token, me, onOpenFinancing }) {
   const [status, setStatus] = useState('PENDING');
   // Spec 013 — apagado por defecto: el defecto es la cola completa, priorizada
   // pero sin filtrar.
@@ -106,16 +107,18 @@ export default function EscalationsQueue({ token, me }) {
   const [confirmedPrice, setConfirmedPrice] = useState('');
   const [priceError, setPriceError] = useState('');
   const isPriceCase = selected?.reason?.startsWith('Financiación:') ?? false;
+  const isApprovedSale = priceDraft?.request?.status === 'APPROVED';
+  const ResolvePanel = isApprovedSale ? 'details' : 'div';
   useEffect(() => {
     let active = true;
     setPriceDraft(null); setConfirmedPrice(''); setPriceError('');
-    if (isPriceCase && selected?.conversationId) {
+    if (selected?.conversationId) {
       getFinancingDraft(token, selected.conversationId).then(d => {
         if (active) { setPriceDraft(d); setConfirmedPrice(d.confirmedAmount ?? ''); }
-      }).catch(e => { if (active) setPriceError(e.message); });
+      }).catch(e => { if (active && isPriceCase) setPriceError(e.message); });
     }
     return () => { active = false; };
-  }, [token, selected?.id, isPriceCase]);
+  }, [token, selected?.id, selected?.conversationId, isPriceCase]);
 
 
   /**
@@ -876,7 +879,7 @@ export default function EscalationsQueue({ token, me }) {
                       'Contacto'}
                   </h2>
                   <p className="esc-detail-reason">
-                    {formatEscalationReason(selected.reason)}
+                    {priceDraft?.request ? (priceDraft.request.closedAt ? 'Compra finalizada' : isApprovedSale ? 'Financiación aprobada. Próximo paso: registrar el cierre de la venta.' : 'Compra financiada en curso') : formatEscalationReason(selected.reason)}
                   </p>
                 </div>
               </div>
@@ -897,6 +900,7 @@ export default function EscalationsQueue({ token, me }) {
                 })()}
 
                 {(() => {
+                  if (priceDraft?.request) return null;
                   const ag =
                     conversation?.currentAgent ?? selected.conversation?.currentAgent;
                   const meta = ag ? AGENT_META[ag] : null;
@@ -972,6 +976,7 @@ export default function EscalationsQueue({ token, me }) {
                     conversation={conversation}
                     me={me}
                     className="esc-thread-scroll"
+                    autoScroll
                   />
                   <ConversationControls
                     token={token}
@@ -979,8 +984,9 @@ export default function EscalationsQueue({ token, me }) {
                     me={me}
                     onRefresh={refreshConversation}
                     hideReply
+                    compact
                   />
-                  {!isPriceCase && <FinancingDraftEditor token={token} me={me} conversation={conversation} />}
+                  {!isPriceCase && !priceDraft?.request && <FinancingDraftEditor token={token} me={me} conversation={conversation} />}
                 </>
               ) : (
                 !detailLoading && (
@@ -991,8 +997,11 @@ export default function EscalationsQueue({ token, me }) {
 
             {/* Columna derecha: Panel enfocado de resolución */}
             <section className="esc-card esc-resolve-card">
+              <CommercialCasePanel key={selected.id} token={token} me={me} draft={priceDraft} escalation={selected}
+                onOpenFinancing={onOpenFinancing} onResolved={async () => { setSelected(null); setConversation(null); await loadQueue(); }} />
               {selected.status === 'PENDING' ? (
-                <>
+                <ResolvePanel>
+                  {isApprovedSale && <summary style={{ cursor: 'pointer', marginTop: 16 }}>Responder sin registrar el cierre</summary>}
                   <div className="esc-card-head">
                     <div>
                       <h3>Responder y resolver</h3>
@@ -1291,7 +1300,7 @@ export default function EscalationsQueue({ token, me }) {
                       )}
                     </div>
                   </div>
-                </>
+                </ResolvePanel>
               ) : (
                 <div className="esc-resolved-box">
                   <div className="esc-resolved-banner">

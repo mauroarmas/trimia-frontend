@@ -87,6 +87,7 @@ function NavIcon({ type, className = 'sidebar-nav-icon' }) {
 
 export default function App() {
   const [token, setToken] = useState(null);
+  const [financingRequestToOpen, setFinancingRequestToOpen] = useState(null);
   const [user, setUser] = useState(null);
   const [showLogoutIntro, setShowLogoutIntro] = useState(false);
   // Sin pestaña elegida se abre la primera del perfil (para el supervisor, su panel).
@@ -134,6 +135,7 @@ export default function App() {
       <Login
         showIntro={showLogoutIntro}
         onLogin={(t, u) => {
+          setFinancingRequestToOpen(null);
           setShowLogoutIntro(false);
           setToken(t);
           setUser(u);
@@ -319,8 +321,8 @@ export default function App() {
         {currentTab === 'webchat' && <WebChat token={token} me={user} />}
         {currentTab === 'collections' && <CollectionsPanel token={token} me={user} isCollector={isCobranzas} />}
         {currentTab === 'sales' && <SalesPanel token={token} me={user} />}
-        {currentTab === 'admin_financing' && <AdminFinancingPanel token={token} me={user} />}
-        {currentTab === 'escalations' && <EscalationsQueue token={token} me={user} />}
+        {currentTab === 'admin_financing' && <AdminFinancingPanel token={token} me={user} initialRequestId={financingRequestToOpen} />}
+        {currentTab === 'escalations' && <EscalationsQueue token={token} me={user} onOpenFinancing={id => { setFinancingRequestToOpen(id); setTab('admin_financing'); }} />}
         {isDiego && currentTab === 'supervisor' && <SupervisorPanel token={token} me={user} />}
         {isDiego && currentTab === 'chat' && <ChatSimulator token={token} me={user} />}
         {currentTab === 'knowledge' && (

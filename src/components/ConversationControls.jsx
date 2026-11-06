@@ -84,6 +84,7 @@ export default function ConversationControls({
   onRefresh,
   hideReplyAndNotes = false,
   hideReply = false,
+  compact = false,
   hideNotes = false,
   actions,
 }) {
@@ -174,10 +175,12 @@ export default function ConversationControls({
   const otherHandlerName =
     conversation.handledBy?.name || conversation.handledById || 'otro supervisor';
   const notes = conversation.internalNotes ?? [];
+  const NotesPanel = compact ? 'details' : 'div';
+  const NotesHeading = compact ? 'summary' : 'div';
 
   return (
     <div className="conv-ctrl-root">
-      {(conversation.messages ?? []).filter(m => m.outboundCommunication).map(m => {
+      {!compact && (conversation.messages ?? []).filter(m => m.outboundCommunication).map(m => {
         const n = m.outboundCommunication;
         const labels = { PENDING: 'Pendiente', SENDING: 'En proceso', FAILED: 'Fallido', UNCERTAIN: 'Incierto: requiere atención', ACCEPTED: n.transportMode === 'simulated' ? 'Aceptado en simulación' : 'Aceptado por el canal' };
         return <p key={n.id} className="conv-ctrl-outbound-notice">Aviso de financiación: <strong>{labels[n.status]}</strong>. No acredita entrega al destinatario.</p>;
@@ -295,8 +298,8 @@ export default function ConversationControls({
           )}
 
           {!hideNotes && (
-            <div className="conv-ctrl-card conv-ctrl-notes-card">
-              <div className="conv-ctrl-card-head">
+            <NotesPanel className="conv-ctrl-card conv-ctrl-notes-card">
+              <NotesHeading className="conv-ctrl-card-head">
                 <div className="conv-ctrl-card-title">
                   <span className="conv-ctrl-card-icon is-note" aria-hidden="true">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -312,7 +315,7 @@ export default function ConversationControls({
                     <p>Privadas para supervisores (nunca visibles para el cliente)</p>
                   </div>
                 </div>
-              </div>
+              </NotesHeading>
 
               {notes.length === 0 ? (
                 <div className="conv-ctrl-notes-empty">
@@ -367,7 +370,7 @@ export default function ConversationControls({
                   Agregar
                 </button>
               </form>
-            </div>
+            </NotesPanel>
           )}
         </div>
       )}

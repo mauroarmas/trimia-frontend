@@ -136,7 +136,7 @@ export default function FinancingDraftEditor({ token, me, conversation }) {
             </svg>
           </span>
           <div>
-            <h4>Solicitud de financiación en preparación</h4>
+            <h4>{draft?.stage === 'SUBMITTED' ? 'Solicitud de financiación presentada' : 'Solicitud de financiación en preparación'}</h4>
             <p>Datos recopilados durante la conversación con el cliente</p>
           </div>
         </div>
@@ -193,7 +193,7 @@ export default function FinancingDraftEditor({ token, me, conversation }) {
             <span>
               <strong>Falta completar:</strong> {missingLabel}.
             </span>
-            {conversation.status !== 'ACTIVE' && (
+            {conversation.status !== 'ACTIVE' && !['SUBMITTED', 'CANCELLED'].includes(draft.stage) && (
               <span className="fin-draft-paused-warn">
                 El asistente está pausado: liberá el control manual cuando quieras que el cliente confirme su resumen.
               </span>

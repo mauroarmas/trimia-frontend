@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { buildConversationFeed } from '../conversationHelpers';
 
 export function MessageActorAvatar({
@@ -76,12 +77,15 @@ export default function ConversationThread({
   conversation,
   me,
   className = '',
+  autoScroll = false,
   emptyMessage = 'Esta conversación no tiene mensajes todavía.',
 }) {
+  const thread = useRef(null);
+  useEffect(() => { if (autoScroll && thread.current) thread.current.scrollTop = thread.current.scrollHeight; }, [autoScroll, conversation?.id, conversation?.messages?.length]);
   const feedItems = buildConversationFeed(conversation, me);
 
   return (
-    <div className={`sup-chat-thread ${className}`.trim()}>
+    <div ref={thread} className={`sup-chat-thread ${className}`.trim()}>
       {feedItems.length === 0 ? (
         <p className="sup-chat-empty">{emptyMessage}</p>
       ) : (

@@ -5,7 +5,7 @@ const LABELS = { PENDING_REVIEW: 'Pendiente', APPROVED: 'Aprobada', APPROVED_WIT
 const EVENT_LABELS = { DRAFT_UPDATED: 'Datos recopilados', DRAFT_CORRECTED: 'Datos confirmados por responsable', IDENTITY_CONFLICT: 'Identidad a revisar', SUBMITTED: 'Solicitud presentada para revisión', EVALUATED: 'Evaluación simulada registrada', CORRECTED: 'Solicitud corregida', DECIDED: 'Decisión humana registrada', CANCELLED: 'Solicitud cancelada', NOTICE_CLAIMED: 'Intento de aviso iniciado', NOTICE_ACCEPTED: 'Aviso aceptado en simulación', NOTICE_FAILED: 'Aviso fallido', NOTICE_UNCERTAIN: 'Aviso incierto', NOTICE_RETRY: 'Reintento solicitado' };
 const money = value => value == null ? 'Sin importe' : Number(value).toLocaleString('es-AR', { style: 'currency', currency: 'ARS' });
 const noticeLabel = n => n.status === 'ACCEPTED' && n.transportMode === 'simulated' ? 'Aceptado en simulación' : LABELS[n.status];
-export default function AdminFinancingPanel({ token, me }) {
+export default function AdminFinancingPanel({ token, me, initialRequestId }) {
   const [rows, setRows] = useState([]);
   const detailRequest = useRef(0);
   const [detail, setDetail] = useState(null);
@@ -25,6 +25,7 @@ export default function AdminFinancingPanel({ token, me }) {
       if (request === detailRequest.current) setDetail(result);
     } catch(e) { if (request === detailRequest.current) setError(e.message); }
   }
+  useEffect(() => { if (initialRequestId) open(initialRequestId); }, [initialRequestId, token]);
   async function refresh() {
     const request = detailRequest.current;
     const id = detail?.request.id;
