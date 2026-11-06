@@ -15,33 +15,35 @@ import './TrimiLogin.css';
  * - Mano izquierda: apoyada en el borde de la tarjeta con el pulgar hacia arriba (thumbs up).
  * - Brazo derecho: levantado saludando alegremente con 3 destellos y ondas de saludo.
  *
- * Interacciones:
- * 1. Entrada fluida con rebote elástico (peekaboo) y globo: "¡Qué bueno verte de nuevo!".
- * 2. Al escribir Email: Se apoya en el borde y sus pupilas siguen el cursor de escritura.
- * 3. Al enfocar Contraseña: Se tapa ambos ojos con las manos respetando la privacidad.
- * 4. Si activa "Ver contraseña": Baja una mano y espía con picardía por entre los dedos.
+ * Sincronización con transición de Logout:
+ * - Si showIntro es true, Trimi permanece oculto durante la animación de transición de TrimIA
+ *   y aparece asomándose (peekaboo) una vez que la pantalla de transición se retira.
  */
 export default function TrimiLogin({
   focusedField = null, // 'email' | 'password' | null
   emailValue = '',
   showPassword = false,
+  showIntro = false,
   onGreetingComplete,
 }) {
   const [isInitialGreeting, setIsInitialGreeting] = useState(true);
   const [showGreetingBubble, setShowGreetingBubble] = useState(true);
 
-  // Al cargar, saluda con la mano arriba durante 3.2s
+  // Al cargar, saluda con la mano arriba durante 3.4s (considerando el retraso de la intro si viene de logout)
   useEffect(() => {
+    const greetingDuration = 3400;
+    const introDelay = showIntro ? 1900 : 0;
+
     const greetingTimer = setTimeout(() => {
       setIsInitialGreeting(false);
       setShowGreetingBubble(false);
       if (onGreetingComplete) onGreetingComplete();
-    }, 3400);
+    }, greetingDuration + introDelay);
 
     return () => {
       clearTimeout(greetingTimer);
     };
-  }, [onGreetingComplete]);
+  }, [showIntro, onGreetingComplete]);
 
   // Si el usuario empieza a interactuar antes, ocultamos el globo
   useEffect(() => {

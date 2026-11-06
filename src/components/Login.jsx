@@ -98,6 +98,7 @@ export default function Login({ onLogin, showIntro = false }) {
           focusedField={focusedField}
           emailValue={email}
           showPassword={showPassword}
+          showIntro={showIntro}
         />
 
         <section className="login-card">
