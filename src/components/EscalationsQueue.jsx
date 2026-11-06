@@ -18,6 +18,7 @@ import {
   addInternalNote,
 } from '../api';
 import ConversationControls from './ConversationControls';
+import FinancingDraftEditor from './FinancingDraftEditor';
 import ConversationThread from './ConversationThread';
 import {
   AGENT_META,
@@ -945,6 +946,7 @@ export default function EscalationsQueue({ token, me }) {
                     onRefresh={refreshConversation}
                     hideReply
                   />
+                  <FinancingDraftEditor token={token} me={me} conversation={conversation} />
                 </>
               ) : (
                 !detailLoading && (
