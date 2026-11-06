@@ -35,7 +35,7 @@ function formatCurrency(value) {
   });
 }
 
-export default function FinancingDraftEditor({ token, me, conversation }) {
+export default function FinancingDraftEditor({ token, me, conversation, onOpenFinancing }) {
   const [draft, setDraft] = useState(null);
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
@@ -125,6 +125,10 @@ export default function FinancingDraftEditor({ token, me, conversation }) {
     me?.role === 'SUPERVISOR' &&
     !['SUBMITTED', 'CANCELLED'].includes(draft.stage);
 
+  const request = draft?.request;
+  const requestLabel = request?.financing ? 'Plan de cuotas registrado' : request?.closedAt ? 'Venta cerrada' : ({ APPROVED: 'Financiación aprobada', PENDING_REVIEW: 'Pendiente de revisión', REJECTED: 'Solicitud rechazada', CANCELLED: 'Solicitud cancelada' }[request?.status]);
+  const canReview = me?.isGeneralSupervisor || ['Administración', 'Admin'].includes(me?.sectorName ?? me?.sector?.name);
+
   return (
     <section className="fin-draft-card">
       <header className="fin-draft-head">
@@ -136,14 +140,14 @@ export default function FinancingDraftEditor({ token, me, conversation }) {
             </svg>
           </span>
           <div>
-            <h4>{draft?.stage === 'SUBMITTED' ? 'Solicitud de financiación presentada' : 'Solicitud de financiación en preparación'}</h4>
+            <h4>{request?.financing ? 'Financiación registrada' : request?.closedAt ? 'Venta financiada registrada' : request?.status === 'APPROVED' ? 'Financiación aprobada' : draft?.stage === 'SUBMITTED' ? 'Solicitud de financiación presentada' : 'Solicitud de financiación en preparación'}</h4>
             <p>Datos recopilados durante la conversación con el cliente</p>
           </div>
         </div>
 
         {draft && (
           <span className={`fin-stage-pill ${STAGE_TONES[draft.stage] ?? ''}`}>
-            {STAGES[draft.stage] ?? draft.stage}
+            {requestLabel ?? STAGES[draft.stage] ?? draft.stage}
           </span>
         )}
       </header>
@@ -191,7 +195,7 @@ export default function FinancingDraftEditor({ token, me, conversation }) {
 
           <div className="fin-draft-status-note">
             <span>
-              <strong>Falta completar:</strong> {missingLabel}.
+              <strong>{request ? 'Estado:' : 'Falta completar:'}</strong> {requestLabel ?? missingLabel}.
             </span>
             {conversation.status !== 'ACTIVE' && !['SUBMITTED', 'CANCELLED'].includes(draft.stage) && (
               <span className="fin-draft-paused-warn">
@@ -251,11 +255,13 @@ export default function FinancingDraftEditor({ token, me, conversation }) {
             </form>
           )}
 
-          {!canEditAmount && (
+          {!canEditAmount && <>
             <p className="fin-draft-disclaimer">
-              Confirmar el importe no presenta ni aprueba el pedido. El cliente debe confirmar el resumen actualizado en su siguiente intercambio.
+              {request?.financing ? `Plan registrado: ${request.financing.quotaCount} cuotas. Consultá los vencimientos en Financiación o Cobranzas.` : request?.closedAt ? `Cierre registrado el ${new Date(request.closedAt).toLocaleString('es-AR')}. El plan de cuotas se registra por separado.` : request?.status === 'APPROVED' ? 'La financiación está aprobada. Ventas puede registrar el cierre cuando acuerde la compra.' : draft.stage === 'SUBMITTED' ? 'La solicitud ya está presentada; no hace falta volver a confirmar los mismos datos.' : 'El cliente debe confirmar el resumen actualizado para presentar la solicitud.'}
             </p>
-          )}
+            {request && canReview && onOpenFinancing && <button type="button" className="secondary" onClick={() => onOpenFinancing(request.id)}>Ver solicitud de financiación</button>}
+          </>}
+
         </>
       )}
     </section>

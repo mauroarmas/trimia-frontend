@@ -1,11 +1,12 @@
+import FinancingPlanPanel from './FinancingPlanPanel';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { listFinancingRequests, reviewFinancingRequest, getFinancingRequest, correctFinancingRequest, cancelFinancingRequest, retryFinancingNotice } from '../api';
 import PageHero from './PageHero';
 const LABELS = { PENDING_REVIEW: 'Pendiente', APPROVED: 'Aprobada', APPROVED_WITH_CONDITIONS: 'Con condiciones', UNAVAILABLE: 'No disponible', REJECTED: 'Rechazada', DRAFT: 'Borrador', CANCELLED: 'Cancelada', PENDING: 'Pendiente', SENDING: 'En proceso', ACCEPTED: 'Aceptado', FAILED: 'Fallido', UNCERTAIN: 'Resultado incierto: requiere atención' };
-const EVENT_LABELS = { DRAFT_UPDATED: 'Datos recopilados', DRAFT_CORRECTED: 'Datos confirmados por responsable', IDENTITY_CONFLICT: 'Identidad a revisar', SUBMITTED: 'Solicitud presentada para revisión', EVALUATED: 'Evaluación simulada registrada', CORRECTED: 'Solicitud corregida', DECIDED: 'Decisión humana registrada', CANCELLED: 'Solicitud cancelada', NOTICE_CLAIMED: 'Intento de aviso iniciado', NOTICE_ACCEPTED: 'Aviso aceptado en simulación', NOTICE_FAILED: 'Aviso fallido', NOTICE_UNCERTAIN: 'Aviso incierto', NOTICE_RETRY: 'Reintento solicitado' };
+const EVENT_LABELS = { PLAN_CREATED: 'Plan de cuotas registrado', DRAFT_UPDATED: 'Datos recopilados', DRAFT_CORRECTED: 'Datos confirmados por responsable', IDENTITY_CONFLICT: 'Identidad a revisar', SUBMITTED: 'Solicitud presentada para revisión', EVALUATED: 'Evaluación simulada registrada', CORRECTED: 'Solicitud corregida', DECIDED: 'Decisión humana registrada', CANCELLED: 'Solicitud cancelada', NOTICE_CLAIMED: 'Intento de aviso iniciado', NOTICE_ACCEPTED: 'Aviso aceptado en simulación', NOTICE_FAILED: 'Aviso fallido', NOTICE_UNCERTAIN: 'Aviso incierto', NOTICE_RETRY: 'Reintento solicitado' };
 const money = value => value == null ? 'Sin importe' : Number(value).toLocaleString('es-AR', { style: 'currency', currency: 'ARS' });
 const noticeLabel = n => n.status === 'ACCEPTED' && n.transportMode === 'simulated' ? 'Aceptado en simulación' : LABELS[n.status];
-export default function AdminFinancingPanel({ token, me, initialRequestId }) {
+export default function AdminFinancingPanel({ token, me, initialRequestId, onOpenCollections }) {
   const [rows, setRows] = useState([]);
   const detailRequest = useRef(0);
   const [detail, setDetail] = useState(null);
@@ -78,6 +79,7 @@ export default function AdminFinancingPanel({ token, me, initialRequestId }) {
         {Object.entries({ name: 'Nombre', dni: 'DNI', productSummary: 'Producto', amount: 'Importe ARS' }).map(([key, label]) => <label key={key}>{label}<input aria-label={label} value={editing[key]} onChange={e => setEditing({ ...editing, [key]: e.target.value })} maxLength={key === 'name' ? 120 : key === 'productSummary' ? 500 : key === 'dni' ? 8 : 30} required /></label>)}
         <p>Confirmá la identidad y el importe con una nota. Esto no modifica otras operaciones del cliente.</p><button disabled={busy}>Confirmar corrección</button><button type="button" className="secondary" onClick={() => setEditing(null)}>Descartar</button>
       </form>}
+      <FinancingPlanPanel key={selected.id} token={token} request={selected} plan={detail.plan} canCreate={canMutate} onCreated={refresh} onOpenCollections={onOpenCollections} />
       {selected.notice && <section><h4>Aviso al cliente</h4><p>{noticeLabel(selected.notice)}. {selected.notice.lastErrorCode === 'TRANSPORT_DISABLED' ? 'El transporte está deshabilitado.' : selected.notice.lastErrorCode === 'HUMAN_PAUSED' ? 'El hilo está tomado por una persona.' : ''}</p>
         {selected.notice.status === 'FAILED' && canMutate && <button disabled={busy} onClick={() => mutate(() => retryFinancingNotice(token, selected.notice.id, selected.notice.version), 'Reintento solicitado.')}>Reintentar aviso fallido</button>}
         {selected.notice.status === 'UNCERTAIN' && <p>Revisá lo ocurrido antes de volver a contactar al cliente. No se reenviará automáticamente.</p>}

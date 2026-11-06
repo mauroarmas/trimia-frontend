@@ -201,7 +201,7 @@ function AgentIllustration({ agentType }) {
   }
 }
 
-export default function SupervisorPanel({ token, me }) {
+export default function SupervisorPanel({ token, me, onOpenFinancing }) {
   const [agents, setAgents] = useState(null);
   const [metrics, setMetrics] = useState(null);
 
@@ -920,6 +920,7 @@ export default function SupervisorPanel({ token, me }) {
       {/* Modal de Detalle de Conversación */}
       {selectedConv && (
         <ConversationDetailModal
+          onOpenFinancing={onOpenFinancing}
           token={token}
           me={me}
           conversation={selectedConv}
@@ -936,7 +937,7 @@ export default function SupervisorPanel({ token, me }) {
   );
 }
 
-function ConversationDetailModal({ token, me, conversation, onRefresh, onClose }) {
+function ConversationDetailModal({ token, me, conversation, onRefresh, onClose, onOpenFinancing }) {
   useEffect(() => {
     function onKey(e) {
       if (e.key === 'Escape') onClose();
@@ -988,7 +989,7 @@ function ConversationDetailModal({ token, me, conversation, onRefresh, onClose }
           <ConversationThread conversation={conversation} me={me} />
 
           <div className="sup-conv-controls-wrap">
-            <FinancingDraftEditor token={token} me={me} conversation={conversation} />
+            <FinancingDraftEditor token={token} me={me} conversation={conversation} onOpenFinancing={onOpenFinancing} />
             <ConversationControls
               token={token}
               conversation={conversation}

@@ -1263,3 +1263,7 @@ export const completeFinancingDraft = (token, id, body) => request(`/sales/finan
 export const correctFinancingRequest = (token, id, body) => request(`/sales/financing/requests/${id}/correct`, { method: 'POST', token, body });
 export const cancelFinancingRequest = (token, id, body) => request(`/sales/financing/requests/${id}/cancel`, { method: 'POST', token, body });
 export const retryFinancingNotice = (token, id, expectedVersion) => request(`/sales/financing/notices/${id}/retry`, { method: 'POST', token, body: { expectedVersion } });
+
+export function createFinancingPlan(token, id, body) {
+  return request(`/sales/financing/requests/${id}/plan`, { token, method: 'POST', body });
+}

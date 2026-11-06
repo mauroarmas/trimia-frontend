@@ -46,7 +46,7 @@ const REJECTION_LABELS = {
   AMOUNT_TOO_LOW: 'Monto insuficiente',
 };
 
-export default function CollectionsPanel({ token, me, isCollector }) {
+export default function CollectionsPanel({ token, me, isCollector, initialClientId }) {
   const [kpis, setKpis] = useState(null);
   const [proofs, setProofs] = useState([]);
   const [acceptedProofs, setAcceptedProofs] = useState([]);
@@ -58,6 +58,7 @@ export default function CollectionsPanel({ token, me, isCollector }) {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [tab, setTab] = useState('proofs');
+  useEffect(() => { if (initialClientId) { setTab('clients'); setSelectedClient(initialClientId); } }, [initialClientId]);
   const [proofStatus, setProofStatus] = useState('PENDING_REVIEW');
 
   const isController = me.isController ?? false;
