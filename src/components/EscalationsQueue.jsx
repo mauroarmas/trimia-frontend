@@ -983,7 +983,6 @@ export default function EscalationsQueue({ token, me, onOpenFinancing }) {
                     conversation={conversation}
                     me={me}
                     onRefresh={refreshConversation}
-                    hideReply
                     compact
                   />
                   {!isPriceCase && !priceDraft?.request && <FinancingDraftEditor token={token} me={me} conversation={conversation} />}

@@ -256,7 +256,7 @@ export default function ConversationControls({
       {(!hideReplyAndNotes && ((!hideReply && iHoldControl) || !hideNotes)) && (
         <div
           className={`conv-ctrl-panels${
-            !hideReply && iHoldControl && !hideNotes ? ' has-two-cols' : ''
+            !compact && !hideReply && iHoldControl && !hideNotes ? ' has-two-cols' : ''
           }`}
         >
           {!hideReply && iHoldControl && (
@@ -291,7 +291,7 @@ export default function ConversationControls({
               <div className="conv-ctrl-card-foot">
                 <span className="conv-ctrl-foot-hint">Ctrl + Enter para enviar rápido</span>
                 <button type="submit" disabled={busy || !replyText.trim()}>
-                  Enviar respuesta
+                  {compact ? 'Enviar mensaje' : 'Enviar respuesta'}
                 </button>
               </div>
             </form>
