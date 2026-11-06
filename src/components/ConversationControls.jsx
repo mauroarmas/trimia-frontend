@@ -83,6 +83,7 @@ export default function ConversationControls({
   me,
   onRefresh,
   hideReplyAndNotes = false,
+  hideReply = false,
   hideNotes = false,
   actions,
 }) {
@@ -249,13 +250,13 @@ export default function ConversationControls({
       )}
 
       {/* 2. Paneles inferiores ordenados: Respuesta manual y Notas internas */}
-      {(!hideReplyAndNotes && (iHoldControl || !hideNotes)) && (
+      {(!hideReplyAndNotes && ((!hideReply && iHoldControl) || !hideNotes)) && (
         <div
           className={`conv-ctrl-panels${
-            iHoldControl && !hideNotes ? ' has-two-cols' : ''
+            !hideReply && iHoldControl && !hideNotes ? ' has-two-cols' : ''
           }`}
         >
-          {iHoldControl && (
+          {!hideReply && iHoldControl && (
             <form className="conv-ctrl-card conv-ctrl-reply-card" onSubmit={handleReply}>
               <div className="conv-ctrl-card-head">
                 <div className="conv-ctrl-card-title">

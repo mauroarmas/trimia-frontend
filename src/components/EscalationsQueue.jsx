@@ -943,7 +943,7 @@ export default function EscalationsQueue({ token, me }) {
                     conversation={conversation}
                     me={me}
                     onRefresh={refreshConversation}
-                    hideReplyAndNotes
+                    hideReply
                   />
                 </>
               ) : (
