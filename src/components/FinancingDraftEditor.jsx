@@ -44,6 +44,7 @@ export default function FinancingDraftEditor({ token, me, conversation }) {
   const [busy, setBusy] = useState(false);
 
   const allowed =
+    (me?.role === 'SUPERVISOR' && (me?.sectorName ?? me?.sector?.name) === 'Ventas') ||
     me?.isGeneralSupervisor ||
     ['Administración', 'Admin'].includes(me?.sectorName ?? me?.sector?.name);
 

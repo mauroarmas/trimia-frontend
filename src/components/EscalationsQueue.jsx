@@ -3,6 +3,8 @@ import {
   listEscalations,
   getEscalation,
   getConversation,
+  getFinancingDraft,
+  completeFinancingDraft,
   resolveEscalation,
   getKnowledgeCandidates,
   getKnowledgeDoc,
@@ -100,6 +102,21 @@ export default function EscalationsQueue({ token, me }) {
   const [mostrarMasCierres, setMostrarMasCierres] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState('');
+  const [priceDraft, setPriceDraft] = useState(null);
+  const [confirmedPrice, setConfirmedPrice] = useState('');
+  const [priceError, setPriceError] = useState('');
+  const isPriceCase = selected?.reason?.startsWith('Financiación:') ?? false;
+  useEffect(() => {
+    let active = true;
+    setPriceDraft(null); setConfirmedPrice(''); setPriceError('');
+    if (isPriceCase && selected?.conversationId) {
+      getFinancingDraft(token, selected.conversationId).then(d => {
+        if (active) { setPriceDraft(d); setConfirmedPrice(d.confirmedAmount ?? ''); }
+      }).catch(e => { if (active) setPriceError(e.message); });
+    }
+    return () => { active = false; };
+  }, [token, selected?.id, isPriceCase]);
+
 
   /**
    * De qué áreas es responsable quien está resolviendo (spec 005).
@@ -282,18 +299,32 @@ export default function EscalationsQueue({ token, me }) {
       setActionError('Título y categoría del conocimiento son obligatorios.');
       return;
     }
+    if (isPriceCase && (!priceDraft || !(Number(confirmedPrice) > 0))) {
+      setActionError('Ingresá el importe confirmado antes de resolver este caso.');
+      return;
+    }
     setActionBusy(true);
     setActionError('');
+    let priceSaved = false;
     try {
+      if (isPriceCase) {
+        const saved = await completeFinancingDraft(token, selected.conversationId, {
+          expectedVersion: priceDraft.version,
+          confirmedAmount: Number(confirmedPrice).toFixed(2),
+          note: replyMessage.trim(),
+        });
+        setPriceDraft(saved);
+        priceSaved = true;
+      }
       await resolveEscalation(token, selected.id, {
         message: replyMessage,
-        teachAgent: teachAgent && !corrigiendo,
+        teachAgent: !isPriceCase && teachAgent && !corrigiendo,
         title: knowledgeTitle,
         category: knowledgeCategory,
         audience: knowledgeAudience || undefined,
         agentType: knowledgeAgentType || undefined,
         correctKnowledge:
-          teachAgent && corrigiendo && targetDoc
+          !isPriceCase && teachAgent && corrigiendo && targetDoc
             ? {
                 documentId: targetDoc.id,
                 baseVersion: targetDoc.version,
@@ -306,7 +337,10 @@ export default function EscalationsQueue({ token, me }) {
       setConversation(null);
       await loadQueue();
     } catch (err) {
-      setActionError(err.message);
+      setActionError(priceSaved ? `El importe quedó guardado, pero no se pudo resolver el caso: ${err.message}. Podés reintentar.` : err.message);
+      if (isPriceCase && err.status === 409) {
+        try { setPriceDraft(await getFinancingDraft(token, selected.conversationId)); } catch {}
+      }
     } finally {
       setActionBusy(false);
     }
@@ -946,7 +980,7 @@ export default function EscalationsQueue({ token, me }) {
                     onRefresh={refreshConversation}
                     hideReply
                   />
-                  <FinancingDraftEditor token={token} me={me} conversation={conversation} />
+                  {!isPriceCase && <FinancingDraftEditor token={token} me={me} conversation={conversation} />}
                 </>
               ) : (
                 !detailLoading && (
@@ -999,6 +1033,15 @@ export default function EscalationsQueue({ token, me }) {
                   )}
 
                   <form className="esc-resolve-form" onSubmit={handleResolve}>
+                    {isPriceCase && <div className="esc-field">
+                      <label htmlFor="escalation-confirmed-price">Precio confirmado (ARS)</label>
+                      {priceDraft && <p>{priceDraft.productSummary ?? 'Producto del formulario'}</p>}
+                      <input id="escalation-confirmed-price" type="number" min="0.01" step="0.01" required
+                        value={confirmedPrice} onChange={e => setConfirmedPrice(e.target.value)} disabled={!priceDraft || actionBusy} />
+                      {priceError && <p role="alert">{priceError}</p>}
+                      {!priceDraft && !priceError && <p>Cargando formulario de financiación…</p>}
+                      <p>Al resolver se guarda este precio y se envía tu respuesta. El cliente deberá confirmar el resumen para presentar la solicitud; esto no aprueba el crédito.</p>
+                    </div>}
                     <textarea
                       className="conv-ctrl-textarea esc-reply-textarea"
                       rows={4}
@@ -1008,17 +1051,17 @@ export default function EscalationsQueue({ token, me }) {
                       required
                     />
 
-                    <label className="esc-teach-checkbox">
+                    {!isPriceCase && <label className="esc-teach-checkbox">
                       <input
                         type="checkbox"
                         checked={teachAgent && puedeEnsenarAlgo}
                         onChange={(e) => setTeachAgent(e.target.checked)}
-                        disabled={!puedeEnsenarAlgo}
+                        disabled={isPriceCase || !puedeEnsenarAlgo}
                       />
                       <span>
                         Guardar respuesta en la Base de Conocimiento (enseñar al asistente)
                       </span>
-                    </label>
+                    </label>}
 
                     {!puedeEnsenarAlgo && motivoNoEnsena && (
                       <p className="esc-subtle-note">
@@ -1155,9 +1198,9 @@ export default function EscalationsQueue({ token, me }) {
                     <button
                       type="submit"
                       className="esc-submit-primary"
-                      disabled={actionBusy || detailLoading}
+                      disabled={actionBusy || detailLoading || (isPriceCase && (!priceDraft || !!priceError || !(Number(confirmedPrice) > 0)))}
                     >
-                      Enviar respuesta y resolver caso
+                      {isPriceCase ? 'Confirmar precio, responder y resolver' : 'Enviar respuesta y resolver caso'}
                     </button>
                   </form>
 
