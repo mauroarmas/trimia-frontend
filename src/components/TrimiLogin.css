@@ -1,0 +1,234 @@
+/* ========================================================= */
+/* TRIMI LOGIN - ANIMACIONES E INTERACTIVIDAD              */
+/* ========================================================= */
+
+.trimi-login-scene {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  width: 195px;
+  height: 138px;
+  margin: 0 auto -12px; /* Se apoya exactamente sobre el borde blanco de la tarjeta */
+  z-index: 10;
+  pointer-events: none;
+  animation: trimi-peekaboo 720ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  transform-origin: bottom center;
+}
+
+/* ========================================================= */
+/* ENTRADA PEEKABOO CON REBOTE FLUIDO                       */
+/* ========================================================= */
+@keyframes trimi-peekaboo {
+  0% {
+    opacity: 0;
+    transform: translateY(68px) scale(0.82);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-8px) scale(1.04);
+  }
+  80% {
+    transform: translateY(2px) scale(0.99);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.trimi-login-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 6px 14px rgba(15, 23, 42, 0.09));
+}
+
+/* ========================================================= */
+/* GLOBO DE BIENVENIDA ("¡Qué bueno verte de nuevo!")        */
+/* ========================================================= */
+.trimi-login-bubble {
+  position: absolute;
+  top: -36px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  background: #ffffff;
+  color: #1e3a8a;
+  border: 1.5px solid #bfdbfe;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.14);
+  animation: trimi-bubble-in 420ms cubic-bezier(0.34, 1.56, 0.64, 1) 400ms both;
+  pointer-events: auto;
+}
+
+.trimi-login-bubble-arrow {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid #bfdbfe;
+}
+
+.trimi-login-bubble-arrow::after {
+  content: '';
+  position: absolute;
+  bottom: 1.5px;
+  left: -5px;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid #ffffff;
+}
+
+@keyframes trimi-bubble-in {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px) scale(0.85);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+/* ========================================================= */
+/* SALUDO ALEGRE (Brazo saludando y ondas)                   */
+/* ========================================================= */
+.trimi-arm-wave-active {
+  transform-origin: 163px 87px;
+  animation: trimi-hand-wave 1.1s ease-in-out infinite;
+}
+
+@keyframes trimi-hand-wave {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-14deg);
+  }
+}
+
+.trimi-wave-arc {
+  animation: trimi-wave-fade 1.1s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.trimi-wave-arc.arc-2 {
+  animation-delay: 0.18s;
+}
+
+@keyframes trimi-wave-fade {
+  0%, 100% {
+    opacity: 0.25;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+/* ========================================================= */
+/* ATENCIÓN AL ESCRIBIR EMAIL (Inclinación sutil)            */
+/* ========================================================= */
+.trimi-body-group {
+  transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: bottom center;
+}
+
+.trimi-body-group.leaning {
+  transform: translateY(2.5px) rotate(1.2deg);
+}
+
+.trimi-pupil {
+  transition: cx 120ms ease-out, cy 180ms ease-out;
+}
+
+/* ========================================================= */
+/* TAPA LOS OJOS (Contraseña)                                */
+/* ========================================================= */
+.trimi-arm-cover-left,
+.trimi-arm-cover-right {
+  animation: trimi-cover-eyes 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes trimi-cover-eyes {
+  0% {
+    transform: translateY(22px) scale(0.88);
+    opacity: 0.4;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.mode-covering_eyes .trimi-body-group {
+  animation: trimi-shy-wiggle 2.4s ease-in-out infinite alternate;
+}
+
+@keyframes trimi-shy-wiggle {
+  0% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-1.5deg);
+  }
+  100% {
+    transform: rotate(1.5deg);
+  }
+}
+
+/* ========================================================= */
+/* MODO ESPIAR (Show Password)                               */
+/* ========================================================= */
+.trimi-arm-peek-right {
+  animation: trimi-peek-down 300ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes trimi-peek-down {
+  0% {
+    transform: translateY(-8px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+/* ========================================================= */
+/* ACCESIBILIDAD (Reducción de movimiento)                  */
+/* ========================================================= */
+@media (prefers-reduced-motion: reduce) {
+  .trimi-login-scene,
+  .trimi-login-bubble,
+  .trimi-arm-wave-active,
+  .trimi-wave-arc,
+  .mode-covering_eyes .trimi-body-group,
+  .trimi-arm-cover-left,
+  .trimi-arm-cover-right,
+  .trimi-arm-peek-right {
+    animation: none !important;
+    transition: none !important;
+  }
+  .trimi-login-scene {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .trimi-login-bubble {
+    opacity: 1 !important;
+    transform: translateX(-50%) !important;
+  }
+}

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { login, getMe } from '../api';
+import TrimiLogin from './TrimiLogin';
 
 // Emails del seed (prisma/seed.ts). La contraseña de dev es única: trimia2026.
 const TEST_USERS = [
@@ -30,6 +31,8 @@ function TrimiaBrand({ className }) {
 export default function Login({ onLogin, showIntro = false }) {
   const [email, setEmail] = useState('diego.bazan@credimision.com');
   const [password, setPassword] = useState('trimia2026');
+  const [showPassword, setShowPassword] = useState(false);
+  const [focusedField, setFocusedField] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showEntryAnimation, setShowEntryAnimation] = useState(false);
@@ -56,10 +59,16 @@ export default function Login({ onLogin, showIntro = false }) {
   function handleQuickLogin(testEmail) {
     setEmail(testEmail);
     setError('');
+    // Al seleccionar un usuario de prueba, enfocamos visualmente el email brevemente
+    setFocusedField('email');
+    setTimeout(() => {
+      setFocusedField(null);
+    }, 1500);
   }
 
   return (
     <main className={`login-page${showIntro ? ' login-page-with-intro' : ''}`}>
+      {/* Luces y estrellas de ambiente sutiles fieles al mockup */}
       <div className="login-lights" aria-hidden="true">
         <span className="login-light login-light-one" />
         <span className="login-light login-light-two" />
@@ -69,66 +78,112 @@ export default function Login({ onLogin, showIntro = false }) {
         <span className="login-light login-light-six" />
         <span className="login-light login-light-seven" />
         <span className="login-light login-light-eight" />
+        {/* Estrellitas sutiles flotantes */}
+        <span className="login-star login-star-1">✦</span>
+        <span className="login-star login-star-2">✧</span>
+        <span className="login-star login-star-3">✦</span>
+        <span className="login-star login-star-4">✦</span>
       </div>
+
       {showIntro && <TrimiaBrand className="login-intro-brand" />}
       {showEntryAnimation && (
         <div className="login-entry-overlay" role="status" aria-label="Ingresando a TrimIA">
           <TrimiaBrand className="login-entry-brand" />
         </div>
       )}
-      <section className="login-card">
-        <div className="login-form-panel">
-          <img src="/logo-login.png" alt="TrimIA" className="login-logo" />
-          <div className="login-heading">
-            <h2>Iniciar sesión</h2>
-          </div>
-          <form onSubmit={handleSubmit}>
-            <div className="field">
-              <label htmlFor="login-email">Email</label>
-              <input
-                id="login-email"
-                type="email"
-                autoComplete="username"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="login-password">Contraseña</label>
-              <input
-                id="login-password"
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-            <button type="submit" className="login-submit" disabled={loading}>
-              {loading ? 'Entrando...' : 'Entrar'}
-            </button>
-          </form>
-          {error && <p className="error login-error">{error}</p>}
 
-          <details className="login-test-users">
-            <summary>Accesos de prueba por rol</summary>
-            <div className="login-test-users-grid">
-              {TEST_USERS.map((u) => (
-                <button
-                  key={u.email}
-                  type="button"
-                  className="secondary"
-                  onClick={() => handleQuickLogin(u.email)}
-                >
-                  {u.label}
-                </button>
-              ))}
+      {/* Contenedor central con Trimi asomándose en el borde superior */}
+      <div className="login-card-container">
+        <TrimiLogin
+          focusedField={focusedField}
+          emailValue={email}
+          showPassword={showPassword}
+        />
+
+        <section className="login-card">
+          <div className="login-form-panel">
+            <img src="/logo-login.png" alt="TrimIA" className="login-logo" />
+            <div className="login-heading">
+              <h2>Iniciar sesión</h2>
             </div>
-            <p className="login-test-users-hint">
-              Seleccioná un perfil para completar el email. Contraseña: <b>trimia2026</b>
-            </p>
-          </details>
-        </div>
-      </section>
+            <form onSubmit={handleSubmit}>
+              <div className="field">
+                <label htmlFor="login-email">Email</label>
+                <input
+                  id="login-email"
+                  type="email"
+                  autoComplete="username"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onFocus={() => setFocusedField('email')}
+                  onBlur={() => setFocusedField(null)}
+                  placeholder="tu.nombre@credimision.com"
+                />
+              </div>
+
+              <div className="field login-password-field">
+                <label htmlFor="login-password">Contraseña</label>
+                <div className="login-password-input-wrapper">
+                  <input
+                    id="login-password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onFocus={() => setFocusedField('password')}
+                    onBlur={() => setFocusedField(null)}
+                    placeholder="••••••••••••"
+                  />
+                  <button
+                    type="button"
+                    className="login-password-toggle"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                    aria-label={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                    tabIndex="-1"
+                  >
+                    {showPassword ? (
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                        <line x1="1" y1="1" x2="23" y2="23" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <button type="submit" className="login-submit" disabled={loading}>
+                {loading ? 'Entrando...' : 'Entrar'}
+              </button>
+            </form>
+            {error && <p className="error login-error">{error}</p>}
+
+            <details className="login-test-users">
+              <summary>Acceso de prueba por rol</summary>
+              <div className="login-test-users-grid">
+                {TEST_USERS.map((u) => (
+                  <button
+                    key={u.email}
+                    type="button"
+                    className="secondary"
+                    onClick={() => handleQuickLogin(u.email)}
+                  >
+                    {u.label}
+                  </button>
+                ))}
+              </div>
+              <p className="login-test-users-hint">
+                Seleccioná un perfil para completar el email. Contraseña: <b>trimia2026</b>
+              </p>
+            </details>
+          </div>
+        </section>
+      </div>
     </main>
   );
 }

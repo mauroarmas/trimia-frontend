@@ -1050,6 +1050,15 @@ export function updatePill(token, id, data) {
   });
 }
 
+/** Reordena las píldoras de un módulo formativo (supervisor). */
+export function reorderModulePills(token, moduleId, pillIds) {
+  return request(`/training/modules/${moduleId}/pills/reorder`, {
+    method: 'PUT',
+    token,
+    body: { pillIds },
+  });
+}
+
 /** Publica una píldora en borrador (supervisor). */
 export function publishPill(token, id) {
   return request(`/training/pills/${id}/publish`, {
@@ -1077,6 +1086,11 @@ export function resetEmployeeDiagnostic(token, employeeId) {
     method: 'POST',
     token,
   });
+}
+
+/** Obtiene el seguimiento de ingresantes y métricas de avance formativo (supervisor). */
+export function getSupervisorTracking(token) {
+  return request('/training/supervisor/tracking', { token });
 }
 
 
@@ -1167,6 +1181,15 @@ export function concludeSimulation(token, sessionId) {
   return request(`/training/simulations/${sessionId}/conclude`, {
     method: 'POST',
     token,
+  });
+}
+
+/** Solicita una pista pedagógica a Trimi orientada al objetivo pendiente. */
+export function requestSimulationHint(token, sessionId, goalDescription) {
+  return request(`/training/simulations/${sessionId}/hint`, {
+    method: 'POST',
+    token,
+    body: { goalDescription },
   });
 }
 
