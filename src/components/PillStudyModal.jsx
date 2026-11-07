@@ -7,7 +7,7 @@ import {
   verifyPillQuiz,
 } from '../api';
 
-export default function PillStudyModal({ token, pillId, onClose, onProgressUpdated }) {
+export default function PillStudyModal({ token, pillId, onClose, onProgressUpdated, onStartSimulation }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [pill, setPill] = useState(null);
@@ -418,6 +418,7 @@ export default function PillStudyModal({ token, pillId, onClose, onProgressUpdat
               </div>
             )}
 
+            {onStartSimulation && (!hasAudio || isAudioCompleted || pill.isExempted || pill.isCompleted) && <div style={{ display: 'flex', gap: 8, marginTop: 12 }}><button onClick={() => onStartSimulation('GUIDED')}>Práctica guiada</button><button className="secondary" onClick={() => onStartSimulation('FREE')}>Simulación libre</button></div>}
             {audioNotice && <p className="hint" role="status">{audioNotice}</p>}
             {/* Contenido Teórico */}
             <div

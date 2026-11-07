@@ -1,5 +1,7 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { getDiagnosticQuiz, submitDiagnostic } from '../api';
+import Trimi from './Trimi';
+import TrainingIcon from './TrainingIcon';
 
 export default function DiagnosticQuizModal({ token, onClose, onComplete }) {
   const [loading, setLoading] = useState(true);
@@ -35,7 +37,7 @@ export default function DiagnosticQuizModal({ token, onClose, onComplete }) {
     };
   }, [token]);
 
-  // Timer countdown
+  // Contador de 5 minutos
   useEffect(() => {
     if (loading || alreadyCompleted || result || !quizData || quizData.questions?.length === 0) {
       return;
@@ -52,7 +54,7 @@ export default function DiagnosticQuizModal({ token, onClose, onComplete }) {
     return () => clearInterval(interval);
   }, [loading, alreadyCompleted, result, quizData]);
 
-  const questionKey = (question) => question.pillId + ':' + question.questionId;
+  const questionKey = question => question.pillId + ':' + question.questionId;
   const questions = quizData?.questions || [];
   const currentQ = questions[currentIndex];
   const allAnswered = questions.length > 0 && questions.every((q) => selectedAnswers[questionKey(q)] !== undefined);
@@ -64,23 +66,30 @@ export default function DiagnosticQuizModal({ token, onClose, onComplete }) {
     }));
   };
 
-  const handleSubmit = async () => {
-    if (!allAnswered || submitting) return;
-    setSubmitting(true);
-    setError(null);
-    try {
-      const answers = questions.map((q) => ({
-        pillId: q.pillId,
-        questionId: q.questionId,
-        selectedOptionIndex: selectedAnswers[questionKey(q)],
-      }));
-      const res = await submitDiagnostic(token, answers);
-      setResult(res);
-      if (onComplete) onComplete(res);
-    } catch (err) {
-      setError(err.message || 'Error al calificar el diagnóstico');
-    } finally {
-      setSubmitting(false);
+  const handleNextOrSubmit = async () => {
+    if (!currentQ || submitting || selectedAnswers[questionKey(currentQ)] === undefined) return;
+
+    if (currentIndex < questions.length - 1) {
+      setCurrentIndex((prev) => prev + 1);
+    } else {
+      // Enviar diagnóstico
+      setSubmitting(true);
+      setError(null);
+      try {
+        const answers = questions.map((q) => ({
+          pillId: q.pillId,
+          questionId: q.questionId,
+          // 999 se usa para "Todavía no lo sé" (no rompe @Min(0) del backend y computa como incorrecto)
+          selectedOptionIndex: selectedAnswers[questionKey(q)] !== undefined ? selectedAnswers[questionKey(q)] : 999,
+        }));
+        const res = await submitDiagnostic(token, answers);
+        setResult(res);
+        if (onComplete) onComplete(res);
+      } catch (err) {
+        setError(err.message || 'Error al calificar el diagnóstico');
+      } finally {
+        setSubmitting(false);
+      }
     }
   };
 
@@ -90,223 +99,493 @@ export default function DiagnosticQuizModal({ token, onClose, onComplete }) {
     return `${mins}:${s < 10 ? '0' : ''}${s}`;
   };
 
+  // Mapeo de módulos para la barra inferior "Cómo vas por tema" (Captura 2)
+  const uniqueModules = [];
+  if (questions.length > 0) {
+    const seen = new Set();
+    questions.forEach((q) => {
+      if (!seen.has(q.moduleId)) {
+        seen.add(q.moduleId);
+        const moduleQuestions = questions.filter((item) => item.moduleId === q.moduleId);
+        const answeredCount = moduleQuestions.filter((item) => selectedAnswers[questionKey(item)] !== undefined).length;
+        uniqueModules.push({
+          id: q.moduleId,
+          title: q.moduleTitle,
+          total: moduleQuestions.length,
+          answered: answeredCount,
+        });
+      }
+    });
+  }
+
   return (
-    <div className="modal-overlay diagnostic-quiz-overlay">
-      <div className="modal-content diagnostic-quiz-modal">
+    <div className="modal-overlay diagnostic-quiz-overlay" style={{ background: 'rgba(23, 48, 90, 0.45)', backdropFilter: 'blur(3px)' }}>
+      <div
+        className="modal-content diagnostic-quiz-modal"
+        style={{
+          maxWidth: result ? 780 : 880,
+          width: '94vw',
+          borderRadius: 16,
+          padding: 0,
+          overflow: 'hidden',
+          background: '#ffffff',
+          boxShadow: '0 20px 45px rgba(23, 48, 90, 0.16)',
+        }}
+      >
         {loading && (
-          <div style={{ textAlign: 'center', padding: '30px 0' }}>
-            <p>Cargando evaluación diagnóstica inicial...</p>
+          <div style={{ textAlign: 'center', padding: '50px 20px' }}>
+            <p style={{ color: '#64748B' }}>Cargando evaluación diagnóstica inicial...</p>
           </div>
         )}
 
         {alreadyCompleted && (
-          <div>
-            <h3>Evaluación Diagnóstica ya Realizada</h3>
-            <p className="hint" style={{ marginTop: 8 }}>
-              Ya has completado previamente tu evaluación diagnóstica inicial.
-              Si necesitas volver a rendirla por algún cambio de área o solicitud especial, consulta con tu supervisor para que realice un reinicio de tu diagnóstico.
+          <div style={{ padding: 32 }}>
+            <h3 style={{ margin: '0 0 10px', color: '#17305A' }}>Evaluación diagnóstica ya realizada</h3>
+            <p className="hint" style={{ margin: 0 }}>
+              Ya completaste tu evaluación diagnóstica inicial. Tu ruta de aprendizaje ya está configurada según tus respuestas y exenciones.
             </p>
             <div style={{ marginTop: 24, textAlign: 'right' }}>
-              <button onClick={onClose}>Cerrar</button>
+              <button type="button" onClick={onClose} style={{ background: '#2B6FC0', color: '#fff', border: 'none', padding: '9px 20px', borderRadius: 8, cursor: 'pointer' }}>
+                Ir a mi ruta
+              </button>
             </div>
           </div>
         )}
 
         {!loading && !alreadyCompleted && error && !result && (
-          <div>
-            <h3>Atención</h3>
-            <p className="error" style={{ margin: '16px 0' }}>{error}</p>
+          <div style={{ padding: 32 }}>
+            <h3 style={{ margin: '0 0 10px', color: '#17305A' }}>Atención</h3>
+            <p className="error" style={{ margin: '14px 0' }}>{error}</p>
             <div style={{ textAlign: 'right' }}>
-              <button onClick={onClose}>Cerrar</button>
+              <button type="button" className="secondary" onClick={onClose}>
+                Cerrar
+              </button>
             </div>
           </div>
         )}
 
-        {!loading && !alreadyCompleted && !result && quizData && (
+        {/* CUESTIONARIO CONVERSADO (Captura 2) */}
+        {!loading && !alreadyCompleted && !result && quizData && questions.length > 0 && currentQ && (
           <div>
-            {questions.length === 0 ? (
+            {/* Header: Diagnóstico inicial, título, timer y contador */}
+            <div
+              style={{
+                padding: '24px 30px 18px',
+                borderBottom: '1px solid #E2E8F0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 12,
+              }}
+            >
               <div>
-                <h3>Diagnóstico Inicial</h3>
-                <p className="hint">No hay preguntas de diagnóstico disponibles actualmente para tu sector.</p>
-                <div style={{ marginTop: 20, textAlign: 'right' }}>
-                  <button onClick={onClose}>Cerrar</button>
-                </div>
+                <span
+                  style={{
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    color: '#2B6FC0',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.08em',
+                  }}
+                >
+                  Diagnóstico Inicial
+                </span>
+                <h2
+                  style={{
+                    margin: '3px 0 0',
+                    fontSize: 22,
+                    fontWeight: 700,
+                    color: '#17305A',
+                    fontFamily: 'var(--font-title, "Lexend", sans-serif)',
+                  }}
+                >
+                  Veamos qué ya sabés
+                </h2>
               </div>
-            ) : (
-              <div className="diagnostic-quiz-content">
-                <div className="diagnostic-quiz-header">
-                  <div>
-                    <h3>Evaluación Diagnóstica Inicial</h3>
-                    <span className="diagnostic-quiz-counter">Pregunta {currentIndex + 1} de {questions.length}</span>
-                  </div>
-                  <div
-                    className={`diagnostic-quiz-timer${secondsRemaining < 60 ? ' is-warning' : ''}`}
-                  >
-                    ⏱ {formatTimer(secondsRemaining)}
-                  </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '6px 12px',
+                    borderRadius: 20,
+                    background: secondsRemaining < 60 ? '#FEF2F2' : '#F8FAFC',
+                    border: `1px solid ${secondsRemaining < 60 ? '#FECACA' : '#E2E8F0'}`,
+                    color: secondsRemaining < 60 ? '#DC2626' : '#64748B',
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                  }}
+                >
+                  <TrainingIcon type="clock" size={14} />
+                  <span>Quedan {formatTimer(secondsRemaining)}</span>
+                </span>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '6px 14px',
+                    borderRadius: 20,
+                    background: '#EEF5FC',
+                    color: '#2B6FC0',
+                    border: '1px solid #CFE0F3',
+                    fontSize: 12.5,
+                    fontWeight: 700,
+                  }}
+                >
+                  Pregunta {currentIndex + 1} de {questions.length}
+                </span>
+              </div>
+            </div>
+
+            {/* Cuerpo de 2 Columnas (Trimi piensa a la izquierda, Pregunta a la derecha) */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'minmax(220px, 260px) 1fr',
+                gap: 28,
+                padding: '24px 30px',
+                background: '#FAFCFE',
+              }}
+            >
+              {/* Columna Izquierda: Trimi en "piensa" con globo de diálogo */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div
+                  style={{
+                    background: '#EEF5FC',
+                    borderRadius: 14,
+                    padding: '22px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: '1px solid #CFE0F3',
+                  }}
+                >
+                  <Trimi mood="piensa" size={110} />
                 </div>
 
-                {/* Barra de progreso */}
-                <div className="diagnostic-quiz-progress">
-                  <div
+                <div
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #CFE0F3',
+                    borderRadius: 12,
+                    padding: '16px 18px',
+                    boxShadow: '0 2px 6px rgba(43, 111, 192, 0.04)',
+                  }}
+                >
+                  <p
                     style={{
-                      width: `${((currentIndex + 1) / questions.length) * 100}%`,
-                      height: '100%',
-                      backgroundColor: 'var(--primary)',
-                      borderRadius: 3,
-                      transition: 'width 0.2s',
+                      margin: 0,
+                      fontSize: 12.5,
+                      lineHeight: 1.6,
+                      color: '#17305A',
+                      textAlign: 'justify',
+                      hyphens: 'auto',
                     }}
-                  />
-                </div>
-
-                {/* Pregunta Actual */}
-                <div className="card diagnostic-question-card">
-                  <div className="diagnostic-question-meta">
-                    <span className="badge">{currentQ.moduleTitle}</span>
-                    <span className="diagnostic-question-pill">{currentQ.pillTitle}</span>
-                  </div>
-                  <h4 className="diagnostic-question-title">{currentQ.question}</h4>
-
-                  <div className="diagnostic-options">
-                    {currentQ.options.map((option, idx) => {
-                      const isSelected = selectedAnswers[questionKey(currentQ)] === idx;
-                      return (
-                        <label
-                          key={idx}
-                          className={`diagnostic-option${isSelected ? ' is-selected' : ''}`}
-                        >
-                          <input
-                            type="radio"
-                            name={questionKey(currentQ)}
-                            checked={isSelected}
-                            onChange={() => handleSelectOption(currentQ, idx)}
-                          />
-                          <span>{option}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Navegación y Finalización */}
-                <div className="diagnostic-quiz-navigation">
-                  <button
-                    className="secondary"
-                    disabled={currentIndex === 0}
-                    onClick={() => setCurrentIndex((prev) => prev - 1)}
                   >
-                    ← Anterior
-                  </button>
-
-                  <div>
-                    {currentIndex < questions.length - 1 ? (
-                      <button
-                        onClick={() => setCurrentIndex((prev) => prev + 1)}
-                        disabled={selectedAnswers[questionKey(currentQ)] === undefined}
-                      >
-                        Siguiente →
-                      </button>
-                    ) : (
-                      <button
-                        onClick={handleSubmit}
-                        disabled={!allAnswered || submitting}
-                        style={{ backgroundColor: 'var(--success)', borderColor: 'var(--success)' }}
-                      >
-                        {submitting ? 'Evaluando...' : 'Finalizar y Calificar'}
-                      </button>
-                    )}
-                  </div>
+                    Tomate tu tiempo, esto no es un examen. Me sirve para no hacerte repetir lo que ya sabés. Si no sabés una respuesta, elegí «Todavía no lo sé» y lo vemos juntos en tu ruta.
+                  </p>
                 </div>
               </div>
-            )}
+
+              {/* Columna Derecha: Tarjeta de Pregunta y Opciones */}
+              <div
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: 14,
+                  padding: '22px 24px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                }}
+              >
+                {/* Chip de Área / Módulo */}
+                <div style={{ marginBottom: 12 }}>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      padding: '3px 10px',
+                      borderRadius: 12,
+                      background: '#F1F5F9',
+                      color: '#475569',
+                      border: '1px solid #E2E8F0',
+                    }}
+                  >
+                    {currentQ.moduleTitle} · {currentQ.pillTitle}
+                  </span>
+                </div>
+
+                {/* Pregunta */}
+                <h3
+                  style={{
+                    margin: '0 0 18px',
+                    fontSize: 16,
+                    fontWeight: 700,
+                    color: '#17305A',
+                    lineHeight: 1.45,
+                  }}
+                >
+                  {currentQ.question}
+                </h3>
+
+                {/* Opciones con radio button real */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+                  {currentQ.options.map((option, idx) => {
+                    const isSelected = selectedAnswers[questionKey(currentQ)] === idx;
+                    return (
+                      <label
+                        key={idx}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                          padding: '11px 14px',
+                          borderRadius: 8,
+                          border: `1.5px solid ${isSelected ? '#2B6FC0' : '#E2E8F0'}`,
+                          background: isSelected ? '#EEF5FC' : '#ffffff',
+                          color: isSelected ? '#17305A' : '#334155',
+                          fontSize: 13.5,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <input
+                          type="radio"
+                          name={`q_${currentQ.questionId}`}
+                          checked={isSelected}
+                          onChange={() => handleSelectOption(currentQ, idx)}
+                          style={{ margin: 0, accentColor: '#2B6FC0', width: 17, height: 17 }}
+                        />
+                        <span>{option}</span>
+                      </label>
+                    );
+                  })}
+
+                  {/* Opción "Todavía no lo sé" (Captura 2) */}
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      padding: '11px 14px',
+                      borderRadius: 8,
+                      border: `1.5px solid ${selectedAnswers[questionKey(currentQ)] === 999 ? '#2B6FC0' : '#E2E8F0'}`,
+                      background: selectedAnswers[questionKey(currentQ)] === 999 ? '#EEF5FC' : '#F8FAFC',
+                      color: selectedAnswers[questionKey(currentQ)] === 999 ? '#17305A' : '#64748B',
+                      fontSize: 13.5,
+                      cursor: 'pointer',
+                      fontStyle: 'italic',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name={`q_${currentQ.questionId}`}
+                      checked={selectedAnswers[questionKey(currentQ)] === 999}
+                      onChange={() => handleSelectOption(currentQ, 999)}
+                      style={{ margin: 0, accentColor: '#2B6FC0', width: 17, height: 17 }}
+                    />
+                    <span>Todavía no lo sé</span>
+                  </label>
+                </div>
+
+                {/* Botón Responder */}
+                <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                  {currentIndex > 0 && (
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => setCurrentIndex((prev) => prev - 1)}
+                      style={{ padding: '9px 18px', fontSize: 13, minHeight: 44 }}
+                    >
+                      Anterior
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleNextOrSubmit}
+                    disabled={selectedAnswers[questionKey(currentQ)] === undefined || submitting}
+                    style={{
+                      background: '#2B6FC0',
+                      color: '#ffffff',
+                      border: 'none',
+                      padding: '10px 24px',
+                      borderRadius: 8,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      minHeight: 44,
+                    }}
+                  >
+                    {submitting
+                      ? 'Evaluando...'
+                      : currentIndex === questions.length - 1
+                      ? 'Finalizar y Calificar'
+                      : 'Responder'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Barra Inferior: "Cómo vas por tema" (Captura 2) */}
+            <div
+              style={{
+                padding: '16px 30px',
+                borderTop: '1px solid #E2E8F0',
+                background: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 12,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#17305A' }}>
+                  Cómo vas por tema:
+                </span>
+                {uniqueModules.map((m) => (
+                  <span
+                    key={m.id}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontSize: 12,
+                      color: m.answered === m.total ? '#05968D' : '#64748B',
+                      fontWeight: 500,
+                    }}
+                  >
+                    <TrainingIcon
+                      type={m.answered === m.total ? 'check' : 'clock'}
+                      size={13}
+                      style={{ color: m.answered === m.total ? '#05968D' : '#94A3B8' }}
+                    />
+                    <span>{m.title}: {m.answered} de {m.total}</span>
+                  </span>
+                ))}
+              </div>
+
+              <span style={{ fontSize: 11, color: '#64748B', fontStyle: 'italic' }}>
+                Con todo bien en un tema, esa parada queda eximida.
+              </span>
+            </div>
           </div>
         )}
 
         {/* Modal de Resultados */}
         {result && (
-          <div style={{ textAlign: 'center', padding: '10px 0' }}>
-            <div style={{ fontSize: 44, marginBottom: 8 }}>🎯</div>
-            <h3 style={{ margin: '0 0 8px' }}>¡Diagnóstico Completado!</h3>
-            <p className="hint">Tus respuestas fueron evaluadas automáticamente.</p>
+          <div style={{ padding: '36px 36px 28px', textAlign: 'center' }}>
+            <div style={{ marginBottom: 16 }}>
+              <Trimi mood={result.exemptedModules?.length > 0 ? 'festeja' : 'saluda'} size={90} />
+            </div>
+
+            <h3 style={{ margin: '0 0 6px', fontSize: 22, color: '#17305A', fontFamily: 'var(--font-title, "Lexend", sans-serif)' }}>
+              ¡Diagnóstico completado!
+            </h3>
+            <p className="hint" style={{ margin: '0 auto 20px', maxWidth: 540 }}>
+              Evaluamos tus conocimientos previos para optimizar tu ruta formativa y eximirte de las paradas que ya dominás.
+            </p>
 
             <div
               style={{
-                display: 'inline-block',
-                margin: '16px auto',
-                padding: '16px 28px',
+                display: 'inline-flex',
+                gap: 20,
+                alignItems: 'center',
+                padding: '14px 28px',
                 borderRadius: 12,
-                backgroundColor: result.score >= 80 ? 'var(--success-bg)' : 'var(--bg)',
-                border: `1px solid ${result.score >= 80 ? 'var(--success)' : 'var(--border)'}`,
+                backgroundColor: '#EEF5FC',
+                border: '1px solid #CFE0F3',
+                marginBottom: 24,
               }}
             >
-              <div style={{ fontSize: 32, fontWeight: 700, color: result.score >= 80 ? 'var(--success)' : 'var(--primary)' }}>
-                {result.score}%
+              <div>
+                <span style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 700, color: '#2B6FC0' }}>Aciertos</span>
+                <div style={{ fontSize: 22, fontWeight: 700, color: '#17305A' }}>
+                  {result.correctAnswers} / {result.totalQuestions}
+                </div>
               </div>
-              <div className="hint">
-                {result.correctAnswers} de {result.totalQuestions} aciertos
+              <div style={{ width: 1, height: 32, background: '#CFE0F3' }} />
+              <div>
+                <span style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 700, color: '#2B6FC0' }}>Puntaje global</span>
+                <div style={{ fontSize: 22, fontWeight: 700, color: '#2B6FC0' }}>
+                  {result.score}%
+                </div>
               </div>
             </div>
 
-            {/* Módulos Eximidos */}
-            <div style={{ textAlign: 'left', marginTop: 16 }}>
-              <h4>Módulos Eximidos (100% de Aciertos)</h4>
+            {/* Paradas Eximidas */}
+            <div style={{ textAlign: 'left', marginBottom: 20 }}>
+              <h4 style={{ margin: '0 0 10px', fontSize: 14, color: '#17305A', fontWeight: 700 }}>
+                Paradas eximidas (100% de aciertos)
+              </h4>
               {result.exemptedModules?.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {result.exemptedModules.map((m) => (
                     <div
                       key={m.id}
                       style={{
-                        padding: '8px 12px',
-                        backgroundColor: 'var(--success-bg)',
-                        border: '1px solid var(--success)',
-                        borderRadius: 6,
+                        padding: '10px 14px',
+                        backgroundColor: '#ECFDF5',
+                        border: '1px solid #A7F3EE',
+                        borderRadius: 8,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
                       }}
                     >
-                      <span style={{ fontWeight: 600, color: 'var(--success)' }}>✓ {m.title}</span>
-                      <span className="badge" style={{ backgroundColor: 'var(--success)', color: '#fff' }}>
-                        Eximido
+                      <span style={{ fontWeight: 600, color: '#05968D', fontSize: 13.5, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <TrainingIcon type="check" size={15} style={{ color: '#05968D' }} />
+                        <span>{m.title}</span>
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: '2px 8px',
+                          borderRadius: 10,
+                          background: '#05968D',
+                          color: '#ffffff',
+                        }}
+                      >
+                        Eximida
                       </span>
                     </div>
                   ))}
-                  <p className="hint" style={{ fontSize: 12, marginTop: 4 }}>
-                    🌟 Has demostrado dominio total de estos módulos. Sus lecciones quedan aprobadas automáticamente para desbloquear temas avanzados, con acceso libre de lectura.
+                  <p style={{ fontSize: 12, color: '#05968D', margin: '4px 0 0' }}>
+                    Demostraste dominio de estos temas. Te quedan habilitadas para libre repaso.
                   </p>
                 </div>
               ) : (
-                <p className="hint">No alcanzaste el 100% en ningún módulo completo para exención directa.</p>
+                <p className="hint" style={{ margin: 0 }}>
+                  No alcanzaste el 100% en ningún módulo completo para exención directa; vas a poder cursar cada parada a tu ritmo.
+                </p>
               )}
             </div>
 
-            {/* Módulos Pendientes */}
-            {result.pendingModules?.length > 0 && (
-              <div style={{ textAlign: 'left', marginTop: 16 }}>
-                <h4>Módulos a Cursar</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {result.pendingModules.map((m) => (
-                    <div
-                      key={m.id}
-                      style={{
-                        padding: '8px 12px',
-                        backgroundColor: 'var(--bg)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 6,
-                      }}
-                    >
-                      <span>• {m.title}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div style={{ marginTop: 24, textAlign: 'center' }}>
-              <button onClick={onClose} style={{ width: '100%' }}>
-                Ir a mi Ruta de Capacitación
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                width: '100%',
+                background: '#2B6FC0',
+                color: '#ffffff',
+                border: 'none',
+                padding: '12px 20px',
+                borderRadius: 8,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: 'pointer',
+                minHeight: 44,
+              }}
+            >
+              Comenzar mi ruta de aprendizaje →
+            </button>
           </div>
         )}
       </div>
