@@ -10,6 +10,8 @@ import {
 } from '../api';
 import ConversationControls from './ConversationControls';
 import ConversationThread, { MessageActorAvatar } from './ConversationThread';
+import ChatExportMenu from './ChatExportMenu';
+import { buildConversationMarkdown, buildTimelineMarkdown } from '../chatExport';
 import {
   AGENT_META,
   STATUS_LABELS,
@@ -975,14 +977,29 @@ function ConversationDetailModal({ token, me, conversation, onRefresh, onClose, 
               {conversation.messages?.length ?? 0} mensajes registrados
             </p>
           </div>
-          <button
-            type="button"
-            className="econ-modal-close"
-            onClick={onClose}
-            aria-label="Cerrar conversación"
-          >
-            ✕
-          </button>
+          <div className="econ-modal-actions">
+            <ChatExportMenu
+              variant="inverse"
+              filename={`conversacion-${displayName}`}
+              disabled={(conversation.messages?.length ?? 0) === 0}
+              getMarkdown={() =>
+                buildConversationMarkdown({
+                  title: `Conversación con ${displayName}`,
+                  contactLabel: displayName,
+                  conversation,
+                  me,
+                })
+              }
+            />
+            <button
+              type="button"
+              className="econ-modal-close"
+              onClick={onClose}
+              aria-label="Cerrar conversación"
+            >
+              ✕
+            </button>
+          </div>
         </header>
 
         <div className="econ-modal-body sup-conv-modal-body">
@@ -1047,14 +1064,22 @@ function ContactTimelineModal({ data, onClose }) {
               ).
             </p>
           </div>
-          <button
-            type="button"
-            className="econ-modal-close"
-            onClick={onClose}
-            aria-label="Cerrar línea de tiempo"
-          >
-            ✕
-          </button>
+          <div className="econ-modal-actions">
+            <ChatExportMenu
+              variant="inverse"
+              filename={`historial-${data.contact.externalId}`}
+              disabled={(data.timeline?.length ?? 0) === 0}
+              getMarkdown={() => buildTimelineMarkdown({ data })}
+            />
+            <button
+              type="button"
+              className="econ-modal-close"
+              onClick={onClose}
+              aria-label="Cerrar línea de tiempo"
+            >
+              ✕
+            </button>
+          </div>
         </header>
 
         <div className="econ-modal-body sup-conv-modal-body">

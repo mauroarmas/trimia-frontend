@@ -18,6 +18,8 @@ const STAGE_TONES = {
 };
 
 const FIELDS = {
+  business: 'comercio',
+  locality: 'localidad',
   name: 'nombre',
   dni: 'DNI',
   product: 'producto',
@@ -257,7 +259,7 @@ export default function FinancingDraftEditor({ token, me, conversation, onOpenFi
 
           {!canEditAmount && <>
             <p className="fin-draft-disclaimer">
-              {request?.financing ? `Plan registrado: ${request.financing.quotaCount} cuotas. Consultá los vencimientos en Financiación o Cobranzas.` : request?.closedAt ? `Cierre registrado el ${new Date(request.closedAt).toLocaleString('es-AR')}. El plan de cuotas se registra por separado.` : request?.status === 'APPROVED' ? 'La financiación está aprobada. Ventas puede registrar el cierre cuando acuerde la compra.' : draft.stage === 'SUBMITTED' ? 'La solicitud ya está presentada; no hace falta volver a confirmar los mismos datos.' : 'El cliente debe confirmar el resumen actualizado para presentar la solicitud.'}
+              {request?.commercialFlow ? 'El pedido continúa en Administración y en la ficha de Cierres de venta. El agente recopila la elección y la confirmación del cliente; el cierre registra las cuotas acordadas.' : request?.financing ? `Plan registrado: ${request.financing.quotaCount} cuotas. Consultá los vencimientos en Financiación o Cobranzas.` : request?.closedAt ? `Cierre registrado el ${new Date(request.closedAt).toLocaleString('es-AR')}. El plan de cuotas se registra por separado.` : request?.status === 'APPROVED' ? 'La financiación está aprobada. Ventas puede registrar el cierre cuando acuerde la compra.' : draft.stage === 'SUBMITTED' ? 'La solicitud ya está presentada; no hace falta volver a confirmar los mismos datos.' : 'El cliente debe confirmar el resumen actualizado para presentar la solicitud.'}
             </p>
             {request && canReview && onOpenFinancing && <button type="button" className="secondary" onClick={() => onOpenFinancing(request.id)}>Ver solicitud de financiación</button>}
           </>}

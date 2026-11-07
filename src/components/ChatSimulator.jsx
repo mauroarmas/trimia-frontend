@@ -6,6 +6,8 @@ import {
   openConversationStream,
 } from '../api';
 import { AGENT_META, buildConversationFeed } from '../conversationHelpers';
+import { buildConversationMarkdown } from '../chatExport';
+import ChatExportMenu from './ChatExportMenu';
 import { MessageActorAvatar } from './ConversationThread';
 import InfoNotes, { InfoToggle } from './InfoNotes';
 import PageHero from './PageHero';
@@ -538,6 +540,21 @@ export default function ChatSimulator({ token, me }) {
                   ? 'Conectando…'
                   : 'Listo'}
             </span>
+
+            <ChatExportMenu
+              filename={`simulacion-${phone.trim() || 'chat'}`}
+              disabled={!hayContenido}
+              getMarkdown={() =>
+                buildConversationMarkdown({
+                  title: `Simulación de Chat — ${phone.trim() || 'Contacto'}`,
+                  contactLabel: phone.trim() || undefined,
+                  conversation,
+                  messages,
+                  optimisticMessages,
+                  me,
+                })
+              }
+            />
           </div>
         </header>
 

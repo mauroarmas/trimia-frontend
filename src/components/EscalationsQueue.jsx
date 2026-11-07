@@ -23,6 +23,8 @@ import ConversationControls from './ConversationControls';
 import FinancingDraftEditor from './FinancingDraftEditor';
 import CommercialCasePanel from './CommercialCasePanel';
 import ConversationThread from './ConversationThread';
+import ChatExportMenu from './ChatExportMenu';
+import { buildConversationMarkdown } from '../chatExport';
 import {
   AGENT_META,
   contactInitials,
@@ -963,11 +965,37 @@ export default function EscalationsQueue({ token, me, onOpenFinancing }) {
                   </h3>
                   <p>Historial completo con el contacto e intervenciones previas.</p>
                 </div>
-                {selected.consultasPosteriores?.length > 0 && (
-                  <span className="esc-waiting-badge">
-                    +{selected.consultasPosteriores.length} mientras esperaba
-                  </span>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {selected.consultasPosteriores?.length > 0 && (
+                    <span className="esc-waiting-badge">
+                      +{selected.consultasPosteriores.length} mientras esperaba
+                    </span>
+                  )}
+                  <ChatExportMenu
+                    filename={`escalado-${
+                      conversation?.client?.name ||
+                      conversation?.externalId ||
+                      selected.id
+                    }`}
+                    disabled={!conversation?.messages?.length}
+                    getMarkdown={() =>
+                      buildConversationMarkdown({
+                        title: `Caso escalado — ${
+                          conversation?.client?.name ||
+                          conversation?.externalId ||
+                          'Contacto'
+                        }`,
+                        contactLabel:
+                          conversation?.client?.name || conversation?.externalId,
+                        conversation,
+                        me,
+                        extraMeta: [
+                          ['Motivo de escalamiento', formatEscalationReason(selected.reason)],
+                        ],
+                      })
+                    }
+                  />
+                </div>
               </div>
 
               {conversation ? (

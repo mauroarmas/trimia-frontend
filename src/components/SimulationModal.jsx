@@ -5,6 +5,8 @@ import {
   sendSimulationMessage,
   concludeSimulation,
 } from '../api';
+import ChatExportMenu from './ChatExportMenu';
+import { buildTrainingSimulationMarkdown } from '../chatExport';
 
 export default function SimulationModal({
   token,
@@ -219,6 +221,23 @@ export default function SimulationModal({
                 {concluding ? 'Evaluando...' : '🏁 Finalizar Simulación'}
               </button>
             )}
+            <ChatExportMenu
+              filename={`practica-${currentPillTitle}`}
+              disabled={messages.length === 0}
+              getMarkdown={() =>
+                buildTrainingSimulationMarkdown({
+                  title: `${
+                    mode === 'GUIDED' ? 'Práctica Guiada' : 'Simulación Libre'
+                  } — ${currentPillTitle}`,
+                  mode,
+                  customerName: session?.customerName,
+                  scenarioTitle: session?.scenarioTitle,
+                  messages,
+                  goals,
+                  feedback,
+                })
+              }
+            />
             <button
               onClick={onClose}
               style={{

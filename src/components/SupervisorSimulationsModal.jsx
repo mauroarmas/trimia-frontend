@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getEmployeeSimulations, getSimulation } from '../api';
+import ChatExportMenu from './ChatExportMenu';
+import { buildTrainingSimulationMarkdown } from '../chatExport';
 
 export default function SupervisorSimulationsModal({ token, employeeId, employeeName, onClose }) {
   const [loading, setLoading] = useState(true);
@@ -246,7 +248,27 @@ export default function SupervisorSimulationsModal({ token, employeeId, employee
 
                 {/* Transcripción Completa */}
                 <div className="card" style={{ margin: 0, padding: 12, flex: 1 }}>
-                  <h5 style={{ margin: '0 0 10px', fontSize: 13 }}>Transcripción de la Conversación</h5>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <h5 style={{ margin: 0, fontSize: 13 }}>Transcripción de la Conversación</h5>
+                    <ChatExportMenu
+                      filename={`simulacion-${employeeName || 'empleado'}-${selectedSimulation.pill?.title || selectedSimulation.id}`}
+                      disabled={!selectedSimulation.messages?.length}
+                      getMarkdown={() =>
+                        buildTrainingSimulationMarkdown({
+                          title: `Simulación de ${employeeName || 'Empleado'} — ${
+                            selectedSimulation.pill?.title || 'Práctica'
+                          }`,
+                          mode: selectedSimulation.mode,
+                          employeeName,
+                          customerName: selectedSimulation.customerName,
+                          scenarioTitle: selectedSimulation.scenarioTitle,
+                          messages: selectedSimulation.messages || [],
+                          goals: selectedSimulation.goals || [],
+                          feedback: selectedSimulation.feedback || null,
+                        })
+                      }
+                    />
+                  </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {selectedSimulation.messages?.map((msg) => {
                       const isEmployee = msg.sender === 'EMPLOYEE';

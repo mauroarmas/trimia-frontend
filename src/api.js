@@ -1267,3 +1267,11 @@ export const retryFinancingNotice = (token, id, expectedVersion) => request(`/sa
 export function createFinancingPlan(token, id, body) {
   return request(`/sales/financing/requests/${id}/plan`, { token, method: 'POST', body });
 }
+
+export const listCommercialOrders = token => request('/sales/commercial/orders', { token });
+export const getCommercialOrder = (token, id) => request(`/sales/commercial/orders/${id}`, { token });
+export const getCommercialOffers = (token, id) => request(`/sales/commercial/orders/${id}/offers`, { token });
+export const reviewCommercialOrder = (token, id, body) => request(`/sales/commercial/orders/${id}/review`, { method: 'POST', token, body });
+export const renewCommercialOrder = (token, id, body) => request(`/sales/commercial/orders/${id}/renew`, { method: 'POST', token, body });
+export const editCommercialOrder = (token, id, body) => request(`/sales/commercial/orders/${id}/edit`, { method: 'POST', token, body });
+export const closeCommercialOrder = (token, id, body) => request(`/sales/commercial/orders/${id}/close`, { method: 'POST', token, body });

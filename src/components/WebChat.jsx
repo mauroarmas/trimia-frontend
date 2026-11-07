@@ -17,45 +17,29 @@ import {
   ordenarCandidatos,
   puedeEscribirEn,
 } from '../areas';
+import { AGENT_META, buildConversationFeed } from '../conversationHelpers';
+import { MessageActorAvatar } from './ConversationThread';
 import InfoNotes, { InfoToggle } from './InfoNotes';
 import PageHero from './PageHero';
+import { buildConversationMarkdown } from '../chatExport';
+import ChatExportMenu from './ChatExportMenu';
 
-/**
- * Dónde se recuerda la conversación entre recargas.
- *
- * Sin esto, recargar la página perdía el `convId` y no había forma de volver a
- * engancharse al hilo: el backend no expone "dame mi conversación actual", el id
- * solo sale al enviar un mensaje. Y justamente el caso que más importa demostrar
- * —que la respuesta de un supervisor llega sola— pide tener el chat abierto sin
- * escribir nada.
- */
-/**
- * La clave lleva el id de la persona.
- *
- * Con una clave única para todo el panel, cambiar de usuario en el mismo navegador
- * dejaba el `convId` del anterior: la pantalla arrancaba pidiendo una conversación
- * ajena y el backend contestaba 403 —correctamente— con un cartel de error apenas
- * entrabas. Se recupera solo, pero es un susto gratis y ensucia la consola.
- */
 const claveDeConversacion = (employeeId) =>
   `trimia:webchat:conversacion:${employeeId ?? 'anon'}`;
 
-/** Espera creciente entre reintentos de reconexión, con techo. */
 const esperaDeReintento = (intentos) => Math.min(1000 * 2 ** intentos, 15000);
+
+const QUICK_EMPLOYEE_PROMPTS = [
+  '¿Cuáles son los requisitos para aprobar una financiación?',
+  '¿Cómo se valida un comprobante de pago en cobranzas?',
+  '¿Cuál es el procedimiento ante una consulta sin stock?',
+];
 
 /**
  * ¿Este mensaje es el aviso de baja confianza que recibe un responsable?
  *
- * ⚠️ **Se reconoce por el texto, y eso es una limitación conocida.** El aviso viaja
- * como un mensaje del asistente igual que cualquier otro —el backend no marca los
- * mensajes con un tipo—, así que no hay nada más firme para engancharse. Lo que sí
- * está elegido es el **modo de fallar**: si el texto del backend cambia, esto deja
- * de coincidir y el mensaje se muestra como un mensaje normal, sin acciones. Nunca
- * al revés. Un aviso sin botones es un inconveniente; un mensaje cualquiera
- * disfrazado de informe sería mentira.
- *
- * Lo robusto sería que el backend marcara el mensaje; queda anotado por si el aviso
- * pasa de banco de pruebas a algo que alguien usa en serio.
+ * Se reconoce por el texto que envía el backend cuando ningún documento supera
+ * el umbral de similitud para un supervisor.
  */
 function esInformeDeBajaConfianza(m) {
   if (m.role !== 'ASSISTANT') return false;
@@ -68,15 +52,7 @@ function esInformeDeBajaConfianza(m) {
 }
 
 /**
- * Chat web del panel.
- *
- * A diferencia del Simulador de Chat, acá no hay secreto ni teléfono a mano: la
- * conversación es la del **empleado logueado**, y el backend la identifica por el
- * teléfono de su perfil a partir del JWT. Por eso alcanza con estar autenticado —
- * no hace falta ser SUPERVISOR.
- *
- * Ya no hay polling (spec 004). Los mensajes llegan por un stream, y con eso
- * desaparece el "no llegó respuesta a tiempo": un turno lento no es un error.
+ * Chat con el Asistente (canal web interno del empleado autenticado).
  */
 export default function WebChat({ token, me }) {
   const [text, setText] = useState('');
@@ -84,54 +60,68 @@ export default function WebChat({ token, me }) {
   const claveConv = claveDeConversacion(me?.id);
   const [convId, setConvId] = useState(() => localStorage.getItem(claveConv));
   const [messages, setMessages] = useState([]);
+  const [optimisticMessages, setOptimisticMessages] = useState([]);
   const [conversation, setConversation] = useState(null);
   const [sending, setSending] = useState(false);
+  const [loadingConv, setLoadingConv] = useState(false);
+  const [streamConnected, setStreamConnected] = useState(false);
   const [esperandoRespuesta, setEsperandoRespuesta] = useState(false);
   const [error, setError] = useState(null);
-  /** Motivo por el que la entrega dejó de funcionar, si aplica. */
   const [corte, setCorte] = useState(null);
   const [aviso, setAviso] = useState(null);
 
-  /** Último mensaje visto: es el cursor con el que se reanuda el stream. */
   const ultimoIdRef = useRef(null);
+  const sendingRef = useRef(false);
+  const viewportRef = useRef(null);
+  const textareaRef = useRef(null);
 
-  /**
-   * De qué áreas es responsable quien está logueado, y cuántas existen.
-   *
-   * Sale de `GET /employees/:id`, **no del token**: las áreas no viajan en la
-   * sesión a propósito. Solo se usa para habilitar o deshabilitar un botón con el
-   * motivo a la vista — quien decide de verdad sigue siendo el backend.
-   */
   const [misAreas, setMisAreas] = useState(null);
   const [totalAreas, setTotalAreas] = useState(0);
 
-  /** Agrega respetando RF-004/RF-005: sin duplicados y ordenado por fecha. */
-  function agregarMensajes(nuevos) {
+  const agregarMensajes = useCallback((nuevos) => {
+    if (!nuevos || nuevos.length === 0) return;
+
     setMessages((previos) => {
       const porId = new Map(previos.map((m) => [m.id, m]));
-      for (const m of nuevos) porId.set(m.id, m);
+      for (const m of nuevos) {
+        if (m?.id) porId.set(m.id, m);
+      }
       const todos = [...porId.values()].sort(
         (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
       );
       ultimoIdRef.current = todos.at(-1)?.id ?? null;
       return todos;
     });
-  }
 
-  // `useCallback` porque el efecto del stream la usa: sin una referencia estable,
-  // cada render reabriría la conexión. `claveConv` no cambia dentro de una sesión.
+    const userContents = nuevos
+      .filter((m) => m.role === 'USER')
+      .map((m) => (m.content ?? '').trim());
+
+    if (userContents.length > 0) {
+      setOptimisticMessages((prevOpt) => {
+        if (prevOpt.length === 0) return prevOpt;
+        const remaining = [...prevOpt];
+        for (const content of userContents) {
+          const idx = remaining.findIndex((o) => o.content.trim() === content);
+          if (idx !== -1) remaining.splice(idx, 1);
+        }
+        return remaining;
+      });
+    }
+  }, []);
+
   const olvidarConversacion = useCallback(() => {
     localStorage.removeItem(claveConv);
     ultimoIdRef.current = null;
     setConvId(null);
     setMessages([]);
+    setOptimisticMessages([]);
     setConversation(null);
+    setStreamConnected(false);
     setEsperandoRespuesta(false);
   }, [claveConv]);
 
   useEffect(() => {
-    // Solo un responsable recibe el aviso de baja confianza y solo él puede
-    // derivar o escribir conocimiento; para un empleado común no hace falta.
     if (!me || me.role !== 'SUPERVISOR') return undefined;
     let vigente = true;
     Promise.all([getEmployee(token, me.id), listSectors(token)])
@@ -140,8 +130,6 @@ export default function WebChat({ token, me }) {
         setMisAreas(empleado.areasSupervisadas ?? []);
         setTotalAreas(sectores.length);
       })
-      // Que falle no puede romper el chat: sin esto simplemente no se ofrecen
-      // las acciones, y el chat sigue funcionando igual.
       .catch(() => {});
     return () => {
       vigente = false;
@@ -149,7 +137,10 @@ export default function WebChat({ token, me }) {
   }, [token, me]);
 
   useEffect(() => {
-    if (!convId) return undefined;
+    if (!convId) {
+      setStreamConnected(false);
+      return undefined;
+    }
 
     let cancelado = false;
     let stream = null;
@@ -159,16 +150,22 @@ export default function WebChat({ token, me }) {
 
     async function conectar() {
       try {
-        // El historial primero, y el stream después **con `after`**: el servidor
-        // reproduce lo que haya pasado entre una cosa y la otra, así que no queda
-        // una ventana en la que un mensaje se caiga.
         if (!historialCargado) {
+          setLoadingConv(true);
           const res = await getWebMessages(token, convId, { limit: 100 });
           if (cancelado) return;
-          agregarMensajes(res.data);
+          setLoadingConv(false);
+          agregarMensajes(res.data ?? []);
           setConversation(res.conversation);
+          if (res.conversation?.status && res.conversation.status !== 'ACTIVE') {
+            setEsperandoRespuesta(false);
+          } else if ((res.data ?? []).at(-1)?.role === 'ASSISTANT') {
+            setEsperandoRespuesta(false);
+          }
           historialCargado = true;
         }
+
+        if (cancelado) return;
 
         stream = await openConversationStream(
           token,
@@ -178,20 +175,24 @@ export default function WebChat({ token, me }) {
             onMessage: (m) => {
               if (cancelado) return;
               agregarMensajes([m]);
-              if (m.role === 'ASSISTANT') setEsperandoRespuesta(false);
+              if (m.role === 'ASSISTANT') {
+                setEsperandoRespuesta(false);
+                if (m.agentType) {
+                  setConversation((c) =>
+                    c ? { ...c, currentAgent: m.agentType } : c,
+                  );
+                }
+              }
             },
             onStatus: (s) => {
               if (cancelado) return;
               setConversation((c) => ({ ...c, ...s }));
-              // Si el caso pasó a manos de una persona, el asistente no va a
-              // contestar: dejar el "está escribiendo" sería mentir (CL-1).
               if (s.status !== 'ACTIVE') setEsperandoRespuesta(false);
             },
             onClose: ({ conversacionTerminada, abortado }) => {
               if (cancelado || abortado) return;
+              setStreamConnected(false);
 
-              // Único motivo que el servidor comunica explícitamente. El
-              // `convId` quedó muerto: el próximo mensaje abre otro hilo.
               if (conversacionTerminada) {
                 setAviso(
                   'La conversación se terminó. El próximo mensaje empieza una nueva.',
@@ -200,9 +201,6 @@ export default function WebChat({ token, me }) {
                 return;
               }
 
-              // Los otros tres motivos —inactividad, sesión vencida y permiso
-              // perdido— cierran el stream de la misma forma y NO se distinguen
-              // desde acá. Se distinguen por lo que pasa al reabrir, más abajo.
               reintento = setTimeout(conectar, esperaDeReintento(intentos));
               intentos += 1;
             },
@@ -214,12 +212,13 @@ export default function WebChat({ token, me }) {
           return;
         }
         intentos = 0;
+        setStreamConnected(true);
         setCorte(null);
       } catch (err) {
         if (cancelado) return;
+        setLoadingConv(false);
+        setStreamConnected(false);
 
-        // 401 — la sesión venció (el stream tampoco sobrevive al token que lo
-        // abrió). Reintentar con el mismo token falla en loop: hay que renovarla.
         if (err.status === 401) {
           setCorte({
             tipo: 'sesion',
@@ -228,9 +227,6 @@ export default function WebChat({ token, me }) {
           return;
         }
 
-        // 403 — esta conversación ya no es tuya. **No se reintenta nunca**: un
-        // bucle contra un 403 es el polling que esta spec vino a sacar, con otra
-        // cara. 404 va por el mismo camino: el hilo no existe más.
         if (err.status === 403 || err.status === 404) {
           setCorte({
             tipo: 'permiso',
@@ -240,8 +236,10 @@ export default function WebChat({ token, me }) {
           return;
         }
 
-        // Cualquier otra cosa es un problema de red: se reintenta espaciado.
-        setCorte({ tipo: 'red', texto: 'Sin conexión con el servidor. Reintentando…' });
+        setCorte({
+          tipo: 'red',
+          texto: 'Sin conexión con el servidor. Reintentando…',
+        });
         reintento = setTimeout(conectar, esperaDeReintento(intentos));
         intentos += 1;
       }
@@ -254,29 +252,117 @@ export default function WebChat({ token, me }) {
       clearTimeout(reintento);
       stream?.close();
     };
-  }, [convId, token, olvidarConversacion]);
+  }, [convId, token, agregarMensajes, olvidarConversacion]);
 
-  async function handleSend(e) {
-    e.preventDefault();
-    if (!text.trim()) return;
+  // Tope de seguridad para el indicador de escritura
+  useEffect(() => {
+    if (!esperandoRespuesta) return undefined;
+    const timer = setTimeout(() => setEsperandoRespuesta(false), 45000);
+    return () => clearTimeout(timer);
+  }, [esperandoRespuesta]);
+
+  // Auto-scroll suave al fondo cuando llegan mensajes o cambia el estado
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, [
+    messages.length,
+    optimisticMessages.length,
+    esperandoRespuesta,
+    conversation?.status,
+  ]);
+
+  function syncTextareaHeight(target) {
+    const el = target ?? textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  }
+
+  const estado = conversation?.status;
+  const enManosDeUnaPersona =
+    estado === 'WAITING_HUMAN' || estado === 'HUMAN_HANDLING';
+  const ultimoMensaje = messages.at(-1);
+  const ultimoEsInforme =
+    !!ultimoMensaje &&
+    !enManosDeUnaPersona &&
+    esInformeDeBajaConfianza(ultimoMensaje);
+
+  const areaActual = conversation?.currentAgent
+    ? AGENT_META[conversation.currentAgent]
+    : null;
+
+  const feedItems = buildConversationFeed(
+    conversation
+      ? {
+          ...conversation,
+          userType: conversation.userType ?? 'EMPLEADO',
+          messages,
+        }
+      : { userType: 'EMPLEADO', messages },
+    me,
+  );
+
+  const hayContenido = feedItems.length > 0 || optimisticMessages.length > 0;
+  const displayName = me?.name || me?.email || 'Empleado';
+
+  async function enviarMensaje(contenidoRaw) {
+    const msgText = (contenidoRaw ?? text).trim();
+    if (!msgText || sendingRef.current) return;
+
+    const tempId = `opt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+    sendingRef.current = true;
     setSending(true);
     setError(null);
     setAviso(null);
+    setText('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+
+    setOptimisticMessages((prev) => [
+      ...prev,
+      {
+        id: tempId,
+        role: 'USER',
+        content: msgText,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+
+    if (!enManosDeUnaPersona) {
+      setEsperandoRespuesta(true);
+    }
+
     try {
-      const res = await sendWebMessage(token, text);
-      setText('');
-      setEsperandoRespuesta(!enManosDeUnaPersona);
+      const res = await sendWebMessage(token, msgText);
       if (res.conversationId !== convId) {
         localStorage.setItem(claveConv, res.conversationId);
         setConvId(res.conversationId);
       }
     } catch (err) {
-      // 409: el empleado no tiene teléfono cargado, así que no hay conversación
-      // que identificar. NO se intenta abrir ningún stream — el mensaje del
-      // backend ya explica qué hay que hacer (que un supervisor lo cargue).
+      setEsperandoRespuesta(false);
+      setOptimisticMessages((prev) => prev.filter((o) => o.id !== tempId));
+      setText(msgText);
       setError(err);
     } finally {
+      sendingRef.current = false;
       setSending(false);
+      textareaRef.current?.focus();
+    }
+  }
+
+  function handleSend(e) {
+    e.preventDefault();
+    enviarMensaje();
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      enviarMensaje();
     }
   }
 
@@ -289,220 +375,506 @@ export default function WebChat({ token, me }) {
     if (!ok) return;
     try {
       await closeWebConversation(token, convId);
-      // No se limpia acá: llega el evento de estado CLOSED y el propio stream se
-      // encarga, que es el mismo camino por el que se entera una segunda pestaña.
     } catch (err) {
       setError(err);
     }
   }
 
-  const estado = conversation?.status;
-  const enManosDeUnaPersona = estado === 'WAITING_HUMAN' || estado === 'HUMAN_HANDLING';
-  const ultimoMensaje = messages.at(-1);
-  const ultimoEsInforme =
-    !!ultimoMensaje && !enManosDeUnaPersona && esInformeDeBajaConfianza(ultimoMensaje);
-
   return (
-    <div className="webchat-page">
+    <div className="webchat-page sim-page">
       <PageHero
         kicker="Asistente virtual"
         title="Chat con el Asistente"
-        description={`Conversás como ${me?.name || me?.email}. El asistente te reconoce como empleado y responde consultas con conocimiento interno.`}
-        action={<InfoToggle open={mostrarInfo} onToggle={() => setMostrarInfo((v) => !v)} />}
+        description={`Conversás como ${displayName}. El asistente te reconoce como empleado y responde consultas con conocimiento interno.`}
+        action={
+          <InfoToggle
+            open={mostrarInfo}
+            onToggle={() => setMostrarInfo((v) => !v)}
+          />
+        }
       />
+
       {mostrarInfo && (
         <InfoNotes
           title="Chat con el asistente"
           onClose={() => setMostrarInfo(false)}
           notes={[
-            ['Conversás como vos mismo.',
-              'El asistente te reconoce como empleado y puede usar conocimiento interno.'],
-            ['Hilo aparte.', 'Es un hilo aparte del de WhatsApp, aunque los dos sean tuyos.'],
+            [
+              'Conversás como vos mismo.',
+              'El asistente te reconoce como empleado y puede usar procedimientos, políticas y conocimiento interno.',
+            ],
+            [
+              'Hilo independiente.',
+              'Es un hilo aparte del de WhatsApp, aunque los dos estén asociados a tu perfil.',
+            ],
+            [
+              'Mejora continua.',
+              'Si sos supervisor y una consulta no supera el umbral de confianza, podés cargar conocimiento o derivarla desde el mismo chat.',
+            ],
           ]}
         />
       )}
-      <div className="card">
 
-      {/* 409: el backend no puede resolver la identidad conversacional sin
-          teléfono. El mensaje viene accionable desde el backend. */}
-      {error?.status === 409 && (
-        <div className="error" style={{ marginTop: 12 }}>{error.message}</div>
-      )}
-      {error && error.status !== 409 && (
-        <p className="error" style={{ marginTop: 12 }}>{error.message}</p>
-      )}
+      <section
+        className="sim-chat-window webchat-window"
+        aria-label="Ventana de chat con el asistente"
+      >
+        {/* Barra superior de identidad del empleado + estado en tiempo real */}
+        <header className="sim-chat-topbar">
+          <div className="sim-identity-bar">
+            <div
+              className="sim-contact-avatar is-employee"
+              aria-hidden="true"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+              </svg>
+            </div>
 
-      {aviso && <div className="success-msg" style={{ marginTop: 12 }}>{aviso}</div>}
+            <div className="sim-phone-field">
+              <span className="sim-phone-label">Canal Web interno</span>
+              <div className="sim-phone-controls">
+                <strong className="webchat-user-title">{displayName}</strong>
+                {me?.sectorName && (
+                  <span className="webchat-sector-tag">{me.sectorName}</span>
+                )}
+                {convId && (
+                  <button
+                    type="button"
+                    className="sim-new-phone-btn"
+                    onClick={handleClose}
+                    disabled={enManosDeUnaPersona}
+                    title={
+                      enManosDeUnaPersona
+                        ? 'No podés terminarla mientras un responsable la está atendiendo'
+                        : 'Terminar la conversación actual y empezar un hilo limpio'
+                    }
+                  >
+                    ↻ Nueva conversación
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
 
-      {/* Cada motivo de corte pide algo distinto de quien lee, así que se dicen
-          distinto. Un cartel genérico de "error de conexión" haría que alguien
-          reintente contra un 403 para siempre. */}
-      {corte && (
-        <div
-          className={corte.tipo === 'red' ? 'hint' : 'error'}
-          style={{ marginTop: 12 }}
-        >
-          {corte.texto}
-        </div>
-      )}
+          <div className="sim-status-group">
+            <span className="sim-meta-pill is-employee">Personal interno</span>
 
-      {messages.length > 0 && (
-        <ul className="msg-list" style={{ marginTop: 12 }}>
-          {messages.map((m) => (
-            <li key={m.id}>
-              <strong>{m.role === 'USER' ? 'Vos' : `Asistente${m.agentType ? ` (${m.agentType})` : ''}`}:</strong>{' '}
-              {/* El aviso de baja confianza se muestra distinto porque ES distinto:
-                  no es un error ni una escalación, es información para decidir. Va
-                  con el salto de línea respetado —la lista de documentos con su
-                  score se lee como lista— y en tono neutro. Un cartel rojo de fallo
-                  lograría que se lo saltee, que es justo lo contrario de para lo
-                  que existe. */}
-              {esInformeDeBajaConfianza(m) ? (
-                <div className="hint" style={{ whiteSpace: 'pre-wrap', marginTop: 4 }}>
-                  {m.content}
-                </div>
-              ) : (
-                m.content
-              )}
-              <div className="msg-time">{new Date(m.createdAt).toLocaleTimeString()}</div>
-            </li>
-          ))}
-        </ul>
-      )}
+            {estado === 'WAITING_HUMAN' && (
+              <span className="sim-meta-pill is-waiting">
+                Esperando responsable
+              </span>
+            )}
+            {estado === 'HUMAN_HANDLING' && (
+              <span className="sim-meta-pill is-human">
+                Atendido por responsable
+              </span>
+            )}
+            {(!estado || estado === 'ACTIVE') && areaActual && (
+              <span className="sim-meta-pill is-agent">
+                Agente · {areaActual.name}
+              </span>
+            )}
 
-      {/* Las dos acciones que corresponden después del aviso (US4, CL-2). Se
-          ofrecen solo cuando el último mensaje ES el aviso: sueltas en cualquier
-          momento serían ruido. */}
-      {ultimoEsInforme && (
-        <AccionesDelInforme
-          token={token}
-          convId={convId}
-          me={me}
-          agentType={conversation?.currentAgent ?? null}
-          misAreas={misAreas}
-          totalAreas={totalAreas}
-          onHecho={(texto) => setAviso(texto)}
-        />
-      )}
+            <span
+              className={`sim-live-badge ${
+                streamConnected
+                  ? 'is-live'
+                  : convId
+                    ? 'is-connecting'
+                    : 'is-ready'
+              }`}
+            >
+              <span className="sim-live-dot" aria-hidden="true" />
+              {streamConnected
+                ? 'En vivo'
+                : convId
+                  ? 'Conectando…'
+                  : 'Listo'}
+            </span>
 
-      {/* "Esperando" solo mientras el asistente realmente puede contestar. Si el
-          caso está en manos de una persona, esto no se muestra: ahí el cartel es
-          el de abajo, que dice otra cosa. */}
-      {esperandoRespuesta && !enManosDeUnaPersona && (
-        <p className="hint" style={{ marginTop: 12 }}>
-          El asistente está preparando la respuesta… puede tardar. No hace falta
-          hacer nada: aparece sola.
-        </p>
-      )}
+            <ChatExportMenu
+              filename={`asistente-${displayName}`}
+              disabled={!hayContenido}
+              getMarkdown={() =>
+                buildConversationMarkdown({
+                  title: `Chat con el Asistente — ${displayName}`,
+                  contactLabel: displayName,
+                  conversation: conversation
+                    ? {
+                        ...conversation,
+                        userType: conversation.userType ?? 'EMPLEADO',
+                        channel: 'WEB',
+                      }
+                    : { userType: 'EMPLEADO', channel: 'WEB' },
+                  messages,
+                  optimisticMessages,
+                  me,
+                })
+              }
+            />
+          </div>
+        </header>
 
-      {/* Dos estados distintos, dos mensajes distintos. Aplastarlos en un solo
-          cartel le esconde a la persona si su caso ya lo tomó alguien o sigue en
-          la fila. */}
-      {estado === 'WAITING_HUMAN' && (
-        <div className="success-msg" style={{ marginTop: 12 }}>
-          Tu consulta pasó a un responsable y está esperando a que alguien la tome.
-          El asistente no va a contestar por ahora — podés seguir escribiendo y
-          queda registrado.
-        </div>
-      )}
-      {estado === 'HUMAN_HANDLING' && (
-        <div className="success-msg" style={{ marginTop: 12 }}>
-          Un responsable está atendiendo tu caso ahora mismo. Lo que te conteste
-          aparece acá.
-        </div>
-      )}
+        {/* Alertas de sesión, red, falta de teléfono (409) o avisos */}
+        {error && (
+          <div className="sim-alert-banner" role="alert">
+            {error.message}
+          </div>
+        )}
 
-      <form onSubmit={handleSend} style={{ marginTop: 12 }}>
-        <div className="field">
-          <label>Mensaje</label>
-          <textarea
-            rows={3}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="ej. ¿cuál es el procedimiento para dar de baja un plan?"
-          />
-        </div>
-        <button type="submit" disabled={sending || !text.trim()}>
-          {sending ? 'Enviando…' : 'Enviar'}
-        </button>
-
-        {convId && (
-          <button
-            type="button"
-            onClick={handleClose}
-            disabled={enManosDeUnaPersona}
-            title={
-              enManosDeUnaPersona
-                ? 'No podés terminarla mientras un responsable la está atendiendo'
-                : 'El próximo mensaje empieza un hilo nuevo'
-            }
-            style={{ marginLeft: 8 }}
+        {corte && (
+          <div
+            className={`sim-alert-banner${
+              corte.tipo === 'red' ? ' is-soft' : ''
+            }`}
+            role="status"
           >
-            Terminar conversación
-          </button>
+            {corte.texto}
+          </div>
         )}
 
-        {conversation?.currentAgent && (
-          <span className="hint" style={{ marginLeft: 8 }}>
-            Agente actual: {conversation.currentAgent}
-          </span>
+        {aviso && (
+          <div className="webchat-success-banner" role="status">
+            <span>✓ {aviso}</span>
+            <button
+              type="button"
+              className="fin-banner-dismiss"
+              onClick={() => setAviso(null)}
+              aria-label="Cerrar aviso"
+            >
+              ✕
+            </button>
+          </div>
         )}
-      </form>
-    </div>
+
+        {/* Área central de conversación */}
+        <div className="sim-chat-viewport" ref={viewportRef}>
+          {loadingConv && !hayContenido ? (
+            <div className="sim-empty-state">
+              <p className="sim-empty-subtitle">Cargando conversación…</p>
+            </div>
+          ) : !hayContenido ? (
+            <div className="sim-empty-state">
+              <div className="sim-empty-icon" aria-hidden="true">
+                <svg
+                  width="26"
+                  height="26"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                >
+                  <path
+                    d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+              <h3 className="sim-empty-title">Consultá al Asistente Interno</h3>
+              <p className="sim-empty-subtitle">
+                Hacé preguntas sobre operatoria, reglas de negocio, cobranzas,
+                stock o financiación usando la base de conocimiento interna:
+              </p>
+              <div className="sim-quick-prompts">
+                {QUICK_EMPLOYEE_PROMPTS.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    className="sim-prompt-chip"
+                    disabled={sending}
+                    onClick={() => enviarMensaje(prompt)}
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="sim-messages-feed">
+              {feedItems.map((item) => {
+                if (item.kind === 'milestone') {
+                  return (
+                    <div key={item.id} className="sim-milestone-row">
+                      <span className={`sim-milestone-pill is-${item.variant}`}>
+                        {item.variant === 'takeover' && '🛡️ '}
+                        {item.variant === 'release' && '🤖 '}
+                        {item.variant === 'escalated' && '⚠️ '}
+                        {item.label} ·{' '}
+                        {new Date(item.createdAt).toLocaleTimeString('es-AR', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                  );
+                }
+
+                const { message: m, actor } = item;
+                const isUser = m.role === 'USER';
+
+                if (isUser) {
+                  return (
+                    <div key={item.id} className="sim-msg-row is-outgoing">
+                      <div className="sim-bubble is-outgoing">
+                        <p className="sim-bubble-text">{m.content}</p>
+                        <div className="sim-bubble-foot">
+                          <time>
+                            {new Date(m.createdAt).toLocaleTimeString('es-AR', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </time>
+                          <span
+                            className="sim-msg-check"
+                            title="Entregado"
+                            aria-hidden="true"
+                          >
+                            ✓✓
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                const esInforme = esInformeDeBajaConfianza(m);
+
+                return (
+                  <div key={item.id} className="sim-msg-row is-incoming">
+                    <MessageActorAvatar
+                      actorType={actor.actorType}
+                      accent={actor.accent}
+                      bg={actor.bg}
+                      border={actor.border}
+                    />
+                    <div
+                      className={`sim-bubble is-incoming ${
+                        actor.actorType === 'SUPERVISOR' ? 'is-supervisor' : ''
+                      } ${esInforme ? 'is-lowconf' : ''}`.trim()}
+                    >
+                      <div className="sim-bubble-author">
+                        <strong>{actor.title}</strong>
+                        {actor.actorType === 'SUPERVISOR' && (
+                          <span className="sim-author-tag">
+                            Intervención humana
+                          </span>
+                        )}
+                        {esInforme && (
+                          <span className="webchat-lowconf-tag">
+                            Diagnóstico de cobertura
+                          </span>
+                        )}
+                      </div>
+                      <p className="sim-bubble-text">{m.content}</p>
+                      <div className="sim-bubble-foot">
+                        <time>
+                          {new Date(m.createdAt).toLocaleTimeString('es-AR', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </time>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Mensajes salientes optimistas mientras responde el servidor */}
+              {optimisticMessages.map((opt) => (
+                <div
+                  key={opt.id}
+                  className="sim-msg-row is-outgoing is-optimistic"
+                >
+                  <div className="sim-bubble is-outgoing">
+                    <p className="sim-bubble-text">{opt.content}</p>
+                    <div className="sim-bubble-foot">
+                      <time>
+                        {new Date(opt.createdAt).toLocaleTimeString('es-AR', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </time>
+                      <span
+                        className="sim-msg-check is-pending"
+                        title="Enviando…"
+                        aria-hidden="true"
+                      >
+                        ✓
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* Acciones para supervisores tras un informe de baja confianza */}
+              {ultimoEsInforme && (
+                <AccionesDelInforme
+                  token={token}
+                  convId={convId}
+                  me={me}
+                  agentType={conversation?.currentAgent ?? null}
+                  misAreas={misAreas}
+                  totalAreas={totalAreas}
+                  onHecho={(texto) => setAviso(texto)}
+                />
+              )}
+
+              {/* Indicador de escritura en vivo */}
+              {esperandoRespuesta && !enManosDeUnaPersona && (
+                <div className="sim-msg-row is-incoming" aria-live="polite">
+                  <MessageActorAvatar
+                    actorType="AGENT"
+                    accent={areaActual?.accent ?? '#2563eb'}
+                    bg={areaActual?.bgSoft ?? '#eff6ff'}
+                    border={areaActual?.borderSoft ?? '#bfdbfe'}
+                  />
+                  <div className="sim-bubble is-incoming is-typing">
+                    <div
+                      className="sim-typing-dots"
+                      aria-label="El asistente está preparando la respuesta"
+                    >
+                      <span />
+                      <span />
+                      <span />
+                    </div>
+                    <span className="sim-typing-label">
+                      {areaActual
+                        ? `Agente ${areaActual.name} preparando respuesta…`
+                        : 'El asistente está preparando la respuesta…'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {estado === 'WAITING_HUMAN' && (
+                <div className="sim-human-notice">
+                  Tu consulta pasó a un responsable y está esperando a que alguien
+                  la tome. Podés seguir escribiendo y queda registrado en el hilo.
+                </div>
+              )}
+
+              {estado === 'HUMAN_HANDLING' && (
+                <div className="sim-human-notice is-active">
+                  Un responsable está atendiendo tu consulta en este momento. Sus
+                  respuestas aparecen acá en vivo.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Barra inferior de escritura estilo mensajería moderna */}
+        <footer className="sim-chat-footer">
+          <form className="sim-composer-form" onSubmit={handleSend}>
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              className="sim-composer-input"
+              aria-label="Mensaje para el asistente"
+              value={text}
+              onChange={(e) => {
+                setText(e.target.value);
+                syncTextareaHeight(e.target);
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder="Escribí tu consulta… (Enter para enviar, Shift+Enter para salto de línea)"
+            />
+            <button
+              type="submit"
+              className="sim-send-btn"
+              disabled={sending || !text.trim()}
+              title="Enviar mensaje"
+              aria-label="Enviar mensaje"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+              >
+                <line
+                  x1="22"
+                  y1="2"
+                  x2="11"
+                  y2="13"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <polygon
+                  points="22 2 15 22 11 13 2 9 22 2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </form>
+          <p className="sim-composer-hint">
+            Canal Web interno · Conversación asociada a{' '}
+            <strong>{displayName}</strong> con acceso a conocimiento interno.
+          </p>
+        </footer>
+      </section>
     </div>
   );
 }
 
 /**
- * Qué se puede hacer después del aviso de baja confianza (spec 005, US4/US5).
- *
- * Dos caminos, y cuál corresponde depende de **de quién es el tema**:
- *
- * - si el área del agente que respondió es una de las propias → cargar o corregir
- *   el documento acá mismo;
- * - si es de otra → derivarle la consulta a quien sí la maneja.
- *
- * El que no corresponde queda **deshabilitado con el motivo a la vista**, no
- * escondido: el backend lo va a rechazar igual, y enterarse por un error después de
- * escribir un documento entero es peor que verlo de entrada.
+ * Acciones disponibles para un supervisor después del informe de baja confianza.
  */
-function AccionesDelInforme({ token, convId, me, agentType, misAreas, totalAreas, onHecho }) {
+function AccionesDelInforme({
+  token,
+  convId,
+  me,
+  agentType,
+  misAreas,
+  totalAreas,
+  onHecho,
+}) {
   const [abierto, setAbierto] = useState(null); // null | 'cargar' | 'derivar'
 
-  // Mientras las áreas no cargaron no se afirma nada: ni habilitado ni el motivo.
   if (misAreas === null) return null;
 
   const puedeEscribir = puedeEscribirEn(misAreas, totalAreas, agentType);
   const motivo = motivoDeBloqueo(misAreas, totalAreas, agentType);
 
   return (
-    <div className="card" style={{ marginTop: 12 }}>
-      <p className="hint">
-        El asistente no llegó al umbral. Lo que sigue lo decidís vos: si el dato
-        falta, cargalo; si está y quedó corto, corregilo; si el tema no es tuyo,
-        pasáselo a quien lo maneja.
+    <div className="webchat-report-card">
+      <p className="webchat-report-hint">
+        El asistente no alcanzó el umbral de confianza. Podés cargar o corregir el
+        conocimiento del área, o derivar la consulta a quien corresponda:
       </p>
 
-      <button
-        onClick={() => setAbierto(abierto === 'cargar' ? null : 'cargar')}
-        disabled={!puedeEscribir}
-        title={puedeEscribir ? undefined : motivo}
-      >
-        Cargar o corregir el conocimiento
-      </button>
-      <button
-        className="secondary"
-        onClick={() => setAbierto(abierto === 'derivar' ? null : 'derivar')}
-        style={{ marginLeft: 8 }}
-      >
-        Derivar a otra persona
-      </button>
+      <div className="webchat-report-actions">
+        <button
+          type="button"
+          onClick={() => setAbierto(abierto === 'cargar' ? null : 'cargar')}
+          disabled={!puedeEscribir}
+          title={puedeEscribir ? undefined : motivo}
+        >
+          Cargar o corregir el conocimiento
+        </button>
+        <button
+          type="button"
+          className="secondary"
+          onClick={() => setAbierto(abierto === 'derivar' ? null : 'derivar')}
+        >
+          Derivar a otra persona
+        </button>
+      </div>
 
-      {/* El motivo se muestra, no solo se pone en un title: un botón gris sin
-          explicación se lee como que la pantalla está rota. */}
-      {!puedeEscribir && (
-        <p className="hint" style={{ marginTop: 8 }}>{motivo}</p>
-      )}
+      {!puedeEscribir && <p className="webchat-report-lock">{motivo}</p>}
 
       {abierto === 'cargar' && (
         <FormularioDeCarga
@@ -510,7 +882,9 @@ function AccionesDelInforme({ token, convId, me, agentType, misAreas, totalAreas
           agentType={agentType}
           onHecho={() => {
             setAbierto(null);
-            onHecho('Documento cargado. Volvé a preguntar para ver si ahora alcanza el umbral.');
+            onHecho(
+              'Documento cargado. Volvé a preguntar para verificar si ahora alcanza el umbral.',
+            );
           }}
         />
       )}
@@ -522,7 +896,9 @@ function AccionesDelInforme({ token, convId, me, agentType, misAreas, totalAreas
           agentType={agentType}
           onHecho={(nombre) => {
             setAbierto(null);
-            onHecho(`Consulta derivada a ${nombre}. Le llega el caso con lo que preguntaste.`);
+            onHecho(
+              `Consulta derivada a ${nombre}. Le llega el caso con lo que preguntaste.`,
+            );
           }}
         />
       )}
@@ -530,7 +906,7 @@ function AccionesDelInforme({ token, convId, me, agentType, misAreas, totalAreas
   );
 }
 
-/** Alta de un documento en el área del agente que respondió. */
+/** Alta rápida de documento en el área del agente que respondió. */
 function FormularioDeCarga({ token, agentType, onHecho }) {
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
@@ -544,7 +920,13 @@ function FormularioDeCarga({ token, agentType, onHecho }) {
     setGuardando(true);
     setError('');
     try {
-      await ingestKnowledge(token, { title, content, category, audience, agentType });
+      await ingestKnowledge(token, {
+        title,
+        content,
+        category,
+        audience,
+        agentType,
+      });
       onHecho();
     } catch (err) {
       setError(err.message);
@@ -554,39 +936,48 @@ function FormularioDeCarga({ token, agentType, onHecho }) {
   }
 
   return (
-    <form onSubmit={guardar} style={{ marginTop: 12 }}>
-      <p className="hint">
-        Se carga en el área <strong>{agentType ?? 'transversal'}</strong>, que es la
-        del agente que intentó responder.
+    <form className="webchat-inline-form" onSubmit={guardar}>
+      <p className="webchat-report-hint">
+        Se cargará en el área <strong>{agentType ?? 'transversal'}</strong>, que es
+        la del agente que intentó responder.
       </p>
-      <div className="field">
-        <label>Título</label>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} />
-      </div>
-      <div className="field">
-        <label>Categoría</label>
-        <input value={category} onChange={(e) => setCategory(e.target.value)} />
-      </div>
-      <div className="field">
-        <label>Audiencia</label>
-        <select value={audience} onChange={(e) => setAudience(e.target.value)}>
-          <option value="INTERNO">INTERNO — solo empleados</option>
-          <option value="PUBLICO">PUBLICO — también los clientes</option>
-        </select>
+      <div className="webchat-inline-grid">
+        <div className="field">
+          <label>Título</label>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Categoría</label>
+          <input value={category} onChange={(e) => setCategory(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Audiencia</label>
+          <select value={audience} onChange={(e) => setAudience(e.target.value)}>
+            <option value="INTERNO">INTERNO — solo empleados</option>
+            <option value="PUBLICO">PUBLICO — también los clientes</option>
+          </select>
+        </div>
       </div>
       <div className="field">
         <label>Contenido</label>
-        <textarea rows={5} value={content} onChange={(e) => setContent(e.target.value)} />
+        <textarea
+          rows={4}
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+        />
       </div>
       {error && <p className="error">{error}</p>}
-      <button type="submit" disabled={guardando || !title || !category || !content}>
+      <button
+        type="submit"
+        disabled={guardando || !title || !category || !content}
+      >
         {guardando ? 'Guardando…' : 'Guardar documento'}
       </button>
     </form>
   );
 }
 
-/** Derivación a otro responsable. El texto de la consulta lo saca el backend. */
+/** Derivación a otro supervisor activo. */
 function FormularioDeDerivacion({ token, convId, me, agentType, onHecho }) {
   const [candidatos, setCandidatos] = useState([]);
   const [elegido, setElegido] = useState('');
@@ -598,15 +989,9 @@ function FormularioDeDerivacion({ token, convId, me, agentType, onHecho }) {
     listEmployees(token)
       .then((todos) => {
         if (!vigente) return;
-        // Solo supervisores activos, y nunca uno mismo: el backend rechaza las
-        // dos cosas con 409, y derivarse el caso a uno mismo es exactamente el
-        // problema que esta parte del sistema vino a sacar.
         const elegibles = todos.filter(
           (e) => e.role === 'SUPERVISOR' && e.isActive && e.id !== me?.id,
         );
-        // Primero quien maneja el área del caso. Ordena, no filtra: responder no
-        // está restringido por área, y filtrar dejaría sin salida a un caso de un
-        // área sin supervisor activo.
         setCandidatos(ordenarCandidatos(elegibles, agentType));
       })
       .catch((err) => vigente && setError(err.message));
@@ -637,14 +1022,13 @@ function FormularioDeDerivacion({ token, convId, me, agentType, onHecho }) {
     );
 
   return (
-    <div style={{ marginTop: 12 }}>
-      <p className="hint">
-        La consulta la atendió <strong>{agentType ?? 'el asistente'}</strong>. Le
-        llega el caso con lo que preguntaste, tal cual. La conversación queda
-        esperando a que esa persona responda.
+    <div className="webchat-inline-form">
+      <p className="webchat-report-hint">
+        La consulta fue atendida por <strong>{agentType ?? 'el asistente'}</strong>.
+        La conversación quedará esperando la respuesta del responsable elegido.
       </p>
       <div className="field">
-        <label>¿A quién?</label>
+        <label>¿A quién derivar?</label>
         <select value={elegido} onChange={(e) => setElegido(e.target.value)}>
           <option value="">Elegir…</option>
           {candidatos.map((c) => (
@@ -655,20 +1039,15 @@ function FormularioDeDerivacion({ token, convId, me, agentType, onHecho }) {
         </select>
       </div>
 
-      {/* Se puede derivar fuera del área —responder no está restringido— pero
-          conviene saberlo: esa persona va a poder contestar y NO va a poder dejar
-          la respuesta como conocimiento del área, que suele ser la mitad que
-          importa de un caso así. */}
       {elegidoFueraDelArea && (
-        <p className="hint">
-          Esa persona no es responsable de {agentType}: va a poder responder, pero
-          no va a poder dejar la respuesta como conocimiento de esa área. El ★ marca
-          a quienes sí la manejan.
+        <p className="webchat-report-lock">
+          Esa persona no supervisa {agentType}: podrá responderte, pero no dejar la
+          respuesta como conocimiento de esa área (★ marca quienes sí la manejan).
         </p>
       )}
       {error && <p className="error">{error}</p>}
-      <button onClick={derivar} disabled={enviando || !elegido}>
-        {enviando ? 'Derivando…' : 'Derivar'}
+      <button type="button" onClick={derivar} disabled={enviando || !elegido}>
+        {enviando ? 'Derivando…' : 'Derivar consulta'}
       </button>
     </div>
   );
