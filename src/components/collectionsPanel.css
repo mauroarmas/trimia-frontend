@@ -1,0 +1,49 @@
+.collections-panel { min-width: 0; font-size: 14px; }
+.collections-panel .card { padding: 22px; border: 1px solid #dbe4ee; border-radius: 14px; }
+.collection-metrics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; margin: 20px 0; }
+.collections-panel .collection-metric { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; text-align: left; background: white; border: 1px solid #dbe4ee; border-radius: 12px; padding: 20px; color: #203452; font: inherit; }
+.collections-panel button.collection-metric:hover { border-color: #3584bb; background: #f6fbff; }
+.collection-metric strong { font-size: 30px; line-height: 1.2; color: #236ca2; }
+.collection-metric small { color: #677b94; font-size: 12px; margin-top: 7px; }
+.collections-panel .collection-metric-warning { border-color: #ecd6a3; }
+.collection-metric-warning strong { color: #966510; }
+.collections-panel .collections-tabs { margin-bottom: 18px; overflow-x: auto; }
+.collections-panel .submenu-pill { font-size: 13px; padding: 10px 14px; white-space: nowrap; }
+.collection-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.collections-panel h3 { font-size: 18px; margin: 0 0 6px; }
+.collection-section-heading p, .collection-section-heading > span { color: #64758b; margin: 0; font-size: 13px; }
+.collection-toolbar { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 22px; padding: 16px; background: #f6f8fb; border-radius: 10px; }
+.collection-toolbar label { display: flex; flex-direction: column; gap: 7px; font-size: 12px; font-weight: 600; }
+.collection-search { flex: 1; }
+.collections-panel input, .collections-panel select, .collections-panel textarea { font-size: 14px; padding: 10px 12px; border: 1px solid #cbd7e5; border-radius: 7px; background: white; color: #203452; }
+.collection-toolbar select { min-width: 180px; }
+.collection-table-scroll { overflow-x: auto; }
+.collections-panel table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+.collections-panel th { background: #f6f8fb; padding: 13px 14px; font-size: 12px; font-weight: 600; color: #60738c; white-space: nowrap; }
+.collections-panel td { padding: 15px 14px; border-bottom: 1px solid #e9eef4; vertical-align: middle; }
+.collections-panel tbody tr:last-child td { border-bottom: 0; }
+.collections-panel tbody tr:hover { background: #fbfdff; }
+.collection-subline { display: block; font-size: 12px; color: #6c7f94; margin-top: 5px; max-width: 280px; overflow-wrap: anywhere; }
+.collection-money { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.collections-panel button:not(.submenu-pill):not(.collection-metric):not(.knowledge-hero-action) { min-height: 36px; font-size: 13px; padding: 8px 12px; border-radius: 7px; }
+.collections-panel .badge { font-size: 12px; padding: 5px 9px; white-space: nowrap; }
+.collection-empty { text-align: center; padding: 40px !important; color: #677b94; }
+.collection-dialog-shade { position: fixed; inset: 0; z-index: 1500; background: #142b4999; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.collection-dialog { background: white; color: #203452; width: min(1080px,100%); max-height: calc(100dvh - 48px); display: flex; flex-direction: column; border-radius: 16px; box-shadow: 0 24px 90px #142b4955; overflow: hidden; }
+.collection-dialog-header { display: flex; justify-content: space-between; align-items: flex-start; padding: 24px; gap: 18px; border-bottom: 1px solid #e4ebf3; }
+.collection-dialog-header small { color: #347baa; font-size: 11px; letter-spacing: .08em; font-weight: 700; }
+.collection-dialog-header h2 { font-size: 23px; margin: 6px 0; }
+.collection-dialog-header p { color: #64758b; margin: 0; font-size: 13px; }
+.collection-dialog-body { padding: 24px; overflow-y: auto; min-height: 0; }
+.collection-account-totals { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; margin-bottom: 24px; }
+.collection-account-totals > div { background: #f3f8fc; border: 1px solid #e0eaf3; border-radius: 10px; padding: 18px; }
+.collection-account-totals span { display: block; color: #64758b; font-size: 12px; margin-bottom: 8px; }
+.collection-account-totals strong { font-size: 21px; }
+.collection-quota-actions { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+.collections-panel .collection-text-action { background: transparent; color: #55728c; border: 0; text-decoration: underline; }
+.collection-dialog-footer { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 24px; border-top: 1px solid #e4ebf3; background: #f8fafc; font-size: 13px; color: #64758b; }
+.collection-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.collections-panel :focus-visible { outline: 3px solid #65b5e7; outline-offset: 3px; }
+@media(max-width: 700px) { .collection-metrics { grid-template-columns: 1fr; gap: 8px; } .collections-panel .collection-metric { padding: 14px; } .collection-metric strong { font-size: 24px; } .collection-toolbar, .collection-section-heading { align-items: stretch; flex-direction: column; } .collection-dialog-shade { padding: 8px; } .collection-dialog { max-height: calc(100dvh - 16px); } .collection-dialog-body,.collection-dialog-header { padding: 16px; } .collection-account-totals { grid-template-columns: 1fr; gap: 8px; } .collection-account-totals > div { padding: 12px; } .collection-account-totals strong { font-size: 18px; } .collection-dialog-footer { flex-direction: column; align-items: stretch; } }
+.collections-panel > .card { overflow-x: auto; }
+.collection-dialog .panel-section > div { flex-wrap: wrap; }

@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import './collectionsPanel.css';
 import {
   getCollectionsKpis,
   listPaymentProofs,
@@ -46,6 +48,32 @@ const REJECTION_LABELS = {
   AMOUNT_TOO_LOW: 'Monto insuficiente',
 };
 
+const money = (value) => value == null ? '—' : new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(Number(value));
+const accountLabel = (status) => ({ SIN_DEUDA: 'Sin deuda', EN_MORA: 'Con atraso', AL_DIA: 'Al día' }[status] ?? 'Sin información');
+const proofLabel = (status) => ({ PENDING_REVIEW: 'Pendiente de revisión', ACCEPTED: 'Aceptado', REJECTED: 'Rechazado', MANUAL_HANDLING: 'Manejo manual', PENDING: 'Por verificar', CONFIRMED: 'Confirmado', MISSING: 'No impactó' }[status] ?? status);
+
+function CollectionDialog({ children, title, onClose }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const previous = document.activeElement;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    ref.current?.focus();
+    const keydown = (event) => {
+      if (event.key === 'Escape') onClose();
+      if (event.key !== 'Tab') return;
+      const items = [...ref.current.querySelectorAll('button, input, select, textarea, a[href], [tabindex="0"]')].filter((el) => !el.disabled && el.getClientRects().length);
+      const first = items[0], last = items[items.length - 1];
+      if (!first) { event.preventDefault(); return; }
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === ref.current)) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && (document.activeElement === last || document.activeElement === ref.current)) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', keydown);
+    return () => { document.body.style.overflow = overflow; document.removeEventListener('keydown', keydown); previous?.focus(); };
+  }, [onClose]);
+  return createPortal(<div className="collection-dialog-shade" onClick={onClose}><section className="collection-dialog collections-panel" ref={ref} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} onClick={(event) => event.stopPropagation()}>{children}</section></div>, document.body);
+}
+
 export default function CollectionsPanel({ token, me, isCollector, initialClientId }) {
   const [kpis, setKpis] = useState(null);
   const [proofs, setProofs] = useState([]);
@@ -57,10 +85,15 @@ export default function CollectionsPanel({ token, me, isCollector, initialClient
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  const [tab, setTab] = useState('proofs');
+  const [tab, setTab] = useState(isCollector ? 'clients' : 'proofs');
   useEffect(() => { if (initialClientId) { setTab('clients'); setSelectedClient(initialClientId); } }, [initialClientId]);
   const [proofStatus, setProofStatus] = useState('PENDING_REVIEW');
 
+  const [search, setSearch] = useState('');
+  const [accountFilter, setAccountFilter] = useState('all');
+  const [quotaFilter, setQuotaFilter] = useState('pending');
+  const closeClient = useCallback(() => setSelectedClient(null), []);
+  const closeProof = useCallback(() => setSelectedProof(null), []);
   const isController = me.isController ?? false;
 
   async function loadAll(status = proofStatus) {
@@ -234,14 +267,19 @@ export default function CollectionsPanel({ token, me, isCollector, initialClient
     return map[status] || 'status-idle';
   };
 
+  const activeClient = clients.find((client) => client.id === selectedClient);
+  const visibleClients = clients.filter((client) => {
+    const text = `${client.name} ${client.phone} ${client.dni ?? ''}`.toLocaleLowerCase('es-AR');
+    return text.includes(search.trim().toLocaleLowerCase('es-AR')) && (accountFilter === 'all' || client.accountSummary?.status === accountFilter);
+  });
   return (
-    <div>
+    <div className="collections-panel">
       <PageHero
         kicker="Recupero y cartera"
         title={isCollector ? 'Mi Panel de Cobranzas' : 'Panel de Cobranzas'}
         description="Gestión de cartera, validación de comprobantes y seguimiento de cuotas."
         action={
-          <button className="knowledge-hero-action" onClick={loadAll} disabled={loading}>
+          <button className="knowledge-hero-action" onClick={() => loadAll()} disabled={loading}>
             <span>🔄</span> {loading ? 'Cargando...' : 'Refrescar'}
           </button>
         }
@@ -249,24 +287,10 @@ export default function CollectionsPanel({ token, me, isCollector, initialClient
       {error && <p className="error">{error}</p>}
       {successMsg && <p className="success-msg">{successMsg}</p>}
 
-      {/* GET /collections/kpis ya viene acotado al cobrador logueado salvo que
-          sea Controlador, así que los KPIs son los suyos, no los globales. */}
-      <div className="card" style={{ marginTop: 12 }}>
-        <h3>{isController ? 'KPIs de Cobranzas (todos)' : 'Mis KPIs'}</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 8 }}>
-          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7f3', borderRadius: 6, padding: 12 }}>
-            <div style={{ fontSize: 24, fontWeight: 'bold', color: 'var(--success)' }}>{kpis?.clientsWithPendingQuotas ?? 0}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Cuotas pendientes</div>
-          </div>
-          <div style={{ background: '#fffbeb', border: '1px solid #8afdf6', borderRadius: 6, padding: 12 }}>
-            <div style={{ fontSize: 24, fontWeight: 'bold', color: '#09b4aa' }}>{kpis?.proofsToReview ?? 0}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Comprobantes para revisar</div>
-          </div>
-          <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 6, padding: 12 }}>
-            <div style={{ fontSize: 24, fontWeight: 'bold', color: '#1d4ed8' }}>{kpis?.confirmedThisWeek ?? 0}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Pagos confirmados esta semana</div>
-          </div>
-        </div>
+      <div className="collection-metrics" aria-label="Resumen de cobranzas">
+        <button className="collection-metric" onClick={() => setTab('clients')}><strong>{kpis?.clientsWithPendingQuotas ?? 0}</strong><span>Cuotas pendientes</span><small>Ver cartera →</small></button>
+        <button className="collection-metric collection-metric-warning" onClick={() => { setTab('proofs'); setProofStatus('PENDING_REVIEW'); }}><strong>{kpis?.proofsToReview ?? 0}</strong><span>Comprobantes para revisar</span><small>Revisar comprobantes →</small></button>
+        <div className="collection-metric"><strong>{kpis?.confirmedThisWeek ?? 0}</strong><span>Pagos confirmados esta semana</span><small>Con verificación bancaria</small></div>
       </div>
 
       <div className="submenu-bar collections-tabs">
@@ -324,14 +348,14 @@ export default function CollectionsPanel({ token, me, isCollector, initialClient
                   {proofStatus === 'REJECTED' && <th>Motivo</th>}
                   {proofStatus === 'ACCEPTED' && <th>Aceptado</th>}
                   {proofStatus === 'ACCEPTED' && <th>Impacto</th>}
-                  <th>Status</th><th></th>
+                  <th>Estado</th><th></th>
                 </tr>
               </thead>
               <tbody>
                 {proofs.map((p) => (
                   <tr key={p.id}>
                     <td>{p.quota?.client?.name ?? 'N/A'}</td>
-                    <td>${p.extractedAmount ?? '?'}</td>
+                    <td>{money(p.extractedAmount)}</td>
                     <td>{formatProofDate(p.extractedDate)}</td>
                     <td>{p.extractedBank ?? '—'}</td>
                     {proofStatus === 'MANUAL_HANDLING' && (
@@ -344,9 +368,9 @@ export default function CollectionsPanel({ token, me, isCollector, initialClient
                       <td>{p.acceptedAt ? new Date(p.acceptedAt).toLocaleString() : '—'}</td>
                     )}
                     {proofStatus === 'ACCEPTED' && (
-                      <td><span className={`badge ${statusBadgeColor(p.impactStatus)}`}>{p.impactStatus}</span></td>
+                      <td><span className={`badge ${statusBadgeColor(p.impactStatus)}`}>{proofLabel(p.impactStatus)}</span></td>
                     )}
-                    <td><span className={`badge ${statusBadgeColor(p.status)}`}>{p.status}</span></td>
+                    <td><span className={`badge ${statusBadgeColor(p.status)}`}>{proofLabel(p.status)}</span></td>
                     <td><button className="secondary" onClick={() => setSelectedProof(p)}>Ver</button></td>
                   </tr>
                 ))}
@@ -370,9 +394,9 @@ export default function CollectionsPanel({ token, me, isCollector, initialClient
               {acceptedProofs.map((p) => (
                 <tr key={p.id}>
                   <td>{p.quota?.client?.name ?? 'N/A'}</td>
-                  <td>${p.extractedAmount ?? '?'}</td>
+                  <td>{money(p.extractedAmount)}</td>
                   <td>{p.acceptedBy?.name ?? '—'}</td>
-                  <td><span className={`badge ${statusBadgeColor(p.impactStatus)}`}>{p.impactStatus}</span></td>
+                  <td><span className={`badge ${statusBadgeColor(p.impactStatus)}`}>{proofLabel(p.impactStatus)}</span></td>
                   <td><button className="secondary" onClick={() => setSelectedProof(p)}>Verificar</button></td>
                 </tr>
               ))}
@@ -396,70 +420,28 @@ export default function CollectionsPanel({ token, me, isCollector, initialClient
       )}
 
       {tab === 'clients' && (
-        <div className="card" style={{ marginTop: 12 }}>
-          <h3>{isCollector ? 'Mis Clientes' : 'Clientes'}</h3>
-          {clients.length === 0 ? (
-            <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)' }}>
-              Sin clientes asignados.
-            </div>
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Nombre</th><th>Teléfono</th><th>Cuotas Pendientes</th><th>Cobrador</th><th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {clients.map((c) => (
-                  <tr key={c.id}>
-                    <td>{c.name}</td>
-                    <td>{c.phone}</td>
-                    <td>{c.quotas?.filter((q) => q.status === 'PENDING').length ?? 0}</td>
-                    <td>
-                      {c.assignedCollector ? (
-                        c.assignedCollector.name
-                      ) : isController ? (
-                        // Solo el Controlador puede asignar: el endpoint
-                        // responde 403 a cualquier otro.
-                        <select
-                          defaultValue=""
-                          style={{ width: 'auto' }}
-                          onChange={(e) => handleAssignCollector(c.id, e.target.value)}
-                        >
-                          <option value="">Asignar cobrador...</option>
-                          {collectors.map((col) => (
-                            <option key={col.id} value={col.id}>
-                              {col.name}{col.isController ? ' (Controlador)' : ''}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="badge status-warning">Sin asignar</span>
-                      )}
-                    </td>
-                    <td style={{ display: 'flex', gap: 6 }}>
-                      <button className="secondary" onClick={() => openClientHistory(c.id)}>Historial</button>
-                      <button className="secondary" onClick={() => handleEscalateClient(c.id)}>Escalar</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+        <section className="card collection-portfolio">
+          <div className="collection-section-heading"><div><h3>{isCollector ? 'Mi cartera' : 'Cartera de clientes'}</h3><p>Elegí un cliente para revisar sus cuotas y gestionar la cobranza.</p></div><span>{visibleClients.length} de {clients.length} clientes</span></div>
+          <div className="collection-toolbar"><label className="collection-search">Buscar cliente<input type="search" placeholder="Nombre, teléfono o DNI" value={search} onChange={(event) => setSearch(event.target.value)} /></label><label>Estado de cuenta<select value={accountFilter} onChange={(event) => setAccountFilter(event.target.value)}><option value="all">Todos los clientes</option><option value="EN_MORA">Con atraso</option><option value="AL_DIA">Al día</option><option value="SIN_DEUDA">Sin deuda</option></select></label></div>
+          <div className="collection-table-scroll"><table><thead><tr><th>Cliente</th><th>Estado</th><th>Cuotas sin pagar</th><th>Total adeudado</th>{!isCollector && <th>Cobrador</th>}<th><span className="collection-sr-only">Acciones</span></th></tr></thead><tbody>
+            {visibleClients.map((client) => <tr key={client.id}><td><strong>{client.name}</strong><small className="collection-subline">{client.phone}</small></td><td><span className={`badge ${client.accountSummary?.status === 'EN_MORA' ? 'status-error' : 'status-active'}`}>{accountLabel(client.accountSummary?.status)}</span>{client.accountSummary?.overdueQuotaCount > 0 && <small className="collection-subline">{client.accountSummary.overdueQuotaCount} vencidas</small>}</td><td>{client.quotas?.filter((quota) => quota.status !== 'PAID').length ?? 0}</td><td className="collection-money">{money(client.accountSummary?.totalDebt)}</td>{!isCollector && <td>{client.assignedCollector?.name ?? (isController ? <select aria-label={`Asignar cobrador a ${client.name}`} value="" onChange={(event) => handleAssignCollector(client.id, event.target.value)}><option value="">Asignar cobrador…</option>{collectors.map((collector) => <option key={collector.id} value={collector.id}>{collector.name}</option>)}</select> : 'Sin asignar')}</td>}<td><button className="secondary" onClick={() => { setQuotaFilter('pending'); openClientHistory(client.id); }}>Ver cuenta →</button></td></tr>)}
+            {!visibleClients.length && <tr><td colSpan={isCollector ? 5 : 6} className="collection-empty">{loading ? 'Cargando cartera…' : clients.length ? 'No hay clientes que coincidan con la búsqueda.' : 'Todavía no tenés clientes asignados.'}</td></tr>}
+          </tbody></table></div>
+        </section>
       )}
 
       {tab === 'reminder-config' && <ReminderConfig token={token} />}
 
       {selectedProof && (
-        <div className="card" style={{ marginTop: 12 }}>
+        <CollectionDialog title="Revisar comprobante" onClose={closeProof}><div className="collection-dialog-body">
+          {error && <p className="error" role="alert">{error}</p>}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <h4 style={{ margin: 0 }}>Comprobante: {selectedProof.quota?.client?.name}</h4>
             <button className="secondary" onClick={() => setSelectedProof(null)}>Cerrar</button>
           </div>
-          <p><b>Monto:</b> ${selectedProof.extractedAmount ?? '?'} | <b>Fecha:</b> {formatProofDate(selectedProof.extractedDate)} | <b>Banco:</b> {selectedProof.extractedBank}</p>
+          <p><b>Monto:</b> {money(selectedProof.extractedAmount)} | <b>Fecha:</b> {formatProofDate(selectedProof.extractedDate)} | <b>Banco:</b> {selectedProof.extractedBank}</p>
           <p>
-            <b>Status:</b> <span className={`badge ${statusBadgeColor(selectedProof.status)}`}>{selectedProof.status}</span>
+            <b>Estado:</b> <span className={`badge ${statusBadgeColor(selectedProof.status)}`}>{proofLabel(selectedProof.status)}</span>
             {selectedProof.rejectionReason && (
               <> · <b>Motivo:</b> {REJECTION_LABELS[selectedProof.rejectionReason] ?? selectedProof.rejectionReason}</>
             )}
@@ -532,67 +514,26 @@ export default function CollectionsPanel({ token, me, isCollector, initialClient
                   if (obs !== null) handleVerifyImpact(selectedProof.id, 'MISSING', obs);
                 }}>✗ No impactó</button>
               </div>
-              {selectedProof.impactStatus && <p><b>Impacto:</b> {selectedProof.impactStatus}</p>}
+              {selectedProof.impactStatus && <p><b>Impacto:</b> {proofLabel(selectedProof.impactStatus)}</p>}
             </div>
           )}
-        </div>
+        </div></CollectionDialog>
       )}
 
-      {selectedClient && (
-        <div className="modal-backdrop" onClick={() => setSelectedClient(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <h4 style={{ margin: 0 }}>
-                Historial — {clients.find((c) => c.id === selectedClient)?.name} · {clients.find((c) => c.id === selectedClient)?.phone}
-              </h4>
-              <button className="secondary" onClick={() => setSelectedClient(null)}>Cerrar</button>
-            </div>
-
-            {clients.find((c) => c.id === selectedClient)?.accountSummary && (() => {
-              const summary = clients.find((c) => c.id === selectedClient).accountSummary;
-              return <dl className="client-account-summary">
-                <div><dt>Cuotas vencidas</dt><dd>{summary.overdueQuotaCount}</dd></div>
-                <div><dt>Estado del cliente</dt><dd>{{ SIN_DEUDA: 'Sin deuda', EN_MORA: 'En mora', AL_DIA: 'Al día' }[summary.status] ?? summary.status}</dd></div>
-                <div><dt>Total adeudado</dt><dd>${Number(summary.totalDebt).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</dd></div>
-              </dl>;
-            })()}
-
-            {/* POST /collections/quotas/:id/manual (Historia 5) y
-                POST /collections/quotas/:id/request-proof (Fig 3) — la
-                conversación completa de este cliente (mensajes, notas,
-                eventos) se ve en Registro de Actividad filtrando por este
-                mismo cliente; no se duplica acá. */}
-            <table>
-              <thead>
-                <tr>
-                  <th>Vencimiento</th><th>Monto</th><th>Status</th><th>Nota</th><th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {(clients.find((c) => c.id === selectedClient)?.quotas ?? []).map((q) => (
-                  <tr key={q.id}>
-                    <td>{formatCalendarDate(q.dueDate)}</td>
-                    <td>${q.amount}</td>
-                    <td><span className={`badge ${statusBadgeColor(q.status)}`}>{QUOTA_STATUS_LABELS[q.status] ?? q.status}</span></td>
-                    <td>{q.manualHandlingNote ?? '—'}</td>
-                    <td style={{ display: 'flex', gap: 6 }}>
-                      {!['PAID', 'MANUAL'].includes(q.status) && (
-                        <>
-                          <button className="secondary" onClick={() => handleRequestProof(q.id)}>
-                            Solicitar comprobante
-                          </button>
-                          <button className="secondary" onClick={() => handleMarkQuotaManual(q.id)}>
-                            Marcar manual
-                          </button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {activeClient && (
+        <CollectionDialog title={`Cuenta de ${activeClient.name}`} onClose={closeClient}>
+          <header className="collection-dialog-header"><div><small>CUENTA DEL CLIENTE</small><h2>{activeClient.name}</h2><p>{activeClient.phone}{activeClient.dni ? ` · DNI ${activeClient.dni}` : ''}</p></div><button className="secondary" onClick={closeClient}>Cerrar ✕</button></header>
+          <div className="collection-dialog-body">
+            {(error || successMsg) && <p role="status" className={error ? 'error' : 'success-msg'}>{error || successMsg}</p>}
+            <div className="collection-account-totals"><div><span>Total adeudado</span><strong>{money(activeClient.accountSummary?.totalDebt)}</strong></div><div><span>Cuotas vencidas</span><strong>{activeClient.accountSummary?.overdueQuotaCount ?? '—'}</strong></div><div><span>Estado de cuenta</span><strong>{accountLabel(activeClient.accountSummary?.status)}</strong></div></div>
+            <div className="collection-section-heading"><div><h3>Plan de cuotas</h3><p>Los pagos se confirman después de verificar su impacto bancario.</p></div><label className="collection-sr-only" htmlFor="collection-quota-filter">Mostrar cuotas</label><select id="collection-quota-filter" value={quotaFilter} onChange={(event) => setQuotaFilter(event.target.value)}><option value="pending">Sin pagar</option><option value="paid">Pagadas</option><option value="all">Todas</option></select></div>
+            <div className="collection-table-scroll"><table><thead><tr><th>Vencimiento</th><th>Importe</th><th>Estado</th><th>Gestión</th></tr></thead><tbody>
+              {(activeClient.quotas ?? []).filter((quota) => quotaFilter === 'all' || (quotaFilter === 'paid' ? quota.status === 'PAID' : quota.status !== 'PAID')).map((quota) => <tr key={quota.id}><td>{formatCalendarDate(quota.dueDate)}</td><td className="collection-money">{money(quota.amount)}</td><td><span className={`badge ${statusBadgeColor(quota.status)}`}>{QUOTA_STATUS_LABELS[quota.status] ?? quota.status}</span>{quota.manualHandlingNote && <small className="collection-subline">{quota.manualHandlingNote}</small>}</td><td>{!['PAID', 'MANUAL'].includes(quota.status) ? <div className="collection-quota-actions"><button className="secondary" onClick={() => handleRequestProof(quota.id)}>Pedir comprobante</button><button className="collection-text-action" onClick={() => handleMarkQuotaManual(quota.id)}>Manejo manual</button></div> : '—'}</td></tr>)}
+              {!(activeClient.quotas ?? []).some((quota) => quotaFilter === 'all' || (quotaFilter === 'paid' ? quota.status === 'PAID' : quota.status !== 'PAID')) && <tr><td colSpan={4} className="collection-empty">No hay cuotas en esta vista.</td></tr>}
+            </tbody></table></div>
           </div>
-        </div>
+          <footer className="collection-dialog-footer"><span>¿Necesitás ayuda para gestionar este cliente?</span><button className="secondary" onClick={() => handleEscalateClient(activeClient.id)}>Consultar a un supervisor</button></footer>
+        </CollectionDialog>
       )}
     </div>
   );
