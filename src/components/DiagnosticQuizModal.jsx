@@ -164,6 +164,43 @@ export default function DiagnosticQuizModal({ token, onClose, onComplete }) {
           </div>
         )}
 
+        {/* Sin preguntas disponibles para el sector o rol */}
+        {!loading && !alreadyCompleted && !error && !result && (!quizData || questions.length === 0) && (
+          <div style={{ padding: '36px 32px 28px', textAlign: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+              <Trimi mood="saluda" size={90} />
+            </div>
+            <h3 style={{ margin: '0 0 10px', color: '#17305A', fontSize: 22, fontFamily: 'var(--font-title, "Lexend", sans-serif)' }}>
+              ¡Tu ruta está lista para comenzar!
+            </h3>
+            <p className="hint" style={{ margin: '0 auto 24px', maxWidth: 480, fontSize: 14, color: '#64748B', lineHeight: 1.55 }}>
+              No hay preguntas de diagnóstico pendientes para tu sector en este momento. Podés comenzar directamente a cursar las paradas de tu ruta formativa.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onComplete) onComplete({ score: 100, exemptedModules: [] });
+                  if (onClose) onClose();
+                }}
+                style={{
+                  background: '#2B6FC0',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '11px 28px',
+                  borderRadius: 8,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  minHeight: 44,
+                }}
+              >
+                Comenzar capacitación
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* CUESTIONARIO CONVERSADO (Captura 2) */}
         {!loading && !alreadyCompleted && !result && quizData && questions.length > 0 && currentQ && (
           <div>
@@ -237,6 +274,27 @@ export default function DiagnosticQuizModal({ token, onClose, onComplete }) {
                 >
                   Pregunta {currentIndex + 1} de {questions.length}
                 </span>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  aria-label="Cerrar diagnóstico"
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: 18,
+                    lineHeight: 1,
+                    color: '#94A3B8',
+                    cursor: 'pointer',
+                    padding: '6px 8px',
+                    borderRadius: 6,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  title="Cerrar"
+                >
+                  ✕
+                </button>
               </div>
             </div>
 

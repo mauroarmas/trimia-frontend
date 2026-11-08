@@ -4,7 +4,7 @@ import { estimateMetricsEconomics, formatUsd } from '../tokenEconomics';
 
 const VOLUME_SCENARIOS = [500, 1500, 5000, 15000];
 
-export default function TokenEconomicsModal({ metrics, onClose }) {
+export default function TokenEconomicsModal({ metrics, onClose, children }) {
   const [monthlyQueries, setMonthlyQueries] = useState(1500);
   const [arsRate, setArsRate] = useState(1200);
   const [showTechnical, setShowTechnical] = useState(false);
@@ -52,7 +52,7 @@ export default function TokenEconomicsModal({ metrics, onClose }) {
         <header className="econ-modal-header">
           <div>
             <span className="econ-modal-kicker">Eficiencia e impacto económico</span>
-            <h2 id="econ-modal-title">Consumo y Costos de Inteligencia Artificial</h2>
+            <h2 id="econ-modal-title">Métricas y Costos de IA</h2>
             <p>
               Traducción del uso real del asistente virtual a costos operativos estimados y
               capacidad de atención para el negocio.
@@ -69,6 +69,7 @@ export default function TokenEconomicsModal({ metrics, onClose }) {
         </header>
 
         <div className="econ-modal-body">
+          {children}
           {/* KPIs ejecutivos en lenguaje no técnico */}
           <div className="econ-kpi-grid">
             <article className="econ-kpi-card is-highlight">

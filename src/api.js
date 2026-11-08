@@ -1299,5 +1299,43 @@ export const renewCommercialOrder = (token, id, body) => request(`/sales/commerc
 export const editCommercialOrder = (token, id, body) => request(`/sales/commercial/orders/${id}/edit`, { method: 'POST', token, body });
 export const closeCommercialOrder = (token, id, body) => request(`/sales/commercial/orders/${id}/close`, { method: 'POST', token, body });
 
+// Seguimiento comercial automático 021: regla global, estado por prospecto, simulación de 48 h y resync CRM.
+export const getFollowUpRule = (token) => request('/sales/followup-rule', { token });
+export const updateFollowUpRule = (token, payload) =>
+  request('/sales/followup-rule', { method: 'PUT', token, body: payload });
+export const getProspectFollowUpStatus = (token, id) =>
+  request(`/sales/prospects/${id}/followup-status`, { token });
+export const simulateProspectFollowUpDue = (token, id) =>
+  request(`/sales/prospects/${id}/followup/simulate-due`, { method: 'POST', token });
+export const syncProspectCrm = (token, id) =>
+  request(`/sales/prospects/${id}/crm-sync`, { method: 'POST', token });
+
+// Mensajería 022: preferencia única de no contacto y confirmación simulada de entrega.
+export const getContactPreference = (token, phone) =>
+  request(`/sales/contact-preferences/${encodeURIComponent(phone)}`, { token });
+export const optOutContactPreference = (token, phone, body) =>
+  request(`/sales/contact-preferences/${encodeURIComponent(phone)}/opt-out`, {
+    method: 'POST',
+    token,
+    body,
+  });
+export const reactivateContactPreference = (token, phone, body) =>
+  request(
+    `/sales/contact-preferences/${encodeURIComponent(phone)}/reactivate`,
+    {
+      method: 'POST',
+      token,
+      body,
+    },
+  );
+export const simulateFinancingNoticeDelivery = (token, id, body = {}) =>
+  request(`/sales/financing/notices/${id}/simulate-delivery`, {
+    method: 'POST',
+    token,
+    body,
+  });
+
+
+
 export const getAiModel = (token) => request('/supervisor/ai-model', { token });
 export const updateAiModel = (token, body) => request('/supervisor/ai-model', { method: 'PUT', token, body });

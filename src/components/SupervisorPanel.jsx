@@ -233,7 +233,6 @@ export default function SupervisorPanel({ token, me, onOpenFinancing }) {
   const [showEconomicsModal, setShowEconomicsModal] = useState(false);
   const [selectedConv, setSelectedConv] = useState(null);
   const [timeline, setTimeline] = useState(null);
-
   // Debounce del texto de búsqueda (300ms)
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -373,7 +372,7 @@ export default function SupervisorPanel({ token, me, onOpenFinancing }) {
               onClick={() => setShowEconomicsModal(true)}
             >
               <span aria-hidden="true">✦</span>
-              <span>Consumo y Costos IA</span>
+              <span>Métricas y Costos de IA</span>
               <span className="sup-hero-econ-pill">
                 {formatUsd(econ.totalCostUsd, { compact: true })}
               </span>
@@ -390,8 +389,6 @@ export default function SupervisorPanel({ token, me, onOpenFinancing }) {
           </>
         }
       />
-
-      {canSelectAiModel && <AiModelSelector token={token} onChanged={loadOverview} />}
 
       {error && (
         <p className="error" role="alert" style={{ marginBottom: 16 }}>
@@ -451,18 +448,6 @@ export default function SupervisorPanel({ token, me, onOpenFinancing }) {
               </div>
               <span className="sup-kpi-chip-sub">Confianza mínima exigida</span>
             </div>
-
-            <button
-              type="button"
-              className="sup-kpi-chip sup-kpi-chip-button"
-              onClick={() => setShowEconomicsModal(true)}
-            >
-              <span className="sup-kpi-chip-label">Inversión IA acumulada</span>
-              <div className="sup-kpi-chip-main">
-                <strong>{formatUsd(econ.totalCostUsd)}</strong>
-              </div>
-              <span className="sup-kpi-chip-link">Ver modelo y detalle económico →</span>
-            </button>
           </div>
         </div>
 
@@ -920,7 +905,9 @@ export default function SupervisorPanel({ token, me, onOpenFinancing }) {
         <TokenEconomicsModal
           metrics={metrics}
           onClose={() => setShowEconomicsModal(false)}
-        />
+        >
+          {canSelectAiModel && <AiModelSelector token={token} onChanged={loadOverview} />}
+        </TokenEconomicsModal>
       )}
 
       {/* Modal de Detalle de Conversación */}

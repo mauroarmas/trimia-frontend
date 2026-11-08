@@ -10,7 +10,7 @@ import TrainingIcon from './TrainingIcon';
  * - onComplete: callback al terminar o saltar la presentación
  * - onStartDiagnostic: callback si el usuario decide arrancar directo el diagnóstico
  */
-export default function WelcomeOnboardingModal({ me, onComplete, onStartDiagnostic }) {
+export default function WelcomeOnboardingModal({ me, hasDiagnostic = true, onComplete, onStartDiagnostic }) {
   const [step, setStep] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
 
@@ -40,11 +40,17 @@ export default function WelcomeOnboardingModal({ me, onComplete, onStartDiagnost
       dialogue:
         'Tu ruta está organizada en paradas temáticas con 3 etapas cada una: primero vas a Escuchar la píldora explicativa, después vas a Practicar con mis pistas, y finalmente vas a Demostrar atendiendo a un cliente simulado sin ayuda.',
     },
-    {
-      title: 'Empecemos conociendo lo que ya sabés',
-      dialogue:
-        'Antes de arrancar la primera parada, tenemos un breve diagnóstico conversado de 5 minutos. Si ya conocés un tema, esa parada te queda automáticamente eximida para que no pierdas tiempo y vayas directo a atender clientes.',
-    },
+    hasDiagnostic
+      ? {
+          title: 'Empecemos conociendo lo que ya sabés',
+          dialogue:
+            'Antes de arrancar la primera parada, tenemos un breve diagnóstico conversado de 5 minutos. Si ya conocés un tema, esa parada te queda automáticamente eximida para que no pierdas tiempo y vayas directo a atender clientes.',
+        }
+      : {
+          title: 'Tu ruta de aprendizaje está lista',
+          dialogue:
+            'Tu ruta está configurada según tu puesto. Vas a poder recorrer cada parada a tu ritmo, escuchar las píldoras explicativas, practicar con mis pistas y demostrar tus conocimientos con clientes simulados.',
+        },
   ];
 
   const currentStepData = stepsData[step - 1];
@@ -54,7 +60,9 @@ export default function WelcomeOnboardingModal({ me, onComplete, onStartDiagnost
       setStep(step + 1);
     } else {
       if (onComplete) onComplete();
-      if (onStartDiagnostic) onStartDiagnostic();
+      if (hasDiagnostic && onStartDiagnostic) {
+        onStartDiagnostic();
+      }
     }
   };
 
@@ -254,7 +262,7 @@ export default function WelcomeOnboardingModal({ me, onComplete, onStartDiagnost
                 minHeight: 44,
               }}
             >
-              {step === 3 ? 'Empezar diagnóstico' : 'Siguiente'}
+              {step === 3 ? (hasDiagnostic ? 'Empezar diagnóstico' : 'Comenzar capacitación') : 'Siguiente'}
             </button>
           </div>
         </div>
@@ -295,9 +303,11 @@ export default function WelcomeOnboardingModal({ me, onComplete, onStartDiagnost
             </div>
             <div>
               <strong style={{ fontSize: 12, display: 'block', color: '#17305A' }}>
-                Diagnóstico de 5 minutos
+                {hasDiagnostic ? 'Diagnóstico de 5 minutos' : 'A tu propio ritmo'}
               </strong>
-              <span style={{ fontSize: 11, color: '#64748B' }}>Si ya sabés un tema, lo salteás.</span>
+              <span style={{ fontSize: 11, color: '#64748B' }}>
+                {hasDiagnostic ? 'Si ya sabés un tema, lo salteás.' : 'Avanzás parada a parada sin apuros.'}
+              </span>
             </div>
           </div>
 

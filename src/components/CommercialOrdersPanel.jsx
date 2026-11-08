@@ -51,6 +51,15 @@ export default function CommercialOrdersPanel({ token, me, onCountChange }) {
     return () => clearInterval(timer);
   }, [load]);
 
+  useEffect(() => {
+    if (!selected) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setSelected(null);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selected]);
+
   const counts = useMemo(() => {
     return {
       ALL: rows.length,
@@ -213,12 +222,11 @@ export default function CommercialOrdersPanel({ token, me, onCountChange }) {
                       <td className="sales-col-action">
                         <button
                           type="button"
-                          className={isSelected ? 'btn-pill-action' : 'secondary'}
-                          onClick={() =>
-                            isSelected ? setSelected(null) : openOrder(row.id)
-                          }
+                          className="secondary"
+                          onClick={() => openOrder(row.id)}
+                          title="Abrir ficha en pantalla completa"
                         >
-                          {isSelected ? 'Ocultar' : 'Abrir ficha'}
+                          Abrir ficha
                         </button>
                       </td>
                     </tr>
@@ -231,15 +239,58 @@ export default function CommercialOrdersPanel({ token, me, onCountChange }) {
       </section>
 
       {selected && (
-        <div ref={detailRef}>
-          <CommercialOrderCard
-            key={selected}
-            token={token}
-            me={me}
-            id={selected}
-            onChanged={load}
-            onClose={() => setSelected(null)}
-          />
+        <div
+          className="commerce-fullscreen-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Ficha del pedido en pantalla completa"
+        >
+          <div className="commerce-fullscreen-dialog">
+            <header className="commerce-fullscreen-topbar">
+              <div className="commerce-fullscreen-top-left">
+                <button
+                  type="button"
+                  className="commerce-fullscreen-back-btn"
+                  onClick={() => setSelected(null)}
+                  title="Volver a la lista de pedidos (Esc)"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+                    <line x1="19" y1="12" x2="5" y2="12" />
+                    <polyline points="12 19 5 12 12 5" />
+                  </svg>
+                  <span>Volver a Cierres de venta</span>
+                </button>
+                <span className="commerce-fullscreen-divider">|</span>
+                <span className="commerce-fullscreen-title">
+                  Ficha comercial en pantalla completa
+                </span>
+              </div>
+
+              <div className="commerce-fullscreen-top-right">
+                <span className="commerce-esc-hint">Esc para salir</span>
+                <button
+                  type="button"
+                  className="commerce-fullscreen-close-icon"
+                  onClick={() => setSelected(null)}
+                  aria-label="Cerrar ficha"
+                  title="Cerrar (Esc)"
+                >
+                  ✕
+                </button>
+              </div>
+            </header>
+
+            <div className="commerce-fullscreen-content">
+              <CommercialOrderCard
+                key={selected}
+                token={token}
+                me={me}
+                id={selected}
+                onChanged={load}
+                onClose={() => setSelected(null)}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>

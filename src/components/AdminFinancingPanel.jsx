@@ -1,5 +1,6 @@
 import CommercialReviewPanel from './CommercialReviewPanel';
 import FinancingPlanPanel from './FinancingPlanPanel';
+import FinancingConversationModal from './FinancingConversationModal';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   listFinancingRequests,
@@ -8,6 +9,7 @@ import {
   correctFinancingRequest,
   cancelFinancingRequest,
   retryFinancingNotice,
+  simulateFinancingNoticeDelivery,
 } from '../api';
 import { contactInitials } from '../conversationHelpers';
 import InfoNotes, { InfoToggle } from './InfoNotes';
@@ -26,6 +28,7 @@ const LABELS = {
   PENDING: 'Pendiente',
   SENDING: 'En proceso',
   ACCEPTED: 'Aceptado',
+  DELIVERED: 'Entregado (simulado)',
   FAILED: 'Fallido',
   UNCERTAIN: 'Resultado incierto: requiere atención',
 };
@@ -42,6 +45,7 @@ const EVENT_LABELS = {
   CANCELLED: 'Solicitud cancelada',
   NOTICE_CLAIMED: 'Intento de aviso iniciado',
   NOTICE_ACCEPTED: 'Aviso aceptado en simulación',
+  NOTICE_DELIVERED: 'Entrega confirmada en simulación',
   NOTICE_FAILED: 'Aviso fallido',
   NOTICE_UNCERTAIN: 'Aviso incierto',
   NOTICE_RETRY: 'Reintento solicitado',
@@ -66,6 +70,7 @@ const STATUS_TONE = {
 
 const NOTICE_TONE = {
   ACCEPTED: 'is-approved',
+  DELIVERED: 'is-approved',
   PENDING: 'is-pending',
   SENDING: 'is-sending',
   FAILED: 'is-rejected',
@@ -103,6 +108,7 @@ export default function AdminFinancingPanel({ token, me, initialRequestId, onOpe
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState('');
   const [evalElapsedSec, setEvalElapsedSec] = useState(0);
+  const [showConvModal, setShowConvModal] = useState(false);
 
   const busy = Boolean(busyAction);
 
@@ -156,10 +162,7 @@ export default function AdminFinancingPanel({ token, me, initialRequestId, onOpe
         }
         if (!silent) {
           requestAnimationFrame(() => {
-            detailSectionRef.current?.scrollIntoView({
-              behavior: 'smooth',
-              block: 'nearest',
-            });
+            window.scrollTo?.({ top: 0, behavior: 'smooth' });
           });
         }
       }
@@ -423,167 +426,171 @@ export default function AdminFinancingPanel({ token, me, initialRequestId, onOpe
         </div>
       )}
 
-      <div className="submenu-bar fin-filter-bar">
-        <nav className="submenu-pills" aria-label="Filtrar solicitudes">
-          {FILTER_TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              className={`submenu-pill${filter === t.id ? ' active' : ''}`}
-              onClick={() => setFilter(t.id)}
-            >
-              {t.label}{' '}
-              <span className="fin-tab-count">{counts[t.id] ?? 0}</span>
-            </button>
-          ))}
-        </nav>
+      {!selected && !openingId && (
+        <>
+          <div className="submenu-bar fin-filter-bar">
+            <nav className="submenu-pills" aria-label="Filtrar solicitudes">
+              {FILTER_TABS.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  className={`submenu-pill${filter === t.id ? ' active' : ''}`}
+                  onClick={() => setFilter(t.id)}
+                >
+                  {t.label}{' '}
+                  <span className="fin-tab-count">{counts[t.id] ?? 0}</span>
+                </button>
+              ))}
+            </nav>
 
-        {evaluatingRowsCount > 0 && (
-          <div className="fin-live-sync-pill" role="status" aria-live="polite">
-            <span className="fin-spinner-sm" aria-hidden="true" />
-            <span>
-              {evaluatingRowsCount === 1
-                ? '1 verificación crediticia en curso'
-                : `${evaluatingRowsCount} verificaciones crediticias en curso`}{' '}
-              · Sincronizando
-            </span>
+            {evaluatingRowsCount > 0 && (
+              <div className="fin-live-sync-pill" role="status" aria-live="polite">
+                <span className="fin-spinner-sm" aria-hidden="true" />
+                <span>
+                  {evaluatingRowsCount === 1
+                    ? '1 verificación crediticia en curso'
+                    : `${evaluatingRowsCount} verificaciones crediticias en curso`}{' '}
+                  · Sincronizando
+                </span>
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      <section className="card fin-table-card">
-        {loadingList && rows.length === 0 ? (
-          <div className="fin-empty-box">
-            <span className="fin-spinner-md" aria-hidden="true" />
-            <p>Cargando solicitudes de financiación…</p>
-          </div>
-        ) : filteredRows.length === 0 ? (
-          <div className="fin-empty-box">
-            <p>
-              {rows.length === 0
-                ? 'No hay solicitudes registradas todavía.'
-                : `No hay solicitudes en estado «${
-                    FILTER_TABS.find((t) => t.id === filter)?.label ?? filter
-                  }».`}
-            </p>
-          </div>
-        ) : (
-          <div className="knowledge-table-wrap fin-table-wrap">
-            <table className="knowledge-table fin-requests-table">
-              <thead>
-                <tr>
-                  <th>Cliente</th>
-                  <th>Producto</th>
-                  <th>Importe</th>
-                  <th>Verificación crediticia</th>
-                  <th>Estado</th>
-                  <th>Aviso</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRows.map((r) => {
-                  const clientName = r.inputSnapshot?.name ?? r.client.name;
-                  const clientDni =
-                    r.inputSnapshot?.dni ?? r.client.dni ?? 'Sin confirmar';
-                  const rowAssessment = r.creditAssessments?.[0];
-                  const isRowEvaluating =
-                    r.status === 'PENDING_REVIEW' &&
-                    !r.legacyNeedsConfirmation &&
-                    r.evaluationState === 'PENDING';
-                  const isSelected = selected?.id === r.id;
-                  const isOpeningThis = openingId === r.id;
-
-                  return (
-                    <tr
-                      key={r.id}
-                      className={isSelected ? 'is-selected' : ''}
-                    >
-                      <td>
-                        <div className="fin-client-cell">
-                          <span className="fin-client-avatar" aria-hidden="true">
-                            {contactInitials(clientName)}
-                          </span>
-                          <div>
-                            <strong className="fin-client-name">{clientName}</strong>
-                            <div className="fin-client-sub">
-                              DNI {clientDni} · {r.client.phone}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        <span className="fin-product-cell">{r.productSummary}</span>
-                      </td>
-                      <td>
-                        <strong className="fin-amount-cell">{money(r.amount)}</strong>
-                      </td>
-                      <td>
-                        {r.legacyNeedsConfirmation ? (
-                          <span className="fin-pill is-conditions">
-                            Confirmar datos históricos
-                          </span>
-                        ) : isRowEvaluating ? (
-                          <span className="fin-pill is-evaluating">
-                            <span className="fin-spinner-xs" aria-hidden="true" />
-                            Verificando crédito…
-                          </span>
-                        ) : rowAssessment &&
-                          (r.status !== 'PENDING_REVIEW' ||
-                            rowAssessment.requestVersion === r.version) ? (
-                          <span
-                            className={`fin-pill ${
-                              STATUS_TONE[rowAssessment.verdict] ?? ''
-                            }`}
-                          >
-                            {LABELS[rowAssessment.verdict] ?? rowAssessment.verdict}
-                          </span>
-                        ) : (
-                          <span className="fin-pill is-muted">Sin evaluar</span>
-                        )}
-                      </td>
-                      <td>
-                        <span
-                          className={`fin-pill ${STATUS_TONE[r.status] ?? ''}`}
-                        >
-                          {LABELS[r.status] ?? r.status}
-                        </span>
-                      </td>
-                      <td>
-                        {r.notice ? (
-                          <span
-                            className={`fin-pill ${
-                              NOTICE_TONE[r.notice.status] ?? 'is-muted'
-                            }`}
-                          >
-                            {noticeLabel(r.notice)}
-                          </span>
-                        ) : (
-                          <span className="fin-muted-dash">Sin aviso</span>
-                        )}
-                      </td>
-                      <td className="fin-action-cell">
-                        <button
-                          type="button"
-                          className={isSelected ? '' : 'secondary'}
-                          disabled={isOpeningThis}
-                          onClick={() => open(r.id)}
-                        >
-                          {isOpeningThis
-                            ? 'Abriendo…'
-                            : isSelected
-                              ? 'Revisando'
-                              : 'Revisar'}
-                        </button>
-                      </td>
+          <section className="card fin-table-card">
+            {loadingList && rows.length === 0 ? (
+              <div className="fin-empty-box">
+                <span className="fin-spinner-md" aria-hidden="true" />
+                <p>Cargando solicitudes de financiación…</p>
+              </div>
+            ) : filteredRows.length === 0 ? (
+              <div className="fin-empty-box">
+                <p>
+                  {rows.length === 0
+                    ? 'No hay solicitudes registradas todavía.'
+                    : `No hay solicitudes en estado «${
+                        FILTER_TABS.find((t) => t.id === filter)?.label ?? filter
+                      }».`}
+                </p>
+              </div>
+            ) : (
+              <div className="knowledge-table-wrap fin-table-wrap">
+                <table className="knowledge-table fin-requests-table">
+                  <thead>
+                    <tr>
+                      <th>Cliente</th>
+                      <th>Producto</th>
+                      <th>Importe</th>
+                      <th>Verificación crediticia</th>
+                      <th>Estado</th>
+                      <th>Aviso</th>
+                      <th />
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+                  </thead>
+                  <tbody>
+                    {filteredRows.map((r) => {
+                      const clientName = r.inputSnapshot?.name ?? r.client.name;
+                      const clientDni =
+                        r.inputSnapshot?.dni ?? r.client.dni ?? 'Sin confirmar';
+                      const rowAssessment = r.creditAssessments?.[0];
+                      const isRowEvaluating =
+                        r.status === 'PENDING_REVIEW' &&
+                        !r.legacyNeedsConfirmation &&
+                        r.evaluationState === 'PENDING';
+                      const isSelected = selected?.id === r.id;
+                      const isOpeningThis = openingId === r.id;
+
+                      return (
+                        <tr
+                          key={r.id}
+                          className={isSelected ? 'is-selected' : ''}
+                        >
+                          <td>
+                            <div className="fin-client-cell">
+                              <span className="fin-client-avatar" aria-hidden="true">
+                                {contactInitials(clientName)}
+                              </span>
+                              <div>
+                                <strong className="fin-client-name">{clientName}</strong>
+                                <div className="fin-client-sub">
+                                  DNI {clientDni} · {r.client.phone}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <span className="fin-product-cell">{r.productSummary}</span>
+                          </td>
+                          <td>
+                            <strong className="fin-amount-cell">{money(r.amount)}</strong>
+                          </td>
+                          <td>
+                            {r.legacyNeedsConfirmation ? (
+                              <span className="fin-pill is-conditions">
+                                Confirmar datos históricos
+                              </span>
+                            ) : isRowEvaluating ? (
+                              <span className="fin-pill is-evaluating">
+                                <span className="fin-spinner-xs" aria-hidden="true" />
+                                Verificando crédito…
+                              </span>
+                            ) : rowAssessment &&
+                              (r.status !== 'PENDING_REVIEW' ||
+                                rowAssessment.requestVersion === r.version) ? (
+                              <span
+                                className={`fin-pill ${
+                                  STATUS_TONE[rowAssessment.verdict] ?? ''
+                                }`}
+                              >
+                                {LABELS[rowAssessment.verdict] ?? rowAssessment.verdict}
+                              </span>
+                            ) : (
+                              <span className="fin-pill is-muted">Sin evaluar</span>
+                            )}
+                          </td>
+                          <td>
+                            <span
+                              className={`fin-pill ${STATUS_TONE[r.status] ?? ''}`}
+                            >
+                              {LABELS[r.status] ?? r.status}
+                            </span>
+                          </td>
+                          <td>
+                            {r.notice ? (
+                              <span
+                                className={`fin-pill ${
+                                  NOTICE_TONE[r.notice.status] ?? 'is-muted'
+                                }`}
+                              >
+                                {noticeLabel(r.notice)}
+                              </span>
+                            ) : (
+                              <span className="fin-muted-dash">Sin aviso</span>
+                            )}
+                          </td>
+                          <td className="fin-action-cell">
+                            <button
+                              type="button"
+                              className={isSelected ? '' : 'secondary'}
+                              disabled={isOpeningThis}
+                              onClick={() => open(r.id)}
+                            >
+                              {isOpeningThis
+                                ? 'Abriendo…'
+                                : isSelected
+                                  ? 'Revisando'
+                                  : 'Revisar'}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </>
+      )}
 
       {openingId && !selected && (
         <section className="card fin-detail-loading" aria-live="polite">
@@ -595,7 +602,21 @@ export default function AdminFinancingPanel({ token, me, initialRequestId, onOpe
         </section>
       )}
 
-      {selected?.commercialFlow ? <CommercialReviewPanel key={selected.id} token={token} me={me} detail={detail} onChanged={refresh} onClose={() => { detailRequest.current++; setDetail(null); }} /> : selected && (
+      {selected?.commercialFlow ? (
+        <div ref={detailSectionRef}>
+          <CommercialReviewPanel
+            key={selected.id}
+            token={token}
+            me={me}
+            detail={detail}
+            onChanged={refresh}
+            onClose={() => {
+              detailRequest.current++;
+              setDetail(null);
+            }}
+          />
+        </div>
+      ) : selected && (
         <section
           ref={detailSectionRef}
           className={`card financing-detail fin-detail-card${
@@ -625,17 +646,32 @@ export default function AdminFinancingPanel({ token, me, initialRequestId, onOpe
               </div>
             </div>
 
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => {
-                detailRequest.current++;
-                setDetail(null);
-                setEditing(null);
-              }}
-            >
-              Cerrar
-            </button>
+            <div className="commerce-head-actions">
+              <button
+                type="button"
+                className="btn-pill-action commerce-conv-btn"
+                onClick={() => setShowConvModal(true)}
+              >
+                <span>💬 Conversación con el cliente</span>
+                {detail.messages?.length > 0 && (
+                  <span className="commerce-conv-count">
+                    {detail.messages.length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  detailRequest.current++;
+                  setDetail(null);
+                  setEditing(null);
+                  setShowConvModal(false);
+                }}
+              >
+                ← Volver a solicitudes
+              </button>
+            </div>
           </header>
 
           {/* Grilla resumen de los 4 datos clave */}
@@ -1039,18 +1075,50 @@ export default function AdminFinancingPanel({ token, me, initialRequestId, onOpe
               </div>
 
               <p className="fin-notice-desc">
-                Estado actual: <strong>{noticeLabel(selected.notice)}</strong>.{' '}
+                Estado actual: <strong>{noticeLabel(selected.notice)}</strong> · Intentos:{' '}
+                <strong>{selected.notice.attemptCount || 0}/3</strong>.{' '}
                 {selected.notice.lastErrorCode === 'TRANSPORT_DISABLED'
                   ? 'El transporte de mensajería está deshabilitado en este entorno.'
                   : selected.notice.lastErrorCode === 'HUMAN_PAUSED'
                     ? 'El hilo está tomado manualmente por una persona; liberá la conversación para despachar.'
-                    : ''}
+                    : selected.notice.lastErrorCode === 'CONTACT_OPT_OUT'
+                      ? 'El contacto solicitó no recibir mensajes automáticos (022).'
+                      : selected.notice.lastErrorCode === 'CONDITIONS_CHANGED'
+                        ? 'Las condiciones u oferta asociada cambiaron o vencieron (48 h).'
+                        : ''}
               </p>
+
+              {selected.notice.status === 'ACCEPTED' && canMutate && (
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={busy}
+                  onClick={() =>
+                    mutate(
+                      'CONFIRM_DELIVERY',
+                      () =>
+                        simulateFinancingNoticeDelivery(
+                          token,
+                          selected.notice.id,
+                          {
+                            providerMessageId:
+                              selected.notice.providerMessageId || undefined,
+                          },
+                        ),
+                      'Entrega simulada confirmada (DELIVERED).',
+                    )
+                  }
+                >
+                  {busyAction === 'CONFIRM_DELIVERY'
+                    ? 'Confirmando entrega…'
+                    : '✓ Confirmar entrega simulada'}
+                </button>
+              )}
 
               {selected.notice.status === 'FAILED' && canMutate && (
                 <button
                   type="button"
-                  disabled={busy}
+                  disabled={busy || (selected.notice.attemptCount || 0) >= 3}
                   onClick={() =>
                     mutate(
                       'RETRY_NOTICE',
@@ -1066,7 +1134,9 @@ export default function AdminFinancingPanel({ token, me, initialRequestId, onOpe
                 >
                   {busyAction === 'RETRY_NOTICE'
                     ? 'Reintentando…'
-                    : '↻ Reintentar aviso fallido'}
+                    : (selected.notice.attemptCount || 0) >= 3
+                      ? 'Tope de reintentos alcanzado (3/3)'
+                      : '↻ Reintentar aviso fallido'}
                 </button>
               )}
 
@@ -1187,6 +1257,21 @@ export default function AdminFinancingPanel({ token, me, initialRequestId, onOpe
               )}
             </section>
           </div>
+
+          {showConvModal && (
+            <FinancingConversationModal
+              token={token}
+              me={me}
+              conversationId={selected.conversationId}
+              prospectId={selected.prospectId}
+              clientName={snapshot?.name ?? selected.client.name}
+              clientPhone={selected.client.phone}
+              clientDni={snapshot?.dni ?? selected.client.dni}
+              productSummary={selected.productSummary}
+              fallbackMessages={detail.messages}
+              onClose={() => setShowConvModal(false)}
+            />
+          )}
         </section>
       )}
     </div>

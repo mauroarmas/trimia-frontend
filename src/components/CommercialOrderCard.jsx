@@ -47,6 +47,7 @@ export default function CommercialOrderCard({
   id,
   onChanged,
   onClose,
+  hideConversation = false,
   children,
 }) {
   const [order, setOrder] = useState(null);
@@ -62,12 +63,17 @@ export default function CommercialOrderCard({
   const refresh = useCallback(async () => {
     const next = await getCommercialOrder(token, id);
     setOrder(next);
-    if (next.prospectId && (me.isGeneralSupervisor || me.sectorName === 'Ventas')) {
+    if (
+      !hideConversation &&
+      next.prospectId &&
+      (me.isGeneralSupervisor ||
+        ['Ventas', 'Administración', 'Admin'].includes(me.sectorName))
+    ) {
       setConversation(
         await salesProspectAction(token, next.prospectId, 'conversation'),
       );
     }
-  }, [token, id, me.isGeneralSupervisor, me.sectorName]);
+  }, [token, id, hideConversation, me.isGeneralSupervisor, me.sectorName]);
 
   useEffect(() => {
     let active = true;

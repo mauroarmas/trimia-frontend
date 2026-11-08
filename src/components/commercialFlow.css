@@ -388,22 +388,461 @@
   margin-bottom: 12px;
 }
 
+/* ==========================================================================
+   Revisión del pedido de financiación (Administración)
+   ========================================================================== */
+
+.commerce-review-card {
+  gap: 18px;
+}
+
+.commerce-conv-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 600;
+}
+
+.commerce-conv-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.commerce-conv-modal {
+  width: min(920px, calc(100vw - 28px));
+  max-width: 920px !important;
+}
+
+.commerce-validity-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.commerce-validity-pill.is-valid {
+  background: #f0fdf4;
+  color: #15803d;
+  border-color: #bbf7d0;
+}
+
+.commerce-validity-pill.is-expired {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.commerce-review-summary .fin-summary-box {
+  gap: 4px;
+}
+
+.commerce-summary-sub {
+  font-size: 11.5px;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commerce-review-alert {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.commerce-internal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.commerce-verdict-privacy {
+  margin: 4px 0 0;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(100, 116, 139, 0.25);
+  font-size: 12px;
+  color: #64748b;
+}
+
+.commerce-renewal-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-radius: 11px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+}
+
+.commerce-renewal-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.commerce-renewal-copy strong {
+  font-size: 13.5px;
+  color: #92400e;
+}
+
+.commerce-review-form {
+  margin-top: 2px;
+  gap: 18px;
+}
+
+.commerce-offers-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.commerce-offers-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.commerce-offers-header h4 {
+  margin: 0;
+  font-size: 14.5px;
+  color: #0f172a;
+}
+
+.commerce-offers-subtitle {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: #64748b;
+}
+
+.commerce-offers-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.commerce-offers-count {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #334155;
+}
+
 .commerce-offers {
   display: grid;
-  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
 }
 
+/* Override global .financing-module label & .commerce-form label rules */
+.financing-module .commerce-form label.commerce-offer,
+.commerce-form label.commerce-offer,
 .commerce-offer {
   display: flex;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid #dce5ef;
-  border-radius: 8px;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 15px 16px;
+  border: 1.5px solid #dbe4ef;
+  border-radius: 12px;
   background: #ffffff;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease,
+    box-shadow 0.15s ease, transform 0.12s ease;
+  user-select: none;
 }
 
-.commerce-offer input {
-  width: auto;
+.commerce-offer:hover {
+  border-color: #93c5fd;
+  background: #f8fbff;
+}
+
+.commerce-offer.is-selected {
+  border-color: #2563eb;
+  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
+}
+
+.commerce-offer.is-cash.is-selected {
+  border-color: #0d9488;
+  background: linear-gradient(180deg, #f0fdfa 0%, #ffffff 100%);
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.08);
+}
+
+.commerce-offer-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.commerce-offer-check-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.financing-module label.commerce-offer input[type='checkbox'],
+.commerce-form label.commerce-offer input[type='checkbox'],
+.commerce-offer input[type='checkbox'] {
+  display: inline-block;
+  width: 17px;
+  height: 17px;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  accent-color: #2563eb;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.commerce-offer.is-cash input[type='checkbox'] {
+  accent-color: #0d9488;
+}
+
+.commerce-offer-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.commerce-offer-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.commerce-offer-badge.is-cash {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+
+.commerce-offer-badge.is-financed {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.commerce-offer-body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.commerce-offer-price-main {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.commerce-offer-price-main strong {
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+.commerce-offer.is-cash .commerce-offer-price-main strong {
+  color: #0f766e;
+}
+
+.commerce-offer.is-financed .commerce-offer-price-main strong {
+  color: #1e40af;
+}
+
+.commerce-offer-price-main span {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.commerce-offer-desc {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+  line-height: 1.4;
+}
+
+.commerce-offer-saving {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #047857;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Parámetros de cobrador y primer vencimiento */
+.commerce-financed-box {
+  padding: 15px 18px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-left: 4px solid #2563eb;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.commerce-financed-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.commerce-financed-head h5 {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.commerce-financed-head span {
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+.financing-module .commerce-form label.commerce-field,
+.commerce-form label.commerce-field {
+  margin: 0;
+}
+
+.financing-module .commerce-form label.commerce-field input,
+.financing-module .commerce-form label.commerce-field select {
+  max-width: 100%;
+  margin-top: 0;
+}
+
+.commerce-field-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.commerce-date-shortcuts {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.commerce-date-pill {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.commerce-date-pill:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.commerce-field-hint {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: #64748b;
+}
+
+.financing-module .commerce-note-field textarea {
+  max-width: 100% !important;
+}
+
+/* Acordeón de ficha comercial y conversación */
+.commerce-details-drawer {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  overflow: hidden;
+}
+
+.commerce-details-summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 13px 16px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1e3a8a;
+  user-select: none;
+  transition: background-color 0.15s ease;
+}
+
+.commerce-details-summary::-webkit-details-marker {
+  display: none;
+}
+
+.commerce-details-summary span::before {
+  content: '▸ ';
+  display: inline-block;
+  margin-right: 4px;
+  transition: transform 0.15s ease;
+}
+
+.commerce-details-drawer[open] .commerce-details-summary span::before {
+  transform: rotate(90deg);
+}
+
+.commerce-details-summary:hover {
+  background: #eff6ff;
+}
+
+.commerce-details-summary small {
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.commerce-details-body {
+  padding: 14px;
+  border-top: 1px solid #e2e8f0;
+  background: #ffffff;
 }
 
 .commerce-orders-table {
@@ -479,17 +918,168 @@
   .commerce-workspace {
     grid-template-columns: 1fr;
   }
+
+  .commerce-offers {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
   .commerce-data,
-  .commerce-form-grid {
+  .commerce-form-grid,
+  .commerce-offers {
     grid-template-columns: 1fr;
   }
 
   .commerce-wide {
     grid-column: auto;
   }
+}
+
+/* ==========================================================================
+   Ficha Comercial en Pantalla Completa (Modal Fullscreen)
+   ========================================================================== */
+.commerce-fullscreen-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1200;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: commerceFadeIn 0.16s ease-out;
+}
+
+@keyframes commerceFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.commerce-fullscreen-dialog {
+  width: 100vw;
+  height: 100vh;
+  max-width: 100vw;
+  max-height: 100vh;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.commerce-fullscreen-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.commerce-fullscreen-top-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.commerce-fullscreen-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.commerce-fullscreen-back-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.commerce-fullscreen-divider {
+  color: #cbd5e1;
+  font-weight: 300;
+}
+
+.commerce-fullscreen-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.commerce-fullscreen-top-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.commerce-esc-hint {
+  font-size: 11.5px;
+  color: #94a3b8;
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  font-family: inherit;
+}
+
+.commerce-fullscreen-close-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.commerce-fullscreen-close-icon:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+
+.commerce-fullscreen-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 32px 48px;
+}
+
+.commerce-fullscreen-content .commerce-workspace {
+  max-width: 1720px;
+  margin: 0 auto;
+  align-items: start;
+}
+
+.commerce-fullscreen-content .commerce-operation,
+.commerce-fullscreen-content .commerce-chat {
+  background: #ffffff;
+}
+
+.commerce-fullscreen-content .commerce-chat .sup-chat-thread {
+  height: min(620px, calc(100vh - 300px));
+  max-height: none;
 }
 
 .commerce-customer-details { margin: 12px 0; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; }

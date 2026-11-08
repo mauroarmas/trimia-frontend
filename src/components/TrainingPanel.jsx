@@ -216,8 +216,13 @@ export default function TrainingPanel({ token, me }) {
   useEffect(() => {
     if (isSupervisor) return;
     getDiagnosticQuiz(token)
-      .then(() => {
-        setDiagnosticCompleted(false);
+      .then((data) => {
+        // Si no hay preguntas de diagnóstico configuradas para el sector, se marca como completado/no aplicable
+        if (!data || !data.questions || data.questions.length === 0) {
+          setDiagnosticCompleted(true);
+        } else {
+          setDiagnosticCompleted(false);
+        }
       })
       .catch((err) => {
         if (err.message && (err.message.includes('ya ha completado') || err.message.includes('completado'))) {
@@ -473,6 +478,7 @@ export default function TrainingPanel({ token, me }) {
       {showWelcome && (
         <WelcomeOnboardingModal
           me={me}
+          hasDiagnostic={!hasTakenDiagnostic}
           onComplete={handleWelcomeComplete}
           onStartDiagnostic={() => {
             setShowWelcome(false);
@@ -574,8 +580,8 @@ export default function TrainingPanel({ token, me }) {
 
               {/* 3 Barras horizontales de progreso */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, alignItems: 'center' }}>
-                {/* Diagnóstico (Verde completado) */}
-                <div style={{ height: 6, borderRadius: 3, background: '#16A34A' }} />
+                {/* Diagnóstico (Verde completado si ya fue realizado o no aplica) */}
+                <div style={{ height: 6, borderRadius: 3, background: hasTakenDiagnostic ? '#16A34A' : '#CBD5E1' }} />
                 {/* Parada 1 (Azul en curso) */}
                 <div style={{ height: 6, borderRadius: 3, background: effectiveCompletedPills >= 1 ? '#16A34A' : '#2563EB' }} />
                 {/* Parada 2 (Gris bloqueado) */}
@@ -633,7 +639,7 @@ export default function TrainingPanel({ token, me }) {
                     gap: 32,
                   }}
                 >
-                  {/* 1. Paso Diagnóstico Inicial (Completado) */}
+                  {/* 1. Paso Diagnóstico Inicial */}
                   <div style={{ position: 'relative' }}>
                     {/* Badge circular centrado exactamente sobre la línea */}
                     <div
@@ -644,17 +650,21 @@ export default function TrainingPanel({ token, me }) {
                         width: 26,
                         height: 26,
                         borderRadius: '50%',
-                        background: '#DCFCE7',
-                        border: '1.5px solid #16A34A',
+                        background: hasTakenDiagnostic ? '#DCFCE7' : '#EFF6FF',
+                        border: `1.5px solid ${hasTakenDiagnostic ? '#16A34A' : '#2563EB'}`,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: '#16A34A',
+                        color: hasTakenDiagnostic ? '#16A34A' : '#2563EB',
                       }}
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
+                      {hasTakenDiagnostic ? (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      ) : (
+                        <span style={{ fontSize: 11, fontWeight: 700 }}>0</span>
+                      )}
                     </div>
 
                     <div>
@@ -664,19 +674,39 @@ export default function TrainingPanel({ token, me }) {
                         </span>
                         <span
                           style={{
-                            background: '#DCFCE7',
-                            color: '#15803D',
+                            background: hasTakenDiagnostic ? '#DCFCE7' : '#EFF6FF',
+                            color: hasTakenDiagnostic ? '#15803D' : '#2563EB',
                             fontSize: 11.5,
                             fontWeight: 600,
                             padding: '2px 8px',
                             borderRadius: 12,
                           }}
                         >
-                          Completado
+                          {hasTakenDiagnostic ? 'Completado' : 'Pendiente'}
                         </span>
+                        {!hasTakenDiagnostic && (
+                          <button
+                            type="button"
+                            onClick={() => setShowDiagnostic(true)}
+                            style={{
+                              background: '#2563EB',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: 6,
+                              padding: '2px 10px',
+                              fontSize: 11.5,
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Rendir ahora
+                          </button>
+                        )}
                       </div>
                       <p style={{ margin: 0, fontSize: 13, color: '#64748B' }}>
-                        Tu ruta se armó con tus respuestas.
+                        {hasTakenDiagnostic
+                          ? 'Tu ruta se armó con tus respuestas.'
+                          : 'Evaluación de 5 minutos para conocer lo que ya sabés y eximir paradas.'}
                       </p>
                     </div>
                   </div>
