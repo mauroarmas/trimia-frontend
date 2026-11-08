@@ -491,3 +491,9 @@
     grid-column: auto;
   }
 }
+
+.commerce-customer-details { margin: 12px 0; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; }
+.commerce-customer-details > summary { cursor: pointer; color: #526780; font-size: 13px; font-weight: 600; }
+.commerce-customer-details .commerce-data { margin-top: 12px; }
+.commerce-close-control-note { padding: 10px 12px; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 8px; color: #5b21b6; font-size: 13px; }
+.commerce-success p { margin: 6px 0 0; }

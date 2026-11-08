@@ -52,6 +52,8 @@ export default function CommercialOrderCard({
   const [order, setOrder] = useState(null);
   const [conversation, setConversation] = useState(null);
   const [reference, setReference] = useState('');
+  const [customerMessage, setCustomerMessage] = useState(null);
+  useEffect(() => { setCustomerMessage(null); setReference(''); }, [id]);
   const [editing, setEditing] = useState(null);
   const [catalog, setCatalog] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -115,6 +117,16 @@ export default function CommercialOrderCard({
   const flow = order.flow;
   const offer = flow.offers.find((o) => o.id === flow.selectedOfferId);
   const canClose = me.isGeneralSupervisor || me.sectorName === 'Ventas';
+  const otherOwner = conversation?.status === 'HUMAN_HANDLING' && conversation.handledById !== me.id;
+  const myControl = conversation?.status === 'HUMAN_HANDLING' && conversation.handledById === me.id;
+  const finalMessage = customerMessage ?? order.suggestedClosingMessage ?? '';
+  const notice = order.closingNotice;
+  const noticeText = !notice ? 'Aviso aún no registrado.' : ({
+    PENDING: 'Aviso pendiente de envío.', SENDING: 'Enviando aviso al cliente…',
+    ACCEPTED: notice.transportMode === 'simulated' ? 'Aviso registrado en el chat de prueba.' : 'Aviso aceptado para envío. Aún no hay confirmación de entrega.',
+    DELIVERED: 'Entrega del aviso confirmada.', FAILED: 'El aviso no pudo enviarse. Revisá la conversación para contactar al cliente.',
+    UNCERTAIN: 'No se pudo confirmar el envío. Revisá el chat antes de reenviar para evitar duplicados.',
+  }[notice.status] ?? 'Consultando estado del aviso.');
   const address =
     flow.deliveryMode === 'SHIPPING'
       ? flow.deliveryAddress || 'Falta dirección'
@@ -150,7 +162,7 @@ export default function CommercialOrderCard({
             </span>
           </div>
           <p className="commerce-subtitle">
-            DNI {order.client.dni} · {order.business} ({order.locality})
+            {order.purchaseUse === 'PERSONAL' ? 'Compra personal' : order.business} · {order.locality}
           </p>
         </div>
 
@@ -173,7 +185,9 @@ export default function CommercialOrderCard({
         </div>
       </header>
 
-      <dl className="commerce-data">
+      <details className="commerce-customer-details">
+        <summary>Datos del cliente y contacto</summary>
+          <dl className="commerce-data">
         <div>
           <dt>DNI</dt>
           <dd>{order.client.dni}</dd>
@@ -187,12 +201,16 @@ export default function CommercialOrderCard({
         </div>
         <div>
           <dt>Comercio</dt>
-          <dd>{order.business}</dd>
+          <dd>{order.business || 'Compra personal'}</dd>
         </div>
         <div>
           <dt>Localidad</dt>
           <dd>{order.locality}</dd>
         </div>
+          </dl>
+      </details>
+
+      <dl className="commerce-data">
         <div className="commerce-wide is-highlight">
           <dt>Producto · 1 unidad</dt>
           <dd>{order.productSummary}</dd>
@@ -426,12 +444,13 @@ export default function CommercialOrderCard({
               closeCommercialOrder(token, id, {
                 expectedVersion: order.version,
                 reference,
+                customerMessage: finalMessage,
               }),
             );
           }}
         >
           <div className="commerce-close-head">
-            <h4>Confirmación comercial del cierre</h4>
+            <h4>Último paso: cerrar y avisar al cliente</h4>
             <span
               className={`commerce-ready-tag ${
                 flow.stage === 'READY' && !order.expired ? 'is-ready' : 'is-locked'
@@ -443,8 +462,15 @@ export default function CommercialOrderCard({
             </span>
           </div>
 
+          <p className="commerce-inline-note">Revisá el pedido y el mensaje que recibirá el cliente. Al confirmar se registra la venta y, si corresponde, las cuotas del cobrador asignado.</p>
+          {myControl && <p className="commerce-close-control-note">Tenés el control del chat. Se liberará automáticamente al cerrar; no hace falta hacerlo antes.</p>}
+          {otherOwner && <p className="commerce-inline-note is-warn">Otra persona está atendiendo este chat. Debe liberar el control antes del cierre.</p>}
           <label>
-            <span>Comprobante o constancia del cierre</span>
+            <span>Mensaje final al cliente</span>
+            <textarea value={finalMessage} onChange={(e) => setCustomerMessage(e.target.value)} required maxLength={4000} rows={5} placeholder="Confirmale cómo continúa su compra…" />
+          </label>
+          <label>
+            <span>Constancia interna del cierre</span>
             <textarea
               value={reference}
               onChange={(e) => setReference(e.target.value)}
@@ -462,14 +488,14 @@ export default function CommercialOrderCard({
                 busy ||
                 flow.stage !== 'READY' ||
                 order.expired ||
-                !reference.trim()
+                !reference.trim() ||
+                !finalMessage.trim() ||
+                otherOwner
               }
             >
               {busy
                 ? 'Registrando…'
-                : offer?.modality === 'FINANCED'
-                ? 'Confirmar cierre y registrar cuotas'
-                : 'Confirmar cierre de venta'}
+                : 'Cerrar venta y enviar aviso'}
             </button>
           </div>
 
@@ -490,7 +516,8 @@ export default function CommercialOrderCard({
           {order.financing
             ? ` con ${order.financing.quotaCount} cuotas semanales.`
             : ' al contado.'}{' '}
-          El cliente recibe un aviso en su hilo de prueba.
+          {order.financing && <p>Las cuotas ya están disponibles en la cartera de {order.collector?.name || 'su cobrador asignado'}.</p>}
+          <p role="status" className={['FAILED', 'UNCERTAIN'].includes(notice?.status) ? 'commerce-inline-note is-warn' : ''}>{noticeText}</p>
         </div>
       )}
 
@@ -511,7 +538,7 @@ export default function CommercialOrderCard({
           <header className="commerce-chat-head">
             <div>
               <h3>Conversación con el cliente</h3>
-              <p>Hilo comercial en vivo vinculado al pedido</p>
+              <p>Conversá para coordinar detalles. El mensaje final se envía al confirmar el cierre de la venta.</p>
             </div>
             <ChatExportMenu
               filename={`pedido-${order.client.name || order.id}`}

@@ -91,6 +91,20 @@ export default function CollectionsPanel({ token, me, isCollector, initialClient
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proofStatus]);
 
+  useEffect(() => {
+    let live = true;
+    const refreshPortfolio = async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const [nextClients, nextKpis] = await Promise.all([listCollectionClients(token), getCollectionsKpis(token)]);
+        if (live) { setClients(nextClients); setKpis(nextKpis); }
+      } catch { /* Se mantiene el contenido actual; Actualizar permite ver errores. */ }
+    };
+    const timer = setInterval(refreshPortfolio, 10000);
+    window.addEventListener('focus', refreshPortfolio);
+    return () => { live = false; clearInterval(timer); window.removeEventListener('focus', refreshPortfolio); };
+  }, [token]);
+
   async function handleAcceptProof(proofId) {
     if (!window.confirm('¿Aceptar este comprobante? Quedará pendiente de verificación bancaria.')) return;
     try {
