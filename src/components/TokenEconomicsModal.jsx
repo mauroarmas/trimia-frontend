@@ -109,7 +109,7 @@ export default function TokenEconomicsModal({ metrics, onClose }) {
                 {avgSeconds ? `${avgSeconds} s` : '—'}
               </strong>
               <span className="econ-kpi-sub">
-                Disponibilidad continua 24/7 sin espera en fila
+                Promedio observado; sujeto a latencia y límites de Google
               </span>
             </article>
           </div>

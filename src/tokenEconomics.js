@@ -2,7 +2,16 @@
  * Tarifas públicas de referencia (Pay-as-you-go) en Google AI Studio, expresadas
  * en USD por cada 1.000.000 de tokens.
  */
+const flash38Introductory = Date.now() < Date.UTC(2027, 0, 1);
 const MODEL_PRICING = {
+  // https://ai.google.dev/gemini-api/docs/pricing — tarifa de referencia, no factura.
+  'gemini-3.8-flash': {
+    label: 'Google Gemini 3.8 Flash',
+    badge: 'Flash',
+    inputPer1M: flash38Introductory ? 0.75 : 1.50,
+    outputPer1M: flash38Introductory ? 3.75 : 7.50,
+    summary: 'Modelo conversacional y de razonamiento. Referencia de pago por uso; no representa cargos de la cuenta gratuita.',
+  },
   'gemini-3.5-flash-lite': {
     label: 'Google Gemini 3.5 Flash-Lite',
     badge: 'Alta velocidad · Bajo costo',
@@ -112,9 +121,7 @@ export function estimateMetricsEconomics(metrics) {
   const totalOutput = tokens.totalOutput ?? 0;
   const totalTokens = totalInput + totalOutput;
   const configuredModel = tokens.configuredModel || 'gemini-3.5-flash-lite';
-  const primaryPricing = getModelPricing(
-    tokens.byModel?.[0]?.model || configuredModel,
-  );
+  const primaryPricing = getModelPricing(configuredModel);
 
   let inputCostUsd = 0;
   let outputCostUsd = 0;

@@ -1,0 +1,11 @@
+.ai-model-selector { display:flex; flex-wrap:wrap; align-items:center; gap:16px 24px; background:#fff; border:1px solid #dbe5ef; border-radius:14px; padding:20px 24px; margin:0 0 20px; }
+.ai-model-selector-copy { flex:1 1 300px; }
+.ai-model-selector h3 { margin:0 0 7px; font-size:16px; color:#132440; }
+.ai-model-selector p { margin:0 0 5px; font-size:13px; color:#526780; }
+.ai-model-selector small { color:#667a91; font-size:12px; }
+.ai-model-selector-actions label { display:block; margin-bottom:6px; font-size:12px; font-weight:600; color:#526780; }
+.ai-model-selector-actions > div { display:flex; flex-wrap:wrap; gap:8px; }
+.ai-model-selector select { min-width:210px; max-width:100%; border:1px solid #c8d6e5; border-radius:7px; padding:9px; background:#fff; color:#132440; }
+.ai-model-selector button { padding:9px 15px; white-space:nowrap; }
+.ai-model-selector .ai-model-selector-error { flex-basis:100%; color:#b42318; }
+.ai-model-selector .ai-model-selector-notice { flex-basis:100%; color:#087f6e; }

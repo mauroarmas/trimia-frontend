@@ -1,3 +1,4 @@
+import AiModelSelector from './AiModelSelector';
 import FinancingDraftEditor from './FinancingDraftEditor';
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -204,6 +205,7 @@ function AgentIllustration({ agentType }) {
 }
 
 export default function SupervisorPanel({ token, me, onOpenFinancing }) {
+  const canSelectAiModel = Boolean(me?.isGeneralSupervisor || me?.email === 'diego.bazan@credimision.com');
   const [agents, setAgents] = useState(null);
   const [metrics, setMetrics] = useState(null);
 
@@ -388,6 +390,8 @@ export default function SupervisorPanel({ token, me, onOpenFinancing }) {
           </>
         }
       />
+
+      {canSelectAiModel && <AiModelSelector token={token} onChanged={loadOverview} />}
 
       {error && (
         <p className="error" role="alert" style={{ marginBottom: 16 }}>

@@ -1298,3 +1298,6 @@ export const reviewCommercialOrder = (token, id, body) => request(`/sales/commer
 export const renewCommercialOrder = (token, id, body) => request(`/sales/commercial/orders/${id}/renew`, { method: 'POST', token, body });
 export const editCommercialOrder = (token, id, body) => request(`/sales/commercial/orders/${id}/edit`, { method: 'POST', token, body });
 export const closeCommercialOrder = (token, id, body) => request(`/sales/commercial/orders/${id}/close`, { method: 'POST', token, body });
+
+export const getAiModel = (token) => request('/supervisor/ai-model', { token });
+export const updateAiModel = (token, body) => request('/supervisor/ai-model', { method: 'PUT', token, body });
