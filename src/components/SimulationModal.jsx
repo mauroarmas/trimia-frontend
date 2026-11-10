@@ -20,6 +20,7 @@ export default function SimulationModal({
   onClose,
   onCompleted,
   onOpenPill,
+  onSwitchMode,
 }) {
   const currentPillId = pill?.id || pillId;
   const currentPillTitle = pill?.title || pillTitle || 'Práctica Pedagógica';
@@ -958,7 +959,7 @@ export default function SimulationModal({
               >
                 <button
                   type="button"
-                  onClick={initSimulation}
+                  onClick={() => initSimulation(true)}
                   style={{
                     background: '#ffffff',
                     color: '#2b6fc0',
@@ -977,6 +978,30 @@ export default function SimulationModal({
                   <TrainingIcon type="refresh" size={16} />
                   <span>Repetir simulación</span>
                 </button>
+
+                {isGuided && onSwitchMode && (
+                  <button
+                    type="button"
+                    onClick={() => onSwitchMode('FREE')}
+                    style={{
+                      background: '#eef5fc',
+                      color: '#2b6fc0',
+                      border: '1px solid #2b6fc0',
+                      padding: '10px 22px',
+                      borderRadius: 8,
+                      fontWeight: 600,
+                      fontSize: 14,
+                      cursor: 'pointer',
+                      minHeight: 44,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <TrainingIcon type="simulation" size={16} />
+                    <span>Ir a Demostrar (Simulación libre)</span>
+                  </button>
+                )}
 
                 <button
                   type="button"

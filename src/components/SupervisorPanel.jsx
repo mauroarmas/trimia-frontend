@@ -750,8 +750,10 @@ export default function SupervisorPanel({ token, me, onOpenFinancing }) {
                 convData.rows.map((c) => {
                   const agentMeta = c.currentAgent ? AGENT_META[c.currentAgent] : null;
                   const lastMsg = c.messages?.[0];
-                  const displayName = c.client?.name || c.externalId;
-                  const secondaryId = c.client?.name ? c.externalId : null;
+                  const isEmp = c.userType === 'EMPLEADO' || Boolean(c.employee);
+                  const displayName = c.employee?.name || c.client?.name || c.externalId;
+                  const secondaryId = displayName !== c.externalId ? c.externalId : null;
+                  const empSector = c.employee?.sector?.name;
 
                   return (
                     <tr key={c.id}>
@@ -769,7 +771,11 @@ export default function SupervisorPanel({ token, me, onOpenFinancing }) {
                             </div>
                             {lastMsg ? (
                               <p className="sup-last-msg" title={lastMsg.content}>
-                                {lastMsg.role === 'USER' ? 'Cliente: ' : 'IA: '}
+                                {lastMsg.role === 'USER'
+                                  ? isEmp
+                                    ? 'Empleado: '
+                                    : 'Cliente: '
+                                  : 'IA: '}
                                 {lastMsg.content}
                               </p>
                             ) : (
@@ -789,7 +795,11 @@ export default function SupervisorPanel({ token, me, onOpenFinancing }) {
                       </td>
                       <td>
                         <span className="sup-profile-label">
-                          {c.userType === 'EMPLEADO' ? 'Empleado' : 'Cliente'}
+                          {isEmp
+                            ? empSector
+                              ? `Empleado (${empSector})`
+                            : 'Empleado'
+                            : 'Cliente'}
                         </span>
                       </td>
                       <td>
@@ -806,7 +816,7 @@ export default function SupervisorPanel({ token, me, onOpenFinancing }) {
                               className="sup-agent-pill-dot"
                               style={{ backgroundColor: agentMeta.accent }}
                             />
-                            {agentMeta.name}
+                            {isEmp ? `Tema: ${agentMeta.name}` : agentMeta.name}
                           </span>
                         ) : (
                           <span className="sup-unassigned-label">Sin asignar</span>
@@ -942,8 +952,10 @@ function ConversationDetailModal({ token, me, conversation, onRefresh, onClose, 
   const agentMeta = conversation.currentAgent
     ? AGENT_META[conversation.currentAgent]
     : null;
-  const isEmployee = conversation.userType === 'EMPLEADO';
-  const displayName = conversation.client?.name || conversation.externalId;
+  const isEmployee = conversation.userType === 'EMPLEADO' || Boolean(conversation.employee);
+  const empSector = conversation.employee?.sector?.name;
+  const displayName =
+    conversation.employee?.name || conversation.client?.name || conversation.externalId;
 
   return createPortal(
     <div
@@ -958,12 +970,18 @@ function ConversationDetailModal({ token, me, conversation, onRefresh, onClose, 
           <div>
             <span className="econ-modal-kicker">
               {conversation.channel === 'WHATSAPP' ? 'Canal WhatsApp' : 'Canal Web'} ·{' '}
-              {agentMeta ? `Área ${agentMeta.name}` : 'Sin agente asignado'} ·{' '}
-              {isEmployee ? 'Perfil Empleado' : 'Perfil Cliente'}
+              {isEmployee
+                ? empSector
+                  ? `Empleado de ${empSector}`
+                  : 'Perfil Empleado'
+                : 'Perfil Cliente'}{' '}
+              · {agentMeta ? `Tema consultado: ${agentMeta.name}` : 'Sin agente asignado'}
             </span>
             <h2>Conversación con {displayName}</h2>
             <p>
-              {conversation.client?.name ? `ID/Tel: ${conversation.externalId} · ` : ''}
+              {displayName !== conversation.externalId
+                ? `ID/Tel: ${conversation.externalId} · `
+                : ''}
               Estado actual: {STATUS_LABELS[conversation.status] ?? conversation.status} ·{' '}
               {conversation.messages?.length ?? 0} mensajes registrados
             </p>

@@ -17,7 +17,7 @@ import {
 import AudioScriptModal from './AudioScriptModal';
 import DiagnosticQuizModal from './DiagnosticQuizModal';
 import InfoNotes, { InfoToggle } from './InfoNotes';
-import PillStudyModal from './PillStudyModal';
+import LessonStudyModal from './LessonStudyModal';
 import SimulationModal from './SimulationModal';
 import SupervisorDiagnosticModal from './SupervisorDiagnosticModal';
 import SupervisorSimulationsModal from './SupervisorSimulationsModal';
@@ -889,16 +889,52 @@ export default function TrainingPanel({ token, me }) {
                           </div>
                         ) : (
                           /* Parada Bloqueada o Completada */
-                          <div style={{ opacity: isLocked ? 0.85 : 1 }}>
-                            <span style={{ fontSize: 12, fontWeight: 600, color: isDone ? '#16A34A' : '#64748B', display: 'block' }}>
-                              Parada {pIdx + 1} · {isDone ? 'completada' : 'bloqueada'}
-                            </span>
-                            <h4 style={{ margin: '3px 0 2px', fontSize: 16, fontWeight: 700, color: isDone ? '#0F172A' : '#334155' }}>
-                              {p.title}
-                            </h4>
-                            <p style={{ margin: 0, fontSize: 13, color: '#64748B' }}>
-                              {isLocked ? 'Se habilita cuando termines la parada 1.' : p.objective || 'Parada completada con éxito.'}
-                            </p>
+                          <div
+                            onClick={() => {
+                              if (isDone) setActivePillId(p.id);
+                            }}
+                            style={{
+                              opacity: isLocked ? 0.85 : 1,
+                              cursor: isDone ? 'pointer' : 'default',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              gap: 12,
+                            }}
+                          >
+                            <div>
+                              <span style={{ fontSize: 12, fontWeight: 600, color: isDone ? '#16A34A' : '#64748B', display: 'block' }}>
+                                Parada {pIdx + 1} · {isDone ? 'completada' : 'bloqueada'}
+                              </span>
+                              <h4 style={{ margin: '3px 0 2px', fontSize: 16, fontWeight: 700, color: isDone ? '#0F172A' : '#334155' }}>
+                                {p.title}
+                              </h4>
+                              <p style={{ margin: 0, fontSize: 13, color: '#64748B' }}>
+                                {isLocked ? `Se habilita cuando termines la parada ${pIdx}.` : p.objective || 'Parada completada con éxito.'}
+                              </p>
+                            </div>
+                            {isDone && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActivePillId(p.id);
+                                }}
+                                style={{
+                                  background: '#F8FAFC',
+                                  color: '#2563EB',
+                                  border: '1px solid #BFDBFE',
+                                  borderRadius: 8,
+                                  padding: '6px 14px',
+                                  fontSize: 12.5,
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                Repasar parada
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1819,13 +1855,22 @@ export default function TrainingPanel({ token, me }) {
 
       {/* Lección en 3 etapas: Escuchar -> Practicar -> Demostrar (Captura 4) */}
       {activePillId && (
-        <PillStudyModal
+        <LessonStudyModal
           token={token}
           pillId={activePillId}
           areaName={getModuleAreaName(modules[0] || {})}
+          paradaNumber={
+            Math.max(
+              1,
+              modules
+                .flatMap((m) => m.pills || [])
+                .findIndex((p) => p.id === activePillId) + 1
+            )
+          }
           onClose={() => setActivePillId(null)}
           onStartSimulation={(simMode) => {
             const foundPill = modules.flatMap((m) => m.pills || []).find((p) => p.id === activePillId);
+            setActivePillId(null);
             setSimulationConfig({ pill: foundPill || { id: activePillId }, mode: simMode });
           }}
           onProgressUpdated={() => {
@@ -1841,9 +1886,15 @@ export default function TrainingPanel({ token, me }) {
           pillId={simulationConfig.pill?.id}
           pillTitle={simulationConfig.pill?.title}
           mode={simulationConfig.mode}
-          onClose={() => setSimulationConfig(null)}
+          onClose={() => {
+            setSimulationConfig(null);
+            loadEmployeePath();
+          }}
           onCompleted={() => {
             loadEmployeePath();
+          }}
+          onSwitchMode={(newMode) => {
+            setSimulationConfig((prev) => (prev ? { ...prev, mode: newMode } : null));
           }}
           onOpenPill={(targetPill) => {
             const pId = targetPill?.id || simulationConfig.pill?.id;

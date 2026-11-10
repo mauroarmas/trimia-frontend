@@ -456,7 +456,11 @@ export default function EscalationsQueue({ token, me, onOpenFinancing }) {
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       const matchReason = e.reason?.toLowerCase().includes(term);
-      const matchClient = e.conversation?.externalId?.toLowerCase().includes(term);
+      const matchClient =
+        e.conversation?.externalId?.toLowerCase().includes(term) ||
+        e.conversation?.employee?.name?.toLowerCase().includes(term) ||
+        e.conversation?.employee?.sector?.name?.toLowerCase().includes(term) ||
+        e.conversation?.client?.name?.toLowerCase().includes(term);
       const matchChannel = e.conversation?.channel?.toLowerCase().includes(term);
       const areaName = e.conversation?.currentAgent
         ? AGENT_META[e.conversation.currentAgent]?.name?.toLowerCase() ?? ''
@@ -669,6 +673,7 @@ export default function EscalationsQueue({ token, me, onOpenFinancing }) {
                 <thead>
                   <tr>
                     <th>Contacto</th>
+                    <th>Perfil</th>
                     <th>Motivo de derivación</th>
                     <th>Área</th>
                     <th>Canal</th>
@@ -680,7 +685,7 @@ export default function EscalationsQueue({ token, me, onOpenFinancing }) {
                 <tbody>
                   {paginatedEscalations.length === 0 && !loading ? (
                     <tr>
-                      <td colSpan={7} className="sup-empty-cell">
+                      <td colSpan={8} className="sup-empty-cell">
                         Sin casos {status === 'PENDING' ? 'pendientes' : 'resueltos'}
                         {soloMios ? ' asignados a tus áreas' : ''}.
                       </td>
@@ -688,12 +693,18 @@ export default function EscalationsQueue({ token, me, onOpenFinancing }) {
                   ) : (
                     paginatedEscalations.map((e) => {
                       const contactId = e.conversation?.externalId ?? 'Desconocido';
+                      const emp = e.conversation?.employee;
+                      const isEmployeeCase =
+                        e.conversation?.userType === 'EMPLEADO' || Boolean(emp);
+                      const displayName =
+                        emp?.name || e.conversation?.client?.name || contactId;
+                      const empSectorName = emp?.sector?.name;
                       const agentKey = e.conversation?.currentAgent;
                       const agentMeta = agentKey ? AGENT_META[agentKey] : null;
                       const channel = e.conversation?.channel || 'WEB';
                       const delegatedName =
                         status === 'PENDING' && e.delegatedToId
-                          ? employees.find((emp) => emp.id === e.delegatedToId)?.name ??
+                          ? employees.find((empItem) => empItem.id === e.delegatedToId)?.name ??
                             e.delegatedToId
                           : null;
 
@@ -702,14 +713,24 @@ export default function EscalationsQueue({ token, me, onOpenFinancing }) {
                           <td>
                             <div className="sup-contact-cell esc-contact-compact">
                               <div className="sup-contact-avatar" aria-hidden="true">
-                                {contactInitials(contactId)}
+                                {contactInitials(displayName)}
                               </div>
                               <div className="sup-contact-texts">
-                                <div className="sup-contact-name-row">
-                                  <strong>{contactId}</strong>
+                                <div className="sup-contact-name-row" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                  <strong>{displayName}</strong>
+                                  {displayName !== contactId && (
+                                    <span className="sup-contact-ext" style={{ fontSize: 11.5, color: '#64748b' }}>
+                                      {contactId}
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             </div>
+                          </td>
+                          <td>
+                            <span className="sup-profile-label">
+                              {isEmployeeCase ? 'Personal' : 'Cliente'}
+                            </span>
                           </td>
                           <td>
                             <p className="esc-reason-text" title={e.reason}>
@@ -717,7 +738,24 @@ export default function EscalationsQueue({ token, me, onOpenFinancing }) {
                             </p>
                           </td>
                           <td>
-                            <div className="esc-area-cell">
+                            <div className="esc-area-cell" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+                              {isEmployeeCase && empSectorName && (
+                                <span
+                                  className="sup-agent-pill"
+                                  style={{
+                                    backgroundColor: '#eff6ff',
+                                    color: '#1d4ed8',
+                                    borderColor: '#bfdbfe',
+                                    fontSize: 11.5,
+                                  }}
+                                >
+                                  <span
+                                    className="sup-agent-pill-dot"
+                                    style={{ backgroundColor: '#2563eb' }}
+                                  />
+                                  Consultó desde: {empSectorName}
+                                </span>
+                              )}
                               {agentMeta ? (
                                 <span
                                   className="sup-agent-pill"
@@ -731,7 +769,7 @@ export default function EscalationsQueue({ token, me, onOpenFinancing }) {
                                     className="sup-agent-pill-dot"
                                     style={{ backgroundColor: agentMeta.accent }}
                                   />
-                                  {agentMeta.name}
+                                  {isEmployeeCase ? `Tema: ${agentMeta.name}` : agentMeta.name}
                                 </span>
                               ) : (
                                 <span className="sup-unassigned-label">Sin área</span>
@@ -864,80 +902,125 @@ export default function EscalationsQueue({ token, me, onOpenFinancing }) {
             </div>
 
             <div className="esc-detail-summary-row">
-              <div className="esc-detail-identity">
-                <div className="sup-contact-avatar esc-detail-avatar" aria-hidden="true">
-                  {contactInitials(
-                    conversation?.client?.name ||
-                      conversation?.externalId ||
-                      selected.conversation?.externalId ||
-                      'C',
-                  )}
-                </div>
-                <div>
-                  <h2>
-                    {conversation?.client?.name ||
-                      conversation?.externalId ||
-                      selected.conversation?.externalId ||
-                      'Contacto'}
-                  </h2>
-                  <p className="esc-detail-reason">
-                    {priceDraft?.request ? (priceDraft.request.closedAt ? 'Compra finalizada' : isApprovedSale ? 'Financiación aprobada. Próximo paso: registrar el cierre de la venta.' : 'Compra financiada en curso') : formatEscalationReason(selected.reason)}
-                  </p>
-                </div>
-              </div>
+              {(() => {
+                const emp = conversation?.employee ?? selected.conversation?.employee;
+                const isEmployeeCase =
+                  (conversation?.userType ?? selected.conversation?.userType) === 'EMPLEADO' ||
+                  Boolean(emp);
+                const rawContactId =
+                  conversation?.externalId ||
+                  selected.conversation?.externalId ||
+                  'Contacto';
+                const displayName =
+                  emp?.name ||
+                  conversation?.client?.name ||
+                  rawContactId;
+                const empSectorName = emp?.sector?.name;
 
-              <div className="esc-detail-chips">
-                {(() => {
-                  const ch =
-                    conversation?.channel ?? selected.conversation?.channel ?? 'WEB';
-                  return (
-                    <span
-                      className={`sup-channel-badge ${
-                        ch === 'WHATSAPP' ? 'is-wa' : 'is-web'
-                      }`}
-                    >
-                      {ch === 'WHATSAPP' ? 'WhatsApp' : 'Chat Web'}
-                    </span>
-                  );
-                })()}
+                return (
+                  <>
+                    <div className="esc-detail-identity">
+                      <div className="sup-contact-avatar esc-detail-avatar" aria-hidden="true">
+                        {contactInitials(displayName)}
+                      </div>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                          <h2 style={{ margin: 0 }}>{displayName}</h2>
+                          {displayName !== rawContactId && (
+                            <span style={{ fontSize: 12.5, color: '#64748b' }}>
+                              Tel/ID: {rawContactId}
+                            </span>
+                          )}
+                        </div>
+                        <p className="esc-detail-reason">
+                          {priceDraft?.request
+                            ? priceDraft.request.closedAt
+                              ? 'Compra finalizada'
+                              : isApprovedSale
+                                ? 'Financiación aprobada. Próximo paso: registrar el cierre de la venta.'
+                                : 'Compra financiada en curso'
+                            : formatEscalationReason(selected.reason)}
+                        </p>
+                      </div>
+                    </div>
 
-                {(() => {
-                  if (priceDraft?.request) return null;
-                  const ag =
-                    conversation?.currentAgent ?? selected.conversation?.currentAgent;
-                  const meta = ag ? AGENT_META[ag] : null;
-                  return meta ? (
-                    <span
-                      className="sup-agent-pill"
-                      style={{
-                        backgroundColor: meta.bgSoft,
-                        color: meta.accent,
-                        borderColor: meta.borderSoft,
-                      }}
-                    >
-                      <span
-                        className="sup-agent-pill-dot"
-                        style={{ backgroundColor: meta.accent }}
-                      />
-                      {meta.name}
-                    </span>
-                  ) : (
-                    <span className="esc-belonging-pill is-sin-area">Sin área</span>
-                  );
-                })()}
+                    <div className="esc-detail-chips">
+                      <span className="sup-profile-label">
+                        {isEmployeeCase ? 'Personal' : 'Cliente'}
+                      </span>
+                      {(() => {
+                        const ch =
+                          conversation?.channel ?? selected.conversation?.channel ?? 'WEB';
+                        return (
+                          <span
+                            className={`sup-channel-badge ${
+                              ch === 'WHATSAPP' ? 'is-wa' : 'is-web'
+                            }`}
+                          >
+                            {ch === 'WHATSAPP' ? 'WhatsApp' : 'Chat Web'}
+                          </span>
+                        );
+                      })()}
 
-                <EtiquetaPertenencia valor={selected.pertenencia} />
+                      {isEmployeeCase && empSectorName && (
+                        <span
+                          className="sup-agent-pill"
+                          style={{
+                            backgroundColor: '#eff6ff',
+                            color: '#1d4ed8',
+                            borderColor: '#bfdbfe',
+                          }}
+                          title="Área a la que pertenece el empleado que realizó la consulta"
+                        >
+                          <span
+                            className="sup-agent-pill-dot"
+                            style={{ backgroundColor: '#2563eb' }}
+                          />
+                          Consultó desde: {empSectorName}
+                        </span>
+                      )}
 
-                {selected.delegatedToId && (
-                  <span className="esc-delegated-chip">
-                    Delegado a{' '}
-                    <strong>
-                      {employees.find((emp) => emp.id === selected.delegatedToId)?.name ??
-                        selected.delegatedToId}
-                    </strong>
-                  </span>
-                )}
-              </div>
+                      {(() => {
+                        if (priceDraft?.request) return null;
+                        const ag =
+                          conversation?.currentAgent ?? selected.conversation?.currentAgent;
+                        const meta = ag ? AGENT_META[ag] : null;
+                        return meta ? (
+                          <span
+                            className="sup-agent-pill"
+                            style={{
+                              backgroundColor: meta.bgSoft,
+                              color: meta.accent,
+                              borderColor: meta.borderSoft,
+                            }}
+                            title="Agente o dominio temático al que se derivó la consulta"
+                          >
+                            <span
+                              className="sup-agent-pill-dot"
+                              style={{ backgroundColor: meta.accent }}
+                            />
+                            {isEmployeeCase ? `Tema consultado: ${meta.name}` : meta.name}
+                          </span>
+                        ) : (
+                          <span className="esc-belonging-pill is-sin-area">Sin área</span>
+                        );
+                      })()}
+
+                      <EtiquetaPertenencia valor={selected.pertenencia} />
+
+                      {selected.delegatedToId && (
+                        <span className="esc-delegated-chip">
+                          Delegado a{' '}
+                          <strong>
+                            {employees.find((empItem) => empItem.id === selected.delegatedToId)?.name ??
+                              selected.delegatedToId}
+                          </strong>
+                        </span>
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </header>
 

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  askPillDoubt,
   getAudioStreamUrl,
   getEmployeePill,
   getPillAudioScript,
   reportPlaybackProgress,
-  searchKnowledge,
 } from '../api';
 import Trimi from './Trimi';
 import TrainingIcon from './TrainingIcon';
@@ -73,8 +73,30 @@ export default function LessonStudyModal({
         });
         const fallbackSpVoices = spVoices.length > 0 ? spVoices : v.filter((item) => item.lang && item.lang.toLowerCase().startsWith('es'));
         if (fallbackSpVoices.length > 0 && !selectedVoiceName) {
-          const preferred = fallbackSpVoices.find((item) => item.lang === 'es-AR' || item.lang === 'es_AR') ||
-            fallbackSpVoices.find((item) => item.lang.startsWith('es-419') || item.lang.startsWith('es-US') || item.lang.startsWith('es-MX') || item.lang.startsWith('es-CO') || item.lang.startsWith('es-CL')) ||
+          // Preferir voz femenina del Cono Sur (Uruguay / Chile / Argentina) evitando acentos caribeños/colombianos/venezolanos
+          const isSouthernConeFemale = (item) => {
+            const n = (item.name || '').toLowerCase();
+            const l = (item.lang || '').toLowerCase();
+            // Excluir voces de Colombia, Venezuela, México, Caribe
+            if (l.includes('co') || l.includes('ve') || l.includes('mx') || l.includes('pr') || l.includes('do') || n.includes('salome') || n.includes('paola') || n.includes('dalia') || n.includes('sabina')) {
+              return false;
+            }
+            return (
+              n.includes('valentina') || // es-UY (rioplatense suave, no porteña exagerada)
+              n.includes('catalina') ||  // es-CL (cono sur suave)
+              n.includes('elena') ||     // es-AR (argentina)
+              n.includes('tania') ||     // es-PY
+              n.includes('sofia') ||     // es-BO
+              n.includes('camila') ||
+              (l.includes('es-uy') || l.includes('es-ar') || l.includes('es-cl'))
+            );
+          };
+          const preferred =
+            // 1° Valentina (es-UY) o Catalina (es-CL) Natural: suenan rioplatense/cono sur súper natural sin ser porteñas exageradas
+            fallbackSpVoices.find((item) => isSouthernConeFemale(item) && ((item.name || '').toLowerCase().includes('valentina') || (item.lang || '').toLowerCase().includes('es-uy'))) ||
+            fallbackSpVoices.find((item) => isSouthernConeFemale(item) && (item.name || '').toLowerCase().includes('natural')) ||
+            fallbackSpVoices.find((item) => isSouthernConeFemale(item)) ||
+            fallbackSpVoices.find((item) => (item.lang || '').toLowerCase().includes('es-ar')) ||
             fallbackSpVoices[0];
           if (preferred) setSelectedVoiceName(preferred.name);
         }
@@ -223,10 +245,64 @@ export default function LessonStudyModal({
     });
     const fallbackSp = spVoices.length > 0 ? spVoices : availableVoices.filter((v) => v.lang && v.lang.toLowerCase().startsWith('es'));
 
-    // Voz primaria seleccionada por el usuario o recomendada del sistema
-    const primaryVoice = (selectedVoiceName && availableVoices.find((v) => v.name === selectedVoiceName)) ||
-      fallbackSp.find((v) => v.lang === 'es-AR' || v.lang === 'es_AR') ||
-      fallbackSp.find((v) => v.lang && (v.lang.startsWith('es-419') || v.lang.startsWith('es-US') || v.lang.startsWith('es-MX') || v.lang.startsWith('es-CO'))) ||
+    const isCaribOrAndean = (v) => {
+      const l = (v?.lang || '').toLowerCase();
+      const n = (v?.name || '').toLowerCase();
+      return (
+        l.includes('co') ||
+        l.includes('ve') ||
+        l.includes('mx') ||
+        l.includes('pr') ||
+        l.includes('do') ||
+        l.includes('cu') ||
+        n.includes('salome') ||
+        n.includes('paola') ||
+        n.includes('gonzalo') ||
+        n.includes('sebastian') ||
+        n.includes('dalia') ||
+        n.includes('sabina') ||
+        n.includes('jorge')
+      );
+    };
+
+    const isFemale = (v) => {
+      if (isCaribOrAndean(v)) return false;
+      const n = (v?.name || '').toLowerCase();
+      return (
+        n.includes('valentina') || // es-UY (rioplatense suave)
+        n.includes('catalina') ||  // es-CL (cono sur suave)
+        n.includes('elena') ||     // es-AR (argentina)
+        n.includes('tania') ||     // es-PY
+        n.includes('sofia') ||     // es-BO
+        n.includes('camila') ||
+        n.includes('paloma') ||
+        n.includes('female')
+      );
+    };
+
+    const isMale = (v) => {
+      if (isCaribOrAndean(v)) return false;
+      const n = (v?.name || '').toLowerCase();
+      return (
+        n.includes('mateo') ||     // es-UY (rioplatense suave)
+        n.includes('lorenzo') ||   // es-CL (cono sur suave)
+        n.includes('tomas') ||     // es-AR (argentino)
+        n.includes('tomás') ||
+        n.includes('mario') ||     // es-PY
+        n.includes('marcelo') ||   // es-BO
+        n.includes('alonso') ||
+        n.includes('male')
+      );
+    };
+
+    // Voz primaria (SPEAKER_1 - Trimi, Femenina Cono Sur / Argentina suave)
+    const primaryVoice =
+      (selectedVoiceName && availableVoices.find((v) => v.name === selectedVoiceName && !isCaribOrAndean(v))) ||
+      fallbackSp.find((v) => isFemale(v) && ((v.name || '').toLowerCase().includes('valentina') || (v.lang || '').toLowerCase().includes('es-uy'))) ||
+      fallbackSp.find((v) => isFemale(v) && ((v.name || '').toLowerCase().includes('elena') || (v.lang || '').toLowerCase().includes('es-ar'))) ||
+      fallbackSp.find((v) => isFemale(v) && (v.name || '').toLowerCase().includes('natural')) ||
+      fallbackSp.find((v) => isFemale(v)) ||
+      fallbackSp.find((v) => (v.lang || '').toLowerCase().includes('es-ar') || (v.lang || '').toLowerCase().includes('es-uy')) ||
       fallbackSp[0] ||
       null;
 
@@ -236,15 +312,25 @@ export default function LessonStudyModal({
 
     if (isTrimi) {
       speakerVoice = primaryVoice;
-      speakerPitch = basePitch;
+      speakerPitch = basePitch * 0.98; // Suaviza cualquier agudo excesivo para sonar más natural
     } else {
-      // Colega: si hay otra voz en español disponible, usarla directamente para sonar natural y diferente
-      const secondaryVoice = fallbackSp.find((v) => v.name !== primaryVoice?.name);
-      if (secondaryVoice) {
-        speakerVoice = secondaryVoice;
-        speakerPitch = basePitch;
+      // Colega (SPEAKER_2 - Masculina Cono Sur / Argentina suave):
+      const maleVoice =
+        fallbackSp.find((v) => isMale(v) && ((v.name || '').toLowerCase().includes('mateo') || (v.lang || '').toLowerCase().includes('es-uy'))) ||
+        fallbackSp.find((v) => isMale(v) && ((v.name || '').toLowerCase().includes('tomas') || (v.name || '').toLowerCase().includes('tomás') || (v.lang || '').toLowerCase().includes('es-ar'))) ||
+        fallbackSp.find((v) => isMale(v) && (v.name || '').toLowerCase().includes('natural')) ||
+        fallbackSp.find((v) => isMale(v)) ||
+        fallbackSp.find((v) => !isCaribOrAndean(v) && v.name !== primaryVoice?.name);
+
+      if (maleVoice && isMale(maleVoice)) {
+        speakerVoice = maleVoice;
+        speakerPitch = basePitch * 0.96;
+      } else if (maleVoice) {
+        speakerVoice = maleVoice;
+        speakerPitch = Math.max(0.78, basePitch - 0.14);
+        speakerRate = playbackSpeed * 0.97;
       } else {
-        speakerPitch = Math.max(0.75, basePitch - 0.08);
+        speakerPitch = Math.max(0.76, basePitch - 0.16);
         speakerRate = playbackSpeed * 0.96;
       }
     }
@@ -295,6 +381,9 @@ export default function LessonStudyModal({
 
       // Si la píldora tiene archivo de audio real (ElevenLabs MP3), reproducirlo
       if (audioRef.current && pill?.hasAudio) {
+        const startSec = Math.floor(audioRef.current.currentTime || 0);
+        reportPlaybackProgress(token, pillId, startSec).catch(() => {});
+        lastReportedSecRef.current = startSec;
         audioRef.current.play()
           .then(() => {
             const isTrimi = scriptDialogue[activeParagraphIndex]?.speaker === 'SPEAKER_1';
@@ -431,6 +520,8 @@ export default function LessonStudyModal({
     }
   };
 
+  const lastReportedSecRef = useRef(0);
+
   const handleTimeUpdate = () => {
     if (!audioRef.current) return;
     const curr = audioRef.current.currentTime;
@@ -440,10 +531,24 @@ export default function LessonStudyModal({
       setDuration(dur);
     }
 
+    const sec = Math.floor(curr);
+    if (sec - lastReportedSecRef.current >= 5) {
+      lastReportedSecRef.current = sec;
+      reportPlaybackProgress(token, pillId, sec)
+        .then((res) => {
+          if (res?.isAudioCompleted) {
+            setHasCompletedListening(true);
+            if (onProgressUpdated) onProgressUpdated();
+          }
+        })
+        .catch(() => {});
+    }
+
     // Si supera el 80%, reportar progreso al backend
     if (dur > 0 && curr / dur >= 0.8 && !hasCompletedListening) {
       setHasCompletedListening(true);
-      reportPlaybackProgress(token, pillId, Math.floor(curr), Math.floor(dur))
+      lastReportedSecRef.current = sec;
+      reportPlaybackProgress(token, pillId, sec)
         .then(() => {
           if (onProgressUpdated) onProgressUpdated();
         })
@@ -502,11 +607,6 @@ export default function LessonStudyModal({
   };
 
   // Consulta RAG "¿Dudas? Preguntale a Trimi"
-  const defaultDoubtAnswer = {
-    text: 'Si Paljet no responde, avisale al cliente y registrá la venta en cuanto vuelva...',
-    source: 'procedimiento vigente',
-  };
-
   const handleAskDoubt = async (e, customQuery) => {
     if (e) e.preventDefault();
     const query = (customQuery || doubtQuestion).trim();
@@ -515,24 +615,17 @@ export default function LessonStudyModal({
     setAskingDoubt(true);
 
     try {
-      // Intentar buscar en la base de conocimiento
-      const res = await searchKnowledge(token, { query, k: 2 });
-      if (res && res.length > 0) {
+      const res = await askPillDoubt(token, pillId, query);
+      if (res && res.text) {
         setDoubtAnswer({
-          text: res[0].content || res[0].text,
-          source: res[0].title || 'Base de conocimiento de Credimisión',
-        });
-      } else {
-        // Fallback contextual del objetivo de la píldora
-        setDoubtAnswer({
-          text: `En esta lección sobre «${pill?.title || 'este tema'}», la regla clave es: ${pill?.objective || 'verificar siempre los datos con tu supervisor y seguir las listas de precios vigentes'}.`,
-          source: 'Guía pedagógica de Credimisión',
+          text: res.text,
+          source: res.source || 'Base de conocimiento de Credimisión',
         });
       }
     } catch {
       setDoubtAnswer({
-        text: `Respecto a «${query}»: verificá siempre que el precio cargado coincida con la lista vigente antes de confirmar la operación. Ante cualquier discrepancia, consultá con tu supervisor.`,
-        source: 'Procedimiento operativo vigente',
+        text: `En esta lección sobre «${pill?.title || 'este tema'}», recordá que el objetivo principal es ${pill?.objective || 'seguir el procedimiento operativo vigente'}.`,
+        source: `Lección: ${pill?.title || 'Capacitación Credimisión'}`,
       });
     } finally {
       setAskingDoubt(false);
@@ -564,8 +657,6 @@ export default function LessonStudyModal({
   const isPoint2Checked = progressPct >= 50 || hasCompletedListening;
   const isPoint3Checked = progressPct >= 80 || hasCompletedListening;
   const pointsViewedCount = (isPoint1Checked ? 1 : 0) + (isPoint2Checked ? 1 : 0) + (isPoint3Checked ? 1 : 0);
-
-  const displayedDoubt = doubtAnswer || defaultDoubtAnswer;
 
   return (
     <div className="modal-overlay" style={{ background: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(3px)' }}>
@@ -702,16 +793,41 @@ export default function LessonStudyModal({
             {/* Línea conectora */}
             <div style={{ width: 48, height: 1.5, background: '#CBD5E1' }} />
 
-            {/* 3. Demostrar (Bloqueado) */}
+            {/* 3. Demostrar */}
             <div
+              onClick={() => {
+                if (hasCompletedListening || pill?.isCompleted) {
+                  if (onStartSimulation) onStartSimulation('FREE');
+                }
+              }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 6,
-                color: '#94A3B8',
+                gap: 7,
+                color: hasCompletedListening || pill?.isCompleted ? '#1E293B' : '#94A3B8',
+                cursor: hasCompletedListening || pill?.isCompleted ? 'pointer' : 'default',
               }}
             >
-              <span style={{ fontSize: 12 }}>🔒</span>
+              {hasCompletedListening || pill?.isCompleted ? (
+                <span
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: '50%',
+                    border: '1.5px solid #94A3B8',
+                    color: '#64748B',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 11.5,
+                    fontWeight: 600,
+                  }}
+                >
+                  3
+                </span>
+              ) : (
+                <span style={{ fontSize: 12 }}>🔒</span>
+              )}
               <span>Demostrar</span>
             </div>
           </div>
@@ -1000,44 +1116,34 @@ export default function LessonStudyModal({
                   </span>
                 </div>
 
-                {/* Chip / Píldora de pregunta sugerida rápida (idéntica a la imagen) */}
-                <button
-                  type="button"
-                  onClick={() => handleAskDoubt(null, '¿Qué pasa si un sistema no está disponible?')}
-                  style={{
-                    alignSelf: 'flex-start',
-                    background: '#ffffff',
-                    border: '1px solid #E2E8F0',
-                    borderRadius: 20,
-                    padding: '7px 14px',
-                    fontSize: 12.5,
-                    color: '#1E293B',
-                    cursor: 'pointer',
-                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
-                    textAlign: 'left',
-                  }}
-                >
-                  ¿Qué pasa si un sistema no está disponible?
-                </button>
-
-                {/* Burbuja celeste de respuesta */}
-                <div
-                  style={{
-                    background: '#DBEAFE',
-                    borderRadius: 12,
-                    padding: '12px 14px',
-                    fontSize: 13,
-                    lineHeight: 1.5,
-                    color: '#1E3A8A',
-                  }}
-                >
-                  <p style={{ margin: 0 }}>
-                    {displayedDoubt.text}
-                  </p>
-                  <span style={{ display: 'block', marginTop: 4, fontSize: 11, color: '#64748B' }}>
-                    Fuente: {displayedDoubt.source}
-                  </span>
-                </div>
+                {/* Burbuja celeste de respuesta (solo cuando se hace una consulta) */}
+                {(askingDoubt || doubtAnswer) && (
+                  <div
+                    style={{
+                      background: '#DBEAFE',
+                      borderRadius: 12,
+                      padding: '12px 14px',
+                      fontSize: 13,
+                      lineHeight: 1.5,
+                      color: '#1E3A8A',
+                    }}
+                  >
+                    {askingDoubt ? (
+                      <p style={{ margin: 0, fontStyle: 'italic', color: '#2563EB' }}>
+                        Trimi está buscando en el procedimiento de la lección...
+                      </p>
+                    ) : (
+                      <>
+                        <p style={{ margin: 0 }}>
+                          {doubtAnswer.text}
+                        </p>
+                        <span style={{ display: 'block', marginTop: 4, fontSize: 11, color: '#64748B' }}>
+                          Fuente: {doubtAnswer.source}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )}
 
                 {/* Formulario de consulta con icono de avión de papel */}
                 <form

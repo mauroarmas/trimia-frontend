@@ -113,12 +113,17 @@ export function formatEscalationReason(rawReason) {
 export function resolveMessageActor(m, conversation, me) {
   const isUser = m.role === 'USER';
   if (isUser) {
-    const isEmployee = conversation?.userType === 'EMPLEADO';
+    const isEmployee =
+      conversation?.userType === 'EMPLEADO' || Boolean(conversation?.employee);
     if (isEmployee) {
+      const empName = conversation?.employee?.name || 'Empleado';
+      const empSector = conversation?.employee?.sector?.name;
       return {
         actorType: 'EMPLOYEE',
-        title: 'Empleado',
-        badge: 'Personal interno',
+        title: empName,
+        badge: empSector
+          ? `Personal interno · Área de ${empSector}`
+          : 'Personal interno',
         accent: '#d97706',
         bg: '#fffbeb',
         border: '#fde68a',
@@ -184,9 +189,15 @@ export function resolveMessageActor(m, conversation, me) {
 
   const areaKey = m.agentType || conversation?.currentAgent;
   const areaMeta = areaKey ? AGENT_META[areaKey] : null;
+  const isEmployeeConv =
+    conversation?.userType === 'EMPLEADO' || Boolean(conversation?.employee);
   return {
     actorType: 'AGENT',
-    title: areaMeta ? `Agente IA · ${areaMeta.name}` : 'Agente IA',
+    title: areaMeta
+      ? isEmployeeConv
+        ? `Agente IA · Tema: ${areaMeta.name}`
+        : `Agente IA · ${areaMeta.name}`
+      : 'Agente IA',
     badge: 'Respuesta IA',
     accent: areaMeta?.accent ?? '#2563eb',
     bg: areaMeta?.bgSoft ?? '#eff6ff',

@@ -1027,6 +1027,15 @@ export function getEmployeePill(token, id) {
   return request(`/training/pills/${id}`, { token });
 }
 
+/** Consulta una duda pedagógica a Trimi dentro de una píldora formativa. */
+export function askPillDoubt(token, pillId, question) {
+  return request(`/training/pills/${pillId}/ask`, {
+    method: 'POST',
+    token,
+    body: { question },
+  });
+}
+
 /** Verifica las respuestas del quiz de una píldora. */
 export function verifyPillQuiz(token, pillId, answers) {
   return request(`/training/pills/${pillId}/verify`, {
