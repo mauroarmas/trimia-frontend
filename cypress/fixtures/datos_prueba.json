@@ -1,0 +1,179 @@
+{
+  "_comentario": "Datos de prueba ficticios y anonimizados conforme a la Ley 25.326 y al Anexo B del Plan de Testing PT-TrimIA-2026-01 (Sección 5.6 de TAS26).",
+  "passwordDefault": "trimia2026",
+  "passwordInvalida": "ClaveIncorrecta999!",
+  "usuarios": {
+    "supervisorGeneral": {
+      "nombre": "Diego Bazán",
+      "email": "diego.bazan@credimision.com",
+      "rol": "SUPERVISOR",
+      "sector": "Ventas",
+      "esGerente": true,
+      "pestanasEsperadas": [
+        "Panel del Supervisor",
+        "Casos escalados",
+        "Base de Conocimiento",
+        "Empleados y Áreas",
+        "Capacitación y Diagnóstico",
+        "Panel de Cobranzas",
+        "Panel de Ventas",
+        "Aprobación Financiación",
+        "Simulador de Chat",
+        "Chat con el Asistente"
+      ]
+    },
+    "gerentePrueba": {
+      "nombre": "[QA] Gerente de pruebas",
+      "email": "gerente.prueba@credimision.com",
+      "rol": "SUPERVISOR",
+      "sector": "Ventas",
+      "esGerente": true
+    },
+    "supervisoraCobranzas": {
+      "nombre": "Silvia Ríos",
+      "email": "silvia.rios@credimision.com",
+      "rol": "SUPERVISOR",
+      "sector": "Cobranzas",
+      "esGerente": false,
+      "pestanasEsperadas": [
+        "Panel de Cobranzas",
+        "Casos escalados",
+        "Base de Conocimiento",
+        "Capacitación y Diagnóstico",
+        "Chat con el Asistente"
+      ],
+      "pestanasProhibidas": [
+        "Empleados y Áreas",
+        "Simulador de Chat",
+        "Panel del Supervisor"
+      ]
+    },
+    "vendedora": {
+      "nombre": "Laura Gómez",
+      "email": "laura.gomez@credimision.com",
+      "rol": "EMPLEADO",
+      "sector": "Ventas",
+      "pestanasEsperadas": [
+        "Panel de Ventas",
+        "Mi Capacitación",
+        "Chat con el Asistente"
+      ],
+      "pestanasProhibidas": [
+        "Panel de Cobranzas",
+        "Base de Conocimiento",
+        "Casos escalados",
+        "Empleados y Áreas"
+      ]
+    },
+    "cobrador": {
+      "nombre": "Roberto Sosa",
+      "email": "roberto.sosa@credimision.com",
+      "rol": "EMPLEADO",
+      "sector": "Cobranzas",
+      "esControlador": false,
+      "pestanasEsperadas": [
+        "Mi Panel de Cobranzas",
+        "Mi Capacitación",
+        "Chat con el Asistente"
+      ],
+      "subpestanasProhibidasCobranzas": [
+        "Verificar Impacto",
+        "Configuración de recordatorios"
+      ]
+    },
+    "cobradoraControladora": {
+      "nombre": "Marisa Paz",
+      "email": "marisa.paz@credimision.com",
+      "rol": "EMPLEADO",
+      "sector": "Cobranzas",
+      "esControlador": true,
+      "pestanasEsperadas": [
+        "Mi Panel de Cobranzas",
+        "Mi Capacitación",
+        "Chat con el Asistente"
+      ],
+      "subpestanasEsperadasCobranzas": [
+        "Mis Comprobantes",
+        "Verificar Impacto",
+        "Mis Clientes",
+        "Recordatorios Enviados",
+        "Configuración de recordatorios",
+        "Registro de Actividad"
+      ]
+    },
+    "empleadaCapacitacion": {
+      "nombre": "Sofía Ramírez",
+      "email": "sofia.ramirez@credimision.com",
+      "rol": "EMPLEADO",
+      "sector": "Ventas"
+    },
+    "vendedorInactivo": {
+      "nombre": "Vendedor Inactivo",
+      "email": "vendedor.inactivo@credimision.com",
+      "rol": "EMPLEADO",
+      "sector": "Ventas",
+      "activo": false
+    }
+  },
+  "nuevoEmpleadoAlta": {
+    "nombre": "Empleado Prueba Cypress",
+    "email": "cypress.alta@credimision.com",
+    "telefono": "5493815559900",
+    "password": "Password123!",
+    "rol": "EMPLEADO",
+    "sector": "Ventas"
+  },
+  "clientes": {
+    "clienteConCuotas": {
+      "nombre": "Comercio Don Pedro",
+      "telefono": "5491133334444",
+      "cobradorAsignado": "Roberto Sosa",
+      "montoCuota": 120000
+    },
+    "clienteDerivado": {
+      "nombre": "Valentina Herrera",
+      "motivo": "pidió hablar con un vendedor"
+    },
+    "clienteNuevo": {
+      "nombre": "Cliente Prueba Uno",
+      "dniNormal": "30111222",
+      "dniIrregular": "30999888"
+    }
+  },
+  "paljetStock": {
+    "categoria": "SMART_TV",
+    "productos": {
+      "disponible": {
+        "nombre": "Samsung 55\" 4K",
+        "unidades": 4,
+        "estadoTexto": "Disponible"
+      },
+      "bajoStock": {
+        "nombre": "LG 50\" Full HD",
+        "unidades": 1,
+        "estadoTexto": "Bajo stock"
+      },
+      "sinStock": {
+        "nombre": "Philips 43\"",
+        "unidades": 0,
+        "estadoTexto": "Sin stock"
+      }
+    }
+  },
+  "baseConocimiento": {
+    "docVentasPublico": {
+      "titulo": "Circuito de Ventas",
+      "area": "SALES",
+      "audiencia": "PUBLICO"
+    },
+    "docAdminInterno": {
+      "titulo": "Facturación y documentación",
+      "area": "ADMIN",
+      "audiencia": "INTERNO"
+    }
+  },
+  "valoresLimiteRecordatorios": {
+    "diasValidos": [0, 7, 30],
+    "diasInvalidos": [-1, 31]
+  }
+}
