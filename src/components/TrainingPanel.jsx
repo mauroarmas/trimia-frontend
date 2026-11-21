@@ -18,6 +18,7 @@ import AudioScriptModal from './AudioScriptModal';
 import DiagnosticQuizModal from './DiagnosticQuizModal';
 import InfoNotes, { InfoToggle } from './InfoNotes';
 import LessonStudyModal from './LessonStudyModal';
+import PageHero from './PageHero';
 import SimulationModal from './SimulationModal';
 import SupervisorDiagnosticModal from './SupervisorDiagnosticModal';
 import SupervisorSimulationsModal from './SupervisorSimulationsModal';
@@ -474,6 +475,16 @@ export default function TrainingPanel({ token, me }) {
 
   return (
     <div className="training-panel">
+      <PageHero
+        kicker="Formación continua"
+        title="Capacitación y diagnóstico"
+        description={
+          isSupervisor
+            ? 'Creá módulos, editá guiones con audio a dos voces y seguí el diagnóstico y avance del equipo.'
+            : 'Completá tu evaluación diagnóstica inicial, escuchá las píldoras y practicá con clientes simulados.'
+        }
+      />
+
       {/* 1. Modal de Bienvenida con Trimi (Captura 1) */}
       {showWelcome && (
         <WelcomeOnboardingModal
