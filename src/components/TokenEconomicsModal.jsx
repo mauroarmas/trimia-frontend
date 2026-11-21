@@ -6,7 +6,6 @@ const VOLUME_SCENARIOS = [500, 1500, 5000, 15000];
 
 export default function TokenEconomicsModal({ metrics, onClose, children }) {
   const [monthlyQueries, setMonthlyQueries] = useState(1500);
-  const [arsRate, setArsRate] = useState(1200);
   const [showTechnical, setShowTechnical] = useState(false);
 
   useEffect(() => {
@@ -27,10 +26,6 @@ export default function TokenEconomicsModal({ metrics, onClose, children }) {
         (90 / 1_000_000) * econ.primaryPricing.outputPer1M;
 
   const projectedMonthlyUsd = monthlyQueries * unitCostForProjection;
-  const projectedMonthlyArs =
-    Number.isFinite(Number(arsRate)) && Number(arsRate) > 0
-      ? projectedMonthlyUsd * Number(arsRate)
-      : null;
 
   const avgSeconds =
     econ.avgDurationMs != null ? (econ.avgDurationMs / 1000).toFixed(1) : null;
@@ -167,17 +162,6 @@ export default function TokenEconomicsModal({ metrics, onClose, children }) {
                   </button>
                 ))}
               </div>
-
-              <label className="econ-ars-input">
-                <span>Cotización USD (ARS opcional)</span>
-                <input
-                  type="number"
-                  min="1"
-                  step="10"
-                  value={arsRate}
-                  onChange={(e) => setArsRate(e.target.value)}
-                />
-              </label>
             </div>
 
             <div className="econ-projection-result">
@@ -187,11 +171,6 @@ export default function TokenEconomicsModal({ metrics, onClose, children }) {
                 </span>
                 <div className="econ-proj-numbers">
                   <strong>{formatUsd(projectedMonthlyUsd, { compact: true })} / mes</strong>
-                  {projectedMonthlyArs != null && (
-                    <span className="econ-proj-ars">
-                      ≈ ARS ${Math.round(projectedMonthlyArs).toLocaleString('es-AR')} / mes
-                    </span>
-                  )}
                 </div>
               </div>
               <span className="econ-proj-hint">
