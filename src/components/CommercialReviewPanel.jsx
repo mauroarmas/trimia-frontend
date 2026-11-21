@@ -180,13 +180,11 @@ export default function CommercialReviewPanel({
                   <span className="fin-version-tag">
                     Versión #{order.version}
                   </span>
-                  <span
-                    className={`commerce-validity-pill ${
-                      order.expired ? 'is-expired' : 'is-valid'
-                    }`}
-                  >
-                    {order.expired ? 'Vigencia vencida' : 'Vigencia activa (48 h)'}
-                  </span>
+                  {!order.expired && (
+                    <span className="commerce-validity-pill is-valid">
+                      Vigencia activa (48 h)
+                    </span>
+                  )}
                 </>
               )}
             </div>

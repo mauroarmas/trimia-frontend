@@ -416,44 +416,16 @@ export default function WebChat({ token, me, onOpenSimulator }) {
       />
 
       {onOpenSimulator && (
-        <div
-          style={{
-            width: '100%',
-            boxSizing: 'border-box',
-            marginBottom: 12,
-            padding: '8px 14px',
-            borderRadius: 10,
-            backgroundColor: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            color: '#475569',
-            fontSize: 12.5,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 12,
-            flexWrap: 'wrap',
-          }}
-        >
-          <span>
-            <strong style={{ color: '#334155' }}>Canal interno de empleados ({displayName}):</strong>{' '}
-            El asistente responde consultas operativas con conocimiento interno. Para simular compras o financiación como cliente, usá el Simulador de Chat.
+        <div className="webchat-sim-hint">
+          <span className="webchat-sim-hint-text">
+            <strong>Canal interno ({displayName}):</strong> consultas operativas con conocimiento interno. Para probar como cliente:
           </span>
           <button
             type="button"
+            className="webchat-sim-hint-btn"
             onClick={onOpenSimulator}
-            style={{
-              background: '#ffffff',
-              color: '#2563eb',
-              border: '1px solid #cbd5e1',
-              borderRadius: 7,
-              padding: '4px 10px',
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
           >
-            Ir al Simulador de Chat →
+            Abrir Simulador de Chat →
           </button>
         </div>
       )}

@@ -47,3 +47,329 @@
 @media(max-width: 700px) { .collection-metrics { grid-template-columns: 1fr; gap: 8px; } .collections-panel .collection-metric { padding: 14px; } .collection-metric strong { font-size: 24px; } .collection-toolbar, .collection-section-heading { align-items: stretch; flex-direction: column; } .collection-dialog-shade { padding: 8px; } .collection-dialog { max-height: calc(100dvh - 16px); } .collection-dialog-body,.collection-dialog-header { padding: 16px; } .collection-account-totals { grid-template-columns: 1fr; gap: 8px; } .collection-account-totals > div { padding: 12px; } .collection-account-totals strong { font-size: 18px; } .collection-dialog-footer { flex-direction: column; align-items: stretch; } }
 .collections-panel > .card { overflow-x: auto; }
 .collection-dialog .panel-section > div { flex-wrap: wrap; }
+
+/* ==========================================================================
+   Registro de Actividad — Línea de Tiempo Unificada (Collections / ActivityFeed)
+   ========================================================================== */
+.activity-feed-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.activity-count-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.activity-feed-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 4px;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.activity-feed-toolbar label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.activity-feed-toolbar select,
+.activity-feed-toolbar input[type='date'] {
+  min-height: 38px;
+  padding: 7px 11px;
+  font-size: 13px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #1e293b;
+}
+
+.activity-filter-grow {
+  flex: 1 1 240px;
+}
+
+.activity-clear-btn {
+  min-height: 38px;
+  align-self: flex-end;
+}
+
+.activity-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 36px 20px;
+  text-align: center;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  color: #64748b;
+}
+
+.activity-empty-state strong {
+  color: #1e293b;
+  font-size: 14.5px;
+}
+
+.activity-empty-state p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.activity-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.activity-client-group {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.activity-group-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border: 0;
+  border-bottom: 1px solid #e2e8f0;
+  color: #0f172a;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s ease;
+}
+
+.activity-group-header.is-collapsed {
+  border-bottom: 0;
+}
+
+.activity-group-header:hover {
+  background: #f1f5f9;
+}
+
+.activity-group-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.activity-group-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2563eb, #0d9488);
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.activity-group-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.activity-group-count {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #334155;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.activity-group-chevron {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.activity-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 16px 18px 16px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+}
+
+.activity-timeline::before {
+  content: '';
+  position: absolute;
+  top: 22px;
+  bottom: 22px;
+  left: 25px;
+  width: 2px;
+  background: #e2e8f0;
+}
+
+.activity-item {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding-left: 12px;
+}
+
+.activity-dot {
+  position: relative;
+  z-index: 1;
+  width: 11px;
+  height: 11px;
+  margin-top: 12px;
+  margin-left: -17px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px #ffffff;
+}
+
+.activity-bubble {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.activity-item.is-client .activity-bubble {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.activity-item.is-staff .activity-bubble {
+  background: #f0fdfa;
+  border-color: #99f6e4;
+}
+
+.activity-item.is-alert .activity-bubble {
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
+
+.activity-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.activity-actor-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #e2e8f0;
+  color: #334155;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.activity-actor-pill.is-client {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.activity-actor-pill.is-staff {
+  background: #ccfbf1;
+  color: #115e59;
+}
+
+.activity-actor-pill.is-alert {
+  background: #ffe4e6;
+  color: #be123c;
+}
+
+.activity-timestamp {
+  font-size: 11.5px;
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-text {
+  font-size: 13px;
+  line-height: 1.48;
+  color: #1e293b;
+  overflow-wrap: anywhere;
+}
+
+.activity-pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-top: 14px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.activity-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #475569;
+}
+
+.activity-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.activity-legend i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.activity-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.activity-page-indicator {
+  font-size: 12.5px;
+  color: #475569;
+}

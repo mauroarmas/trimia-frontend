@@ -3,6 +3,7 @@ import ConversationControls from './ConversationControls';
 import ConversationThread from './ConversationThread';
 import ChatExportMenu from './ChatExportMenu';
 import { buildConversationMarkdown } from '../chatExport';
+import { contactInitials } from '../conversationHelpers';
 import { salesProspectAction } from '../api';
 
 export default function SalesConversationModal({ token, me, prospect, onClose }) {
@@ -54,7 +55,7 @@ export default function SalesConversationModal({ token, me, prospect, onClose })
         <header className="sales-conv-modal-head">
           <div className="sales-conv-modal-identity">
             <div className="sales-prospect-avatar" aria-hidden="true">
-              {displayName.trim().slice(0, 2).toUpperCase()}
+              {contactInitials(displayName)}
             </div>
             <div>
               <h3 id="sales-conv-modal-title">Conversación con {displayName}</h3>

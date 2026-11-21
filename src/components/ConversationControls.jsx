@@ -178,13 +178,32 @@ export default function ConversationControls({
   const NotesPanel = compact ? 'details' : 'div';
   const NotesHeading = compact ? 'summary' : 'div';
 
+  const outboundNotices = (conversation.messages ?? [])
+    .map((m) => m.outboundCommunication)
+    .filter(Boolean);
+  const latestNotice =
+    outboundNotices.length > 0 ? outboundNotices[outboundNotices.length - 1] : null;
+  const noticeLabels = {
+    PENDING: 'Pendiente',
+    SENDING: 'En proceso',
+    FAILED: 'Fallido',
+    UNCERTAIN: 'Incierto: requiere atención',
+    ACCEPTED:
+      latestNotice?.transportMode === 'simulated'
+        ? 'Aceptado en simulación'
+        : 'Aceptado por el canal',
+    DELIVERED: 'Entregado al destinatario',
+  };
+
   return (
     <div className="conv-ctrl-root">
-      {!compact && (conversation.messages ?? []).filter(m => m.outboundCommunication).map(m => {
-        const n = m.outboundCommunication;
-        const labels = { PENDING: 'Pendiente', SENDING: 'En proceso', FAILED: 'Fallido', UNCERTAIN: 'Incierto: requiere atención', ACCEPTED: n.transportMode === 'simulated' ? 'Aceptado en simulación' : 'Aceptado por el canal' };
-        return <p key={n.id} className="conv-ctrl-outbound-notice">Aviso de financiación: <strong>{labels[n.status]}</strong>. No acredita entrega al destinatario.</p>;
-      })}
+      {!compact && latestNotice && (
+        <p key={latestNotice.id} className="conv-ctrl-outbound-notice">
+          Aviso de financiación: <strong>{noticeLabels[latestNotice.status] || latestNotice.status}</strong>
+          {outboundNotices.length > 1 ? ` (${outboundNotices.length} avisos enviados)` : ''}.
+          {latestNotice.status !== 'DELIVERED' ? ' No acredita entrega al destinatario.' : ''}
+        </p>
+      )}
 
       {/* 1. Barra horizontal de estado y toma/liberación de control */}
       <div className={`conv-ctrl-status-bar${iHoldControl ? ' is-manual' : ''}`}>

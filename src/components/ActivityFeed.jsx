@@ -18,6 +18,7 @@ const EVENT_TYPE_LABELS = {
   agent_handoff: 'La IA derivó la conversación a otro agente.',
   conversation_release: 'Se liberó el control manual de la conversación.',
   conversation_takeover: 'Se tomó el control manual de la conversación.',
+  conversation_manual_reply: 'Un responsable envió una respuesta manual al cliente.',
   escalation_created: 'El caso fue escalado a un supervisor.',
   escalation_delegated: 'El caso escalado fue delegado a otro supervisor.',
   escalation_resolved: 'El caso escalado fue resuelto.',
@@ -29,31 +30,40 @@ const EVENT_TYPE_LABELS = {
   quota_marked_manual: 'La cuota se marcó como gestionada manualmente.',
   quota_reminder_sent: 'Se envió un recordatorio de cuota al cliente.',
   reminder_cycle_blocked: 'El ciclo de recordatorios está bloqueado (plantilla no aprobada).',
+  FINANCING_CUSTOMER_SELECTION: 'El cliente eligió su opción de pago y modalidad de entrega.',
+  FINANCING_CUSTOMER_ACCEPTED: 'El cliente confirmó el resumen final de su compra financiada.',
+  FINANCING_SALE_CLOSED: 'Se registró el cierre de la venta financiada y el plan de cuotas.',
+  FINANCING_NOTICE_ACCEPTED: 'Aviso de financiación enviado y aceptado por el canal.',
+  FINANCING_NOTICE_DELIVERED: 'Entrega del aviso de financiación confirmada.',
+  FINANCING_NOTICE_FAILED: 'Falló el envío del aviso de financiación.',
+  FINANCING_NOTICE_UNCERTAIN: 'Estado del aviso de financiación incierto (requiere verificación).',
+  FINANCING_NOTICE_RETRY: 'Se solicitó el reintento del aviso de financiación.',
+  FINANCING_SUBMITTED: 'Solicitud de financiación presentada para revisión de Administración.',
+  FINANCING_EVALUATED: 'Se completó la verificación crediticia automática de la solicitud.',
+  FINANCING_DECIDED: 'Administración registró la resolución de la solicitud de financiación.',
+  FINANCING_PLAN_CREATED: 'Se generó el cronograma de cuotas semanales del cliente.',
+  FINANCING_DRAFT_UPDATED: 'El asistente actualizó los datos de la solicitud de financiación.',
+  FINANCING_DRAFT_CORRECTED: 'Se corrigieron y confirmaron los datos de la solicitud.',
 };
 
 /**
- * `internal_note_added` duplica (sin el texto) lo que ya se ve como item
- * `type: internal_note` en el mismo feed, y `ROUTED_TO_AGENT` se loguea en
- * cada turno del orquestador — repite lo que ya se ve como par de mensajes
- * USER/ASSISTANT. Ninguno de los dos aporta algo que no esté ya visible por
- * otro item, así que se ocultan para que la línea de tiempo no quede
- * saturada de ruido técnico.
+ * Se ocultan eventos internos redundantes que duplican mensajes o notificaciones
+ * ya visibles en la misma línea de tiempo.
  */
-const HIDDEN_EVENT_TYPES = new Set(['internal_note_added', 'ROUTED_TO_AGENT']);
+const HIDDEN_EVENT_TYPES = new Set([
+  'internal_note_added',
+  'ROUTED_TO_AGENT',
+  'FINANCING_NOTICE_CLAIMED',
+  'conversation_manual_reply',
+]);
 
-/**
- * Color del punto en la línea de tiempo (Fig 7 del prototipo): gris para lo
- * automático de la IA, teal para acciones del cobrador, naranja para el
- * Cobrador Controlador, rojo para alertas. El prototipo deja el criterio
- * exacto a nuestro criterio — esta es la interpretación que usamos:
- *   - mensajes y notas de agentes IA -> gris
- *   - notas manuales y acciones del cobrador (aceptar/rechazar/manual/
- *     solicitar comprobante/tomar-liberar conversación) -> teal
- *   - verificación de impacto CONFIRMED -> naranja
- *   - verificación de impacto MISSING y escalamientos -> rojo (requieren
- *     atención)
- */
-const DOT_COLORS = { gray: '#9ca3af', teal: '#0d9488', orange: '#06d9cc', red: '#2690dc' };
+const DOT_COLORS = {
+  gray: '#64748b',
+  teal: '#0d9488',
+  orange: '#d97706',
+  red: '#e11d48',
+  blue: '#2563eb',
+};
 
 const COLLECTOR_EVENT_TYPES = new Set([
   'payment_proof_accepted',
@@ -65,6 +75,9 @@ const COLLECTOR_EVENT_TYPES = new Set([
   'conversation_release',
   'escalation_delegated',
   'escalation_resolved',
+  'FINANCING_SALE_CLOSED',
+  'FINANCING_DECIDED',
+  'FINANCING_DRAFT_CORRECTED',
 ]);
 
 const IA_EVENT_TYPES = new Set([
@@ -72,23 +85,54 @@ const IA_EVENT_TYPES = new Set([
   'payment_proof_received',
   'quota_reminder_sent',
   'reminder_cycle_blocked',
+  'FINANCING_CUSTOMER_SELECTION',
+  'FINANCING_CUSTOMER_ACCEPTED',
+  'FINANCING_NOTICE_ACCEPTED',
+  'FINANCING_NOTICE_DELIVERED',
+  'FINANCING_SUBMITTED',
+  'FINANCING_EVALUATED',
+  'FINANCING_PLAN_CREATED',
+  'FINANCING_DRAFT_UPDATED',
 ]);
+
+function humanizeFallbackEvent(eventType) {
+  if (!eventType) return 'Actividad registrada en el sistema.';
+  return String(eventType)
+    .replace(/^FINANCING_/i, 'Financiación: ')
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/^\w/, (c) => c.toUpperCase());
+}
 
 function describeActivity(item) {
   if (item.type === 'message') {
-    const actor = item.role === 'USER' ? 'Cliente' : `Asistente${item.agentType ? ` (${AGENT_LABELS[item.agentType] ?? item.agentType})` : ''}`;
-    return { dot: 'gray', actor, text: item.content || '(mensaje sin texto)' };
+    const isUser = item.role === 'USER';
+    const actor = isUser
+      ? 'Cliente'
+      : `Asistente${item.agentType ? ` (${AGENT_LABELS[item.agentType] ?? item.agentType})` : ''}`;
+    return {
+      dot: isUser ? 'blue' : 'gray',
+      tone: isUser ? 'is-client' : 'is-ai',
+      actor,
+      text: item.content || '(mensaje sin texto)',
+    };
   }
 
   if (item.type === 'internal_note') {
     if (item.authorAgentType) {
       return {
         dot: 'gray',
+        tone: 'is-ai',
         actor: `${AGENT_LABELS[item.authorAgentType] ?? item.authorAgentType} (IA)`,
         text: item.content,
       };
     }
-    return { dot: 'teal', actor: item.author?.name ?? 'Empleado', text: item.content };
+    return {
+      dot: 'teal',
+      tone: 'is-staff',
+      actor: item.author?.name ?? 'Empleado',
+      text: item.content,
+    };
   }
 
   // type === 'event'
@@ -96,22 +140,47 @@ function describeActivity(item) {
     const missing = item.payload?.impactStatus === 'MISSING';
     return {
       dot: missing ? 'red' : 'orange',
+      tone: missing ? 'is-alert' : 'is-controller',
       actor: 'Cobrador Controlador',
       text: missing
         ? 'El pago no impactó en la cuenta — se notificó al cobrador responsable.'
         : 'Se confirmó que el pago impactó en la cuenta de la empresa.',
     };
   }
-  if (item.eventType === 'escalation_created') {
-    return { dot: 'red', actor: 'Sistema', text: EVENT_TYPE_LABELS[item.eventType] };
+  if (
+    item.eventType === 'escalation_created' ||
+    item.eventType === 'FINANCING_NOTICE_FAILED' ||
+    item.eventType === 'FINANCING_NOTICE_UNCERTAIN'
+  ) {
+    return {
+      dot: 'red',
+      tone: 'is-alert',
+      actor: 'Alerta del Sistema',
+      text: EVENT_TYPE_LABELS[item.eventType] ?? humanizeFallbackEvent(item.eventType),
+    };
   }
   if (COLLECTOR_EVENT_TYPES.has(item.eventType)) {
-    return { dot: 'teal', actor: 'Cobrador', text: EVENT_TYPE_LABELS[item.eventType] ?? item.eventType };
+    return {
+      dot: 'teal',
+      tone: 'is-staff',
+      actor: item.eventType.startsWith('FINANCING_') ? 'Gestión Comercial' : 'Cobrador',
+      text: EVENT_TYPE_LABELS[item.eventType] ?? humanizeFallbackEvent(item.eventType),
+    };
   }
   if (IA_EVENT_TYPES.has(item.eventType)) {
-    return { dot: 'gray', actor: 'Asistente IA', text: EVENT_TYPE_LABELS[item.eventType] ?? item.eventType };
+    return {
+      dot: 'gray',
+      tone: 'is-ai',
+      actor: 'Asistente IA',
+      text: EVENT_TYPE_LABELS[item.eventType] ?? humanizeFallbackEvent(item.eventType),
+    };
   }
-  return { dot: 'gray', actor: 'Sistema', text: EVENT_TYPE_LABELS[item.eventType] ?? item.eventType };
+  return {
+    dot: 'gray',
+    tone: 'is-system',
+    actor: 'Sistema',
+    text: EVENT_TYPE_LABELS[item.eventType] ?? humanizeFallbackEvent(item.eventType),
+  };
 }
 
 function groupByClient(items) {
@@ -120,7 +189,11 @@ function groupByClient(items) {
   for (const item of items) {
     const key = item.clientId ?? 'sin-cliente';
     if (!groups[key]) {
-      groups[key] = { clientId: item.clientId, clientName: item.clientName ?? 'Cliente', items: [] };
+      groups[key] = {
+        clientId: item.clientId,
+        clientName: item.clientName ?? 'Cliente',
+        items: [],
+      };
       order.push(key);
     }
     groups[key].items.push(item);
@@ -128,17 +201,22 @@ function groupByClient(items) {
   return order.map((k) => groups[k]);
 }
 
-/**
- * "Registro de Actividad" (Fig 7 del prototipo): vista cruzada sobre todos
- * los clientes en el alcance del empleado, con filtros y paginación —
- * distinta de CollectionsPanel's "Historial" (que es de a un cliente).
- *
- * Se reusa tal cual para "Recordatorios Enviados" (otro ítem del sidebar del
- * prototipo) pasando `fixedEventType="quota_reminder_sent"`: es el mismo
- * endpoint con ?eventType=quota_reminder_sent, así que no hace falta
- * duplicar la lógica de carga/paginación en un componente aparte.
- */
-export default function ActivityFeed({ token, clients, collectors, isController, fixedEventType }) {
+function getClientInitials(name) {
+  const parts = String(name || 'CL')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return (parts[0] || 'CL').slice(0, 2).toUpperCase();
+}
+
+export default function ActivityFeed({
+  token,
+  clients,
+  collectors,
+  isController,
+  fixedEventType,
+}) {
   const [data, setData] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -184,7 +262,9 @@ export default function ActivityFeed({ token, clients, collectors, isController,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, collectorId, eventType, after, before, fixedEventType]);
 
-  const visible = data.filter((item) => !(item.type === 'event' && HIDDEN_EVENT_TYPES.has(item.eventType)));
+  const visible = data.filter(
+    (item) => !(item.type === 'event' && HIDDEN_EVENT_TYPES.has(item.eventType)),
+  );
   const groups = groupByClient(visible);
 
   function toggleGroup(key) {
@@ -196,105 +276,215 @@ export default function ActivityFeed({ token, clients, collectors, isController,
     });
   }
 
+  const hasActiveFilters = Boolean(clientId || collectorId || eventType || after || before);
+
   return (
-    <div className="card" style={{ marginTop: 12 }}>
-      <h3>{fixedEventType ? 'Recordatorios Enviados' : 'Registro de Actividad'}</h3>
+    <div className="card activity-feed-card" style={{ marginTop: 12 }}>
+      <div className="collection-section-heading">
+        <div>
+          <h3>{fixedEventType ? 'Recordatorios Enviados' : 'Registro de Actividad'}</h3>
+          <p>
+            Historial cronológico unificado de mensajes, avisos automáticos y acciones sobre tu cartera de clientes.
+          </p>
+        </div>
+        {total > 0 && (
+          <span className="activity-count-badge">
+            {total} {total === 1 ? 'registro' : 'registros'}
+          </span>
+        )}
+      </div>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '8px 0 12px' }}>
-        <select value={clientId} onChange={(e) => setClientId(e.target.value)} style={{ width: 'auto' }}>
-          <option value="">Todos los clientes</option>
-          {clients.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
-
-        {isController && (
-          <select value={collectorId} onChange={(e) => setCollectorId(e.target.value)} style={{ width: 'auto' }}>
-            <option value="">Todos los cobradores</option>
-            {collectors.map((col) => (
-              <option key={col.id} value={col.id}>{col.name}</option>
+      <div className="collection-toolbar activity-feed-toolbar">
+        <label>
+          <span>Cliente</span>
+          <select value={clientId} onChange={(e) => setClientId(e.target.value)}>
+            <option value="">Todos los clientes</option>
+            {clients.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
             ))}
           </select>
+        </label>
+
+        {isController && (
+          <label>
+            <span>Cobrador asignado</span>
+            <select value={collectorId} onChange={(e) => setCollectorId(e.target.value)}>
+              <option value="">Todos los cobradores</option>
+              {collectors.map((col) => (
+                <option key={col.id} value={col.id}>
+                  {col.name}
+                </option>
+              ))}
+            </select>
+          </label>
         )}
 
         {!fixedEventType && (
-          <select value={eventType} onChange={(e) => setEventType(e.target.value)} style={{ width: 'auto' }}>
-            <option value="">Todo tipo de actividad</option>
-            {Object.entries(EVENT_TYPE_LABELS).map(([key, label]) => (
-              <option key={key} value={key}>{label}</option>
-            ))}
-          </select>
+          <label className="activity-filter-grow">
+            <span>Tipo de evento</span>
+            <select value={eventType} onChange={(e) => setEventType(e.target.value)}>
+              <option value="">Todo tipo de actividad</option>
+              {Object.entries(EVENT_TYPE_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
         )}
 
-        <input type="date" value={after} onChange={(e) => setAfter(e.target.value)} style={{ width: 'auto' }} />
-        <span style={{ alignSelf: 'center', fontSize: 12, color: 'var(--text-muted)' }}>a</span>
-        <input type="date" value={before} onChange={(e) => setBefore(e.target.value)} style={{ width: 'auto' }} />
+        <label>
+          <span>Desde</span>
+          <input type="date" value={after} onChange={(e) => setAfter(e.target.value)} />
+        </label>
+
+        <label>
+          <span>Hasta</span>
+          <input type="date" value={before} onChange={(e) => setBefore(e.target.value)} />
+        </label>
+
+        {hasActiveFilters && (
+          <button
+            type="button"
+            className="secondary activity-clear-btn"
+            onClick={() => {
+              setClientId('');
+              setCollectorId('');
+              setEventType('');
+              setAfter('');
+              setBefore('');
+            }}
+          >
+            Limpiar filtros
+          </button>
+        )}
       </div>
 
       {error && <p className="error">{error}</p>}
-      {loading && <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Cargando...</p>}
+      {loading && (
+        <div className="activity-empty-state">
+          <span className="fin-inline-spinner" aria-hidden="true" />
+          <span>Consultando actividad reciente…</span>
+        </div>
+      )}
 
       {!loading && groups.length === 0 && (
-        <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)' }}>
-          Sin actividad para estos filtros.
+        <div className="activity-empty-state">
+          <strong>Sin actividad registrada para estos filtros</strong>
+          <p>Probá cambiando el rango de fechas o seleccionando otro cliente de la cartera.</p>
         </div>
       )}
 
-      {groups.map((g) => {
-        const key = g.clientId ?? 'sin-cliente';
-        const isCollapsed = collapsed.has(key);
-        return (
-          <div key={key} style={{ marginBottom: 12 }}>
-            <button
-              className="secondary"
-              onClick={() => toggleGroup(key)}
-              style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}
-            >
-              {isCollapsed ? '▸' : '▾'} {g.clientName} ({g.items.length})
-            </button>
-            {!isCollapsed && (
-              <ul className="activity-timeline">
-                {g.items.map((item) => {
-                  const d = describeActivity(item);
-                  return (
-                    <li key={item.id} className="activity-item">
-                      <span className="activity-dot" style={{ background: DOT_COLORS[d.dot] }} />
-                      <div className="activity-bubble">
-                        <div className="note-author">
-                          {d.actor} · {new Date(item.createdAt).toLocaleString()}
+      <div className="activity-groups">
+        {groups.map((g) => {
+          const key = g.clientId ?? 'sin-cliente';
+          const isCollapsed = collapsed.has(key);
+          return (
+            <section key={key} className="activity-client-group">
+              <button
+                type="button"
+                className={`activity-group-header${isCollapsed ? ' is-collapsed' : ''}`}
+                onClick={() => toggleGroup(key)}
+                aria-expanded={!isCollapsed}
+              >
+                <div className="activity-group-identity">
+                  <span className="activity-group-avatar" aria-hidden="true">
+                    {getClientInitials(g.clientName)}
+                  </span>
+                  <span className="activity-group-name">{g.clientName}</span>
+                  <span className="activity-group-count">
+                    {g.items.length} {g.items.length === 1 ? 'evento' : 'eventos'}
+                  </span>
+                </div>
+                <span className="activity-group-chevron" aria-hidden="true">
+                  {isCollapsed ? '▸ Mostrar' : '▾ Ocultar'}
+                </span>
+              </button>
+
+              {!isCollapsed && (
+                <ul className="activity-timeline">
+                  {g.items.map((item) => {
+                    const d = describeActivity(item);
+                    return (
+                      <li key={item.id} className={`activity-item ${d.tone || ''}`}>
+                        <span
+                          className="activity-dot"
+                          style={{ background: DOT_COLORS[d.dot] || DOT_COLORS.gray }}
+                          aria-hidden="true"
+                        />
+                        <div className="activity-bubble">
+                          <div className="activity-meta-row">
+                            <span className={`activity-actor-pill ${d.tone || ''}`}>
+                              {d.actor}
+                            </span>
+                            <time className="activity-timestamp">
+                              {new Date(item.createdAt).toLocaleString('es-AR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </time>
+                          </div>
+                          <div className="activity-text">{d.text}</div>
                         </div>
-                        {d.text}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-        );
-      })}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+          );
+        })}
+      </div>
 
       {total > 0 && (
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
-          <button className="secondary" disabled={page <= 1 || loading} onClick={() => load(page - 1)}>
-            Anterior
-          </button>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            Página {page} · {total} resultado{total === 1 ? '' : 's'}
-          </span>
-          <button className="secondary" disabled={!hasMore || loading} onClick={() => load(page + 1)}>
-            Siguiente
-          </button>
+        <div className="activity-pagination-bar">
+          <div className="activity-legend">
+            <strong>Leyenda:</strong>
+            <span>
+              <i style={{ background: DOT_COLORS.gray }} /> Automático (IA)
+            </span>
+            <span>
+              <i style={{ background: DOT_COLORS.blue }} /> Mensaje del cliente
+            </span>
+            <span>
+              <i style={{ background: DOT_COLORS.teal }} /> Gestión humana
+            </span>
+            <span>
+              <i style={{ background: DOT_COLORS.orange }} /> Verificación bancaria
+            </span>
+            <span>
+              <i style={{ background: DOT_COLORS.red }} /> Alerta / escalado
+            </span>
+          </div>
+
+          <div className="activity-pagination-controls">
+            <button
+              type="button"
+              className="secondary"
+              disabled={page <= 1 || loading}
+              onClick={() => load(page - 1)}
+            >
+              ← Anterior
+            </button>
+            <span className="activity-page-indicator">
+              Página <strong>{page}</strong> · {total} resultado{total === 1 ? '' : 's'}
+            </span>
+            <button
+              type="button"
+              className="secondary"
+              disabled={!hasMore || loading}
+              onClick={() => load(page + 1)}
+            >
+              Siguiente →
+            </button>
+          </div>
         </div>
       )}
-
-      <div className="hint" style={{ marginTop: 12 }}>
-        <b>Leyenda:</b>{' '}
-        <span style={{ color: DOT_COLORS.gray }}>●</span> Automático (IA) &nbsp;
-        <span style={{ color: DOT_COLORS.teal }}>●</span> Acción del cobrador &nbsp;
-        <span style={{ color: DOT_COLORS.orange }}>●</span> Cobrador Controlador &nbsp;
-        <span style={{ color: DOT_COLORS.red }}>●</span> Alerta / notificación
-      </div>
     </div>
   );
 }

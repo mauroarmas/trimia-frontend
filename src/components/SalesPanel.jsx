@@ -4,6 +4,7 @@ import SalesConversationModal from './SalesConversationModal';
 import SalesClientForm from './SalesClientForm';
 import { InfoToggle } from './InfoNotes';
 import PageHero from './PageHero';
+import { useSubtabRoute } from '../router';
 import {
   getSalesStock,
   getSalesProspects,
@@ -118,8 +119,39 @@ function getInitials(name) {
   return (parts[0] || 'CL').slice(0, 2).toUpperCase();
 }
 
+function formatProspectNoteText(rawNotes) {
+  if (!rawNotes) return '';
+  return String(rawNotes)
+    .replace(/\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)\]/g, (_m, iso) => {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return _m;
+      return `${d.toLocaleDateString('es-AR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      })} ${d.toLocaleTimeString('es-AR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })} ·`;
+    })
+    .replace(/\[SEGUIMIENTO AUTOMÁTICO\]/gi, 'Seguimiento automático:');
+}
+
+const SALES_VALID_SUBTABS = [
+  'prospects',
+  'stock',
+  'credit_check',
+  'commercial_orders',
+  'close_sale',
+  'new_client',
+];
+
 export default function SalesPanel({ token, me }) {
-  const [activeSubtab, setActiveSubtab] = useState('prospects');
+  const [activeSubtab, setActiveSubtab] = useSubtabRoute(
+    'sales',
+    SALES_VALID_SUBTABS,
+    'prospects',
+  );
   const [mostrarInfo, setMostrarInfo] = useState(false);
   const [contactProspect, setContactProspect] = useState(null);
   const [banner, setBanner] = useState(null);
@@ -1092,10 +1124,10 @@ export default function SalesPanel({ token, me }) {
                       {/* Observaciones: solo si existen notas registradas */}
                       {notes && (
                         <div className="sales-prospect-notes" title={notes}>
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                           </svg>
-                          <span>{notes}</span>
+                          <span>{formatProspectNoteText(notes)}</span>
                         </div>
                       )}
 
@@ -1190,9 +1222,9 @@ export default function SalesPanel({ token, me }) {
                           </label>
                           <textarea
                             id={`followup-${p.id}`}
-                            rows={2}
+                            rows={3}
                             required
-                            placeholder="Ej. Se envió cotización actualizada; coordinamos llamada mañana. (No incluyas informes crediticios internos)"
+                            placeholder="Ej. Se envió cotización actualizada y coordinamos llamada mañana."
                             value={followUpText}
                             onChange={(e) => setFollowUpText(e.target.value)}
                           />
@@ -1797,11 +1829,20 @@ export default function SalesPanel({ token, me }) {
               })()
             ) : (
               <div className="sales-credit-idle">
-                <div className="sales-empty-icon" aria-hidden="true">💳</div>
-                <h4>Dictamen comercial instantáneo</h4>
-                <p>
-                  Ingresá el DNI o CUIT del cliente a la izquierda para conocer qué modalidad de pago podés ofrecerle antes de iniciar el cierre.
-                </p>
+                <div className="sales-credit-idle-header">
+                  <span className="sales-credit-idle-icon" aria-hidden="true">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect width="20" height="14" x="2" y="5" rx="2" />
+                      <line x1="2" x2="22" y1="10" y2="10" />
+                    </svg>
+                  </span>
+                  <div>
+                    <h4>Dictamen comercial instantáneo</h4>
+                    <p>
+                      Ingresá el DNI o CUIT del cliente a la izquierda para conocer qué modalidad de pago podés ofrecerle antes de iniciar el cierre.
+                    </p>
+                  </div>
+                </div>
                 <ul className="sales-credit-guide-list">
                   <li>
                     <span className="sales-guide-dot is-ok" />

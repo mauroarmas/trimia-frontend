@@ -879,6 +879,45 @@ h1, h2, h3, h4 {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   background: transparent;
   transition: padding 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar-theme-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 11px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #dbe4f7;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.sidebar-theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.13);
+  border-color: rgba(138, 255, 248, 0.35);
+  color: #ffffff;
+}
+
+.sidebar-theme-toggle svg {
+  flex-shrink: 0;
+  color: #8afff8;
+}
+
+.sidebar-collapsed .sidebar-theme-toggle {
+  justify-content: center;
+  padding: 8px;
+}
+
+.sidebar-collapsed .sidebar-theme-toggle span {
+  display: none;
 }
 
 .user-profile-pill {
@@ -7104,6 +7143,119 @@ label {
   gap: 12px;
 }
 
+.esc-price-confirm-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+}
+
+.esc-price-confirm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.esc-price-confirm-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.esc-price-confirm-kicker {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #2563eb;
+}
+
+.esc-price-confirm-label label {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.esc-price-product-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  font-size: 12px;
+  font-weight: 600;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.esc-price-input-wrap {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+  border-radius: 9px;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.esc-price-input-wrap:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(47, 110, 163, 0.16);
+}
+
+.esc-price-currency-prefix {
+  padding: 0 10px 0 14px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #475569;
+  user-select: none;
+}
+
+.esc-price-input-wrap input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 6px 8px 6px 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+.esc-price-input-wrap input:focus {
+  outline: none;
+}
+
+.esc-price-currency-suffix {
+  padding: 0 13px 0 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #64748b;
+  letter-spacing: 0.04em;
+  user-select: none;
+}
+
+.esc-price-helper-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #475569;
+}
+
 .esc-reply-textarea {
   min-height: 96px;
 }
@@ -8986,36 +9138,48 @@ label {
 }
 
 .sales-currency-field {
+  position: relative;
   display: flex;
   min-width: 0;
   align-items: center;
-  overflow: hidden;
-  border: 1px solid var(--border-light);
-  border-radius: 6px;
-  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .sales-currency-field:focus-within {
   border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(47, 110, 163, 0.15);
+  box-shadow: 0 0 0 3px rgba(47, 110, 163, 0.15);
 }
 
 .sales-currency-field > span {
-  flex: 0 0 auto;
-  padding-left: 9px;
-  color: var(--text-muted);
-  font-size: 11px;
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: #64748b;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1;
 }
 
-.sales-currency-field input {
+.sales-currency-field input,
+.sales-credit-field .sales-currency-field input {
+  width: 100%;
   min-width: 0;
-  border: 0;
-  box-shadow: none;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding-left: 32px !important;
 }
 
-.sales-currency-field input:focus {
-  border: 0;
-  box-shadow: none;
+.sales-currency-field input:focus,
+.sales-credit-field .sales-currency-field input:focus {
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: none;
 }
 
 .sales-proof-section textarea {
@@ -11840,23 +12004,21 @@ label {
 .sales-prospect-notes {
   display: flex;
   align-items: flex-start;
-  gap: 7px;
-  padding: 8px 11px;
-  border-radius: 8px;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 9px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   font-size: 12px;
-  line-height: 1.45;
+  line-height: 1.48;
   color: #475569;
   overflow-wrap: anywhere;
-  max-height: 72px;
-  overflow-y: auto;
 }
 
 .sales-prospect-notes svg {
   flex-shrink: 0;
   margin-top: 2px;
-  color: #94a3b8;
+  color: #64748b;
 }
 
 .sales-prospect-notes.is-empty {
@@ -11866,28 +12028,31 @@ label {
 
 /* Inline CRM Follow-up Box */
 .sales-followup-box {
-  padding: 11px 12px;
+  padding: 12px 13px;
   border-radius: 10px;
   background: #f8fafc;
   border: 1px solid #cbd5e1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 9px;
 }
 
 .sales-followup-box label {
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 700;
-  color: #334155;
+  color: #1e293b;
   margin: 0;
 }
 
 .sales-followup-box textarea {
   width: 100%;
-  border-radius: 7px;
+  min-height: 76px;
+  border-radius: 8px;
   border: 1px solid #cbd5e1;
-  padding: 8px 10px;
+  background: #ffffff;
+  padding: 9px 11px;
   font-size: 12.5px;
+  line-height: 1.45;
   resize: vertical;
 }
 
@@ -12513,15 +12678,35 @@ label {
 }
 
 .sales-credit-idle {
-  margin: auto 0;
-  padding: 12px 8px;
+  padding: 4px 2px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 16px;
+}
+
+.sales-credit-idle-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.sales-credit-idle-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #2563eb;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .sales-credit-idle h4 {
-  margin: 0;
+  margin: 0 0 4px;
   font-size: 16px;
   color: #0f172a;
 }
@@ -12535,29 +12720,30 @@ label {
 
 .sales-credit-guide-list {
   list-style: none;
-  margin: 6px 0 0;
+  margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .sales-credit-guide-list li {
   display: flex;
   align-items: flex-start;
-  gap: 9px;
-  padding: 9px 12px;
-  border-radius: 9px;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
-  font-size: 12.5px;
+  font-size: 13px;
+  line-height: 1.45;
   color: #334155;
 }
 
 .sales-guide-dot {
   width: 9px;
   height: 9px;
-  margin-top: 4px;
+  margin-top: 5px;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -12576,22 +12762,23 @@ label {
 
 /* Modal de Conversación de Ventas */
 .sales-conv-modal {
-  width: min(860px, calc(100vw - 28px));
-  max-width: 860px !important;
-  max-height: 90vh;
+  width: min(880px, calc(100vw - 28px));
+  max-width: 880px !important;
+  max-height: 92vh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
+  padding: 18px 22px !important;
 }
 
 .sales-conv-modal-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding-bottom: 12px;
+  gap: 14px;
+  flex-wrap: nowrap;
+  padding-bottom: 10px;
   border-bottom: 1px solid #e2e8f0;
 }
 
@@ -12599,21 +12786,27 @@ label {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.sales-conv-modal-identity > div:last-child {
+  min-width: 0;
 }
 
 .sales-conv-modal-identity h3 {
   margin: 0;
-  font-size: 17px;
+  font-size: 16.5px;
   color: #0f172a;
 }
 
 .sales-conv-modal-meta {
-  margin-top: 3px;
+  margin-top: 2px;
   display: flex;
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  font-size: 12.5px;
+  font-size: 12px;
   color: #64748b;
 }
 
@@ -12621,26 +12814,29 @@ label {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .sales-conv-modal-banner {
   margin: 0;
-  padding: 9px 12px;
-  border-radius: 9px;
+  padding: 8px 12px;
+  border-radius: 8px;
   background: #f0f7ff;
   border: 1px solid #cfe3f8;
   color: #1e3a8a;
-  font-size: 12.5px;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .sales-conv-modal-body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  min-height: 0;
 }
 
 .sales-conv-modal-body .sup-chat-thread {
-  max-height: 48vh;
+  max-height: min(340px, 36vh);
   overflow-y: auto;
 }
 
@@ -12664,4 +12860,872 @@ label {
   .sales-credit-meta-grid {
     grid-template-columns: 1fr;
   }
+}
+
+
+/* ==========================================================================
+   Modo Oscuro Integral (data-theme="dark")
+   ========================================================================== */
+:root[data-theme='dark'] {
+  --bg: #0b1120;
+  --surface: #131c2e;
+  --surface-elevated: #1a263d;
+  --border: #263552;
+  --border-light: #1e2c46;
+  --text: #e2e8f0;
+  --text-muted: #94a3b8;
+  --primary: #3b82f6;
+  --primary-hover: #2563eb;
+  --primary-light: #1e3a8a;
+  --primary-subtle: #172554;
+  --danger-bg: rgba(239, 68, 68, 0.14);
+  --success-bg: rgba(16, 185, 129, 0.14);
+  --success-text: #34d399;
+  --warning-bg: rgba(245, 158, 11, 0.14);
+  --warning-text: #fbbf24;
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 6px 18px -2px rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
+}
+
+[data-theme='dark'] body,
+[data-theme='dark'] .app-layout,
+[data-theme='dark'] .app-main {
+  background: var(--bg);
+  color: var(--text);
+}
+
+[data-theme='dark'] .app-sidebar {
+  background-color: #090e1a;
+  border-right-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme='dark'] .sidebar-toggle-outline {
+  fill: #090e1a;
+}
+
+/* Superficies y Tarjetas */
+[data-theme='dark'] .card,
+[data-theme='dark'] .search-filter-card,
+[data-theme='dark'] .data-table-card,
+[data-theme='dark'] .table-pagination-footer,
+[data-theme='dark'] .sales-section-card,
+[data-theme='dark'] .sales-prospect-card,
+[data-theme='dark'] .sales-kpi-card,
+[data-theme='dark'] .sales-kpi-item,
+[data-theme='dark'] .sales-kpi-card-btn,
+[data-theme='dark'] .sales-credit-form-card,
+[data-theme='dark'] .sales-credit-result-panel,
+[data-theme='dark'] .fin-detail-card,
+[data-theme='dark'] .fin-kpi-card,
+[data-theme='dark'] .fin-decision-box,
+[data-theme='dark'] .fin-notice-card,
+[data-theme='dark'] .fin-subcard,
+[data-theme='dark'] .fin-eval-loading-card,
+[data-theme='dark'] .fin-verdict-card,
+[data-theme='dark'] .fin-edit-form,
+[data-theme='dark'] .sup-unified-overview,
+[data-theme='dark'] .sup-conv-section,
+[data-theme='dark'] .sup-agent-card,
+[data-theme='dark'] .sup-kpi-card,
+[data-theme='dark'] .sup-panel-card,
+[data-theme='dark'] .econ-modal,
+[data-theme='dark'] .econ-section-card,
+[data-theme='dark'] .econ-kpi-card,
+[data-theme='dark'] .esc-detail-header-card,
+[data-theme='dark'] .esc-detail-card,
+[data-theme='dark'] .esc-action-card,
+[data-theme='dark'] .esc-conv-card,
+[data-theme='dark'] .esc-card,
+[data-theme='dark'] .conv-ctrl-card,
+[data-theme='dark'] .collections-panel .collection-metric,
+[data-theme='dark'] .collection-dialog,
+[data-theme='dark'] .activity-client-group,
+[data-theme='dark'] .modal-content,
+[data-theme='dark'] .info-modal,
+[data-theme='dark'] .audio-script-modal,
+[data-theme='dark'] .diagnostic-question-card,
+[data-theme='dark'] .commerce-fullscreen-topbar,
+[data-theme='dark'] .commerce-fullscreen-content .commerce-operation,
+[data-theme='dark'] .commerce-fullscreen-content .commerce-chat,
+[data-theme='dark'] .commerce-details-body,
+[data-theme='dark'] .commerce-offer,
+[data-theme='dark'] .commerce-legacy summary,
+[data-theme='dark'] .commerce-legacy-menu,
+[data-theme='dark'] .sim-chat-window,
+[data-theme='dark'] .sim-chat-topbar,
+[data-theme='dark'] .sim-chat-footer,
+[data-theme='dark'] .sim-card,
+[data-theme='dark'] .webchat-container,
+[data-theme='dark'] .webchat-header,
+[data-theme='dark'] .webchat-composer,
+[data-theme='dark'] .webchat-report-card,
+[data-theme='dark'] .knowledge-panel,
+[data-theme='dark'] .knowledge-page .card,
+[data-theme='dark'] .knowledge-card,
+[data-theme='dark'] .emp-card,
+[data-theme='dark'] .emp-dropdown-menu,
+[data-theme='dark'] .chat-more-menu,
+[data-theme='dark'] .training-card,
+[data-theme='dark'] .training-module-card,
+[data-theme='dark'] .card.training-admin-card,
+[data-theme='dark'] .card.training-supervisor-module,
+[data-theme='dark'] .card.training-progress-card,
+[data-theme='dark'] .card.credit-check-card,
+[data-theme='dark'] .card.sales-close-card,
+[data-theme='dark'] .card.sales-client-card,
+[data-theme='dark'] .current-stop-card,
+[data-theme='dark'] .login-card {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+/* Bloques secundarios, barras y cajas internas */
+[data-theme='dark'] .submenu-bar,
+[data-theme='dark'] .submenu-pills,
+[data-theme='dark'] .collection-toolbar,
+[data-theme='dark'] .activity-feed-toolbar,
+[data-theme='dark'] .activity-group-header,
+[data-theme='dark'] .activity-bubble,
+[data-theme='dark'] .activity-empty-state,
+[data-theme='dark'] .sales-prospect-interest,
+[data-theme='dark'] .sales-prospect-notes,
+[data-theme='dark'] .sales-prospect-details,
+[data-theme='dark'] .sales-followup-box,
+[data-theme='dark'] .sales-confidentiality-note,
+[data-theme='dark'] .sales-credit-guide-list li,
+[data-theme='dark'] .sales-credit-meta-grid div,
+[data-theme='dark'] .sales-empty-box,
+[data-theme='dark'] .sales-info-popover,
+[data-theme='dark'] .esc-calm-notice,
+[data-theme='dark'] .esc-knowledge-drawer,
+[data-theme='dark'] .esc-price-confirm-card,
+[data-theme='dark'] .esc-alt-drawer,
+[data-theme='dark'] .esc-doc-preview,
+[data-theme='dark'] .esc-resolved-answer,
+[data-theme='dark'] .esc-suggestion-box,
+[data-theme='dark'] .esc-loading-box,
+[data-theme='dark'] .esc-thread-scroll,
+[data-theme='dark'] .fin-summary-box,
+[data-theme='dark'] .fin-draft-card,
+[data-theme='dark'] .fin-draft-datum,
+[data-theme='dark'] .fin-older-item,
+[data-theme='dark'] .fin-resolution-summary,
+[data-theme='dark'] .fin-eval-steps li,
+[data-theme='dark'] .financing-facts > div,
+[data-theme='dark'] .commerce-summary-card,
+[data-theme='dark'] .commerce-data div,
+[data-theme='dark'] .commerce-installments-box,
+[data-theme='dark'] .commerce-edit-box,
+[data-theme='dark'] .commerce-close-box,
+[data-theme='dark'] .commerce-financed-box,
+[data-theme='dark'] .commerce-details-drawer,
+[data-theme='dark'] .commerce-fullscreen-dialog,
+[data-theme='dark'] .commerce-fullscreen-back-btn,
+[data-theme='dark'] .commerce-esc-hint,
+[data-theme='dark'] .commerce-fullscreen-close-icon,
+[data-theme='dark'] .collection-account-totals > div,
+[data-theme='dark'] .collection-dialog-footer,
+[data-theme='dark'] .conv-ctrl-status-bar,
+[data-theme='dark'] .conv-ctrl-note-item,
+[data-theme='dark'] .conv-ctrl-notes-empty,
+[data-theme='dark'] .sup-chat-thread,
+[data-theme='dark'] .sup-kpi-chip,
+[data-theme='dark'] .sup-kpi-chip-button,
+[data-theme='dark'] .sup-agent-conv-box,
+[data-theme='dark'] .sup-conv-legend-bar,
+[data-theme='dark'] .econ-modal-body,
+[data-theme='dark'] .econ-rate-item,
+[data-theme='dark'] .econ-projection-result,
+[data-theme='dark'] .econ-tech-box,
+[data-theme='dark'] .webchat-messages,
+[data-theme='dark'] .sim-chat-viewport,
+[data-theme='dark'] .sim-human-notice,
+[data-theme='dark'] .sim-alert-banner,
+[data-theme='dark'] .knowledge-note,
+[data-theme='dark'] .knowledge-input-option,
+[data-theme='dark'] .knowledge-dropzone,
+[data-theme='dark'] .knowledge-block-note,
+[data-theme='dark'] .knowledge-search-tip,
+[data-theme='dark'] .knowledge-stat-grid > div,
+[data-theme='dark'] .employees-area-option,
+[data-theme='dark'] .training-generation-note,
+[data-theme='dark'] .diagnostic-option,
+[data-theme='dark'] .audio-script-sidebar,
+[data-theme='dark'] .audio-script-line,
+[data-theme='dark'] .audio-script-footer,
+[data-theme='dark'] .audio-script-tip,
+[data-theme='dark'] .info-modal-note,
+[data-theme='dark'] .info-modal-footer,
+[data-theme='dark'] .modal-footer,
+[data-theme='dark'] .ai-model-selector,
+[data-theme='dark'] .hint {
+  background: var(--surface-elevated) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+/* Textos y títulos en modo oscuro */
+[data-theme='dark'] h1,
+[data-theme='dark'] h2,
+[data-theme='dark'] h3,
+[data-theme='dark'] h4,
+[data-theme='dark'] strong,
+[data-theme='dark'] .sales-prospect-name,
+[data-theme='dark'] .sales-cell-primary,
+[data-theme='dark'] .sales-cell-money,
+[data-theme='dark'] .sales-kpi-card strong,
+[data-theme='dark'] .collection-metric strong,
+[data-theme='dark'] .activity-group-name,
+[data-theme='dark'] .activity-text,
+[data-theme='dark'] .commerce-summary-card strong,
+[data-theme='dark'] .commerce-offer-title,
+[data-theme='dark'] .commerce-offer-price-main strong,
+[data-theme='dark'] .fin-summary-box strong,
+[data-theme='dark'] .esc-price-confirm-label label,
+[data-theme='dark'] .esc-contact-name,
+[data-theme='dark'] .sup-contact-name,
+[data-theme='dark'] .knowledge-doc-title,
+[data-theme='dark'] .employees-person-name,
+[data-theme='dark'] .login-heading h2 {
+  color: #f1f5f9 !important;
+}
+
+[data-theme='dark'] p,
+[data-theme='dark'] small,
+[data-theme='dark'] dt,
+[data-theme='dark'] label,
+[data-theme='dark'] .sales-section-subtitle,
+[data-theme='dark'] .sales-cell-sub,
+[data-theme='dark'] .sales-prospect-business,
+[data-theme='dark'] .sales-prospect-date,
+[data-theme='dark'] .sales-conv-modal-meta,
+[data-theme='dark'] .activity-timestamp,
+[data-theme='dark'] .activity-legend,
+[data-theme='dark'] .activity-page-indicator,
+[data-theme='dark'] .esc-price-helper-note,
+[data-theme='dark'] .esc-muted-text,
+[data-theme='dark'] .esc-time-label,
+[data-theme='dark'] .esc-subtle-note,
+[data-theme='dark'] .fin-detail-sub,
+[data-theme='dark'] .commerce-subtitle,
+[data-theme='dark'] .commerce-offer-desc,
+[data-theme='dark'] .knowledge-doc-summary {
+  color: var(--text-muted) !important;
+}
+
+/* Inputs, Selects, Textareas y Buscadores */
+[data-theme='dark'] input,
+[data-theme='dark'] select,
+[data-theme='dark'] textarea,
+[data-theme='dark'] .sales-search-box,
+[data-theme='dark'] .sup-search-box,
+[data-theme='dark'] .knowledge-search-box,
+[data-theme='dark'] .sales-currency-field,
+[data-theme='dark'] .esc-price-input-wrap,
+[data-theme='dark'] .sim-phone-input,
+[data-theme='dark'] .sim-composer-input,
+[data-theme='dark'] .conv-ctrl-note-input,
+[data-theme='dark'] .page-size-select {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+[data-theme='dark'] input::placeholder,
+[data-theme='dark'] textarea::placeholder {
+  color: #64748b !important;
+}
+
+[data-theme='dark'] .sales-search-box input,
+[data-theme='dark'] .sup-search-box input,
+[data-theme='dark'] .knowledge-search-box input,
+[data-theme='dark'] .sales-currency-field input,
+[data-theme='dark'] .esc-price-input-wrap input {
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+/* Tablas */
+[data-theme='dark'] table th,
+[data-theme='dark'] .custom-data-table th,
+[data-theme='dark'] .sup-modern-table th,
+[data-theme='dark'] .fin-requests-table th,
+[data-theme='dark'] .sales-table th,
+[data-theme='dark'] .sales-quotas-table th,
+[data-theme='dark'] .commerce-schedule-wrap th,
+[data-theme='dark'] .knowledge-page th,
+[data-theme='dark'] .collections-panel th {
+  background: #1a263d !important;
+  color: #94a3b8 !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme='dark'] table td,
+[data-theme='dark'] .custom-data-table td,
+[data-theme='dark'] .sup-modern-table td,
+[data-theme='dark'] .fin-requests-table td,
+[data-theme='dark'] .sales-table td,
+[data-theme='dark'] .collections-panel td {
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+[data-theme='dark'] table tbody tr:hover,
+[data-theme='dark'] .custom-data-table tr:hover td,
+[data-theme='dark'] .sup-modern-table tbody tr:hover,
+[data-theme='dark'] .fin-requests-table tbody tr:hover,
+[data-theme='dark'] .sales-table tbody tr:hover,
+[data-theme='dark'] .collections-panel tbody tr:hover {
+  background: rgba(59, 130, 246, 0.08) !important;
+}
+
+/* Botones secundarios, filtros, hero actions y píldoras */
+[data-theme='dark'] button.secondary,
+[data-theme='dark'] .btn-pill-action,
+[data-theme='dark'] .btn-table-action,
+[data-theme='dark'] .page-nav-btn,
+[data-theme='dark'] .submenu-pill,
+[data-theme='dark'] .sales-filter-chip,
+[data-theme='dark'] .sales-btn-followup,
+[data-theme='dark'] .sales-more-btn,
+[data-theme='dark'] .sales-prospect-phone,
+[data-theme='dark'] .sales-phone-chip,
+[data-theme='dark'] .sales-category-tag,
+[data-theme='dark'] .sales-sku-code,
+[data-theme='dark'] .esc-mine-chip,
+[data-theme='dark'] .esc-suggest-btn,
+[data-theme='dark'] .sim-new-phone-btn,
+[data-theme='dark'] .sim-prompt-chip,
+[data-theme='dark'] .econ-scenario-btn,
+[data-theme='dark'] .commerce-date-pill,
+[data-theme='dark'] .commerce-version-pill,
+[data-theme='dark'] .fin-version-tag,
+[data-theme='dark'] .employees-area-chip,
+[data-theme='dark'] .emp-dropdown-trigger,
+[data-theme='dark'] .badge-role-tag,
+[data-theme='dark'] .activity-group-count,
+[data-theme='dark'] .activity-actor-pill,
+[data-theme='dark'] .page-hero .page-hero-action,
+[data-theme='dark'] .page-hero .knowledge-hero-action,
+[data-theme='dark'] .knowledge-hero .knowledge-hero-action,
+[data-theme='dark'] .page-hero .knowledge-info-toggle,
+[data-theme='dark'] .knowledge-hero .knowledge-info-toggle,
+[data-theme='dark'] button.knowledge-info-toggle {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+[data-theme='dark'] .submenu-pill.active,
+[data-theme='dark'] .sales-filter-chip.is-active {
+  background: #2563eb !important;
+  border-color: #3b82f6 !important;
+  color: #ffffff !important;
+}
+
+[data-theme='dark'] .login-page {
+  background: #0b1120 !important;
+}
+
+[data-theme='dark'] .login-entry-overlay {
+  background: #0b1120 !important;
+}
+
+/* Cajas destacadas y avisos en modo oscuro */
+[data-theme='dark'] .sales-handoff-box,
+[data-theme='dark'] .sales-conv-modal-banner,
+[data-theme='dark'] .conv-ctrl-outbound-notice,
+[data-theme='dark'] .activity-count-badge,
+[data-theme='dark'] .esc-price-product-pill,
+[data-theme='dark'] .sales-credit-idle-icon {
+  background: rgba(37, 99, 235, 0.16) !important;
+  border-color: rgba(59, 130, 246, 0.35) !important;
+  color: #93c5fd !important;
+}
+
+[data-theme='dark'] .sales-handoff-kicker {
+  color: #60a5fa !important;
+}
+
+[data-theme='dark'] .sales-handoff-grid dd {
+  color: #f1f5f9 !important;
+}
+
+[data-theme='dark'] .commerce-renewal-box,
+[data-theme='dark'] .esc-calm-notice.is-warn,
+[data-theme='dark'] .fin-callout.is-warning {
+  background: rgba(245, 158, 11, 0.14) !important;
+  border-color: rgba(245, 158, 11, 0.38) !important;
+  color: #fcd34d !important;
+}
+
+[data-theme='dark'] .commerce-renewal-copy strong {
+  color: #fbbf24 !important;
+}
+
+[data-theme='dark'] .commerce-verdict-box.is-approved {
+  background: rgba(16, 185, 129, 0.12) !important;
+  border-color: rgba(16, 185, 129, 0.35) !important;
+}
+
+[data-theme='dark'] .commerce-verdict-condition {
+  background: rgba(15, 23, 42, 0.65) !important;
+  border-color: rgba(148, 163, 184, 0.25) !important;
+  color: #e2e8f0 !important;
+}
+
+/* Burbujas de conversación en modo oscuro */
+[data-theme='dark'] .sup-msg-bubble,
+[data-theme='dark'] .sup-chat-bubble,
+[data-theme='dark'] .sim-bubble.is-incoming,
+[data-theme='dark'] .fin-chat-bubble.is-client {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+[data-theme='dark'] .sup-msg-row.is-assistant .sup-msg-bubble,
+[data-theme='dark'] .sup-chat-bubble-row.actor-agent .sup-chat-bubble,
+[data-theme='dark'] .fin-chat-bubble.is-assistant {
+  background: rgba(37, 99, 235, 0.16) !important;
+  border-color: rgba(59, 130, 246, 0.32) !important;
+  color: #e2e8f0 !important;
+}
+
+[data-theme='dark'] .sup-msg-row.is-human .sup-msg-bubble,
+[data-theme='dark'] .sup-chat-bubble-row.actor-supervisor .sup-chat-bubble,
+[data-theme='dark'] .sim-bubble.is-incoming.is-supervisor {
+  background: rgba(124, 58, 237, 0.18) !important;
+  border-color: rgba(139, 92, 246, 0.35) !important;
+  color: #f3e8ff !important;
+}
+
+[data-theme='dark'] .activity-timeline::before {
+  background: #334155;
+}
+
+[data-theme='dark'] .activity-dot {
+  box-shadow: 0 0 0 3px var(--surface);
+}
+
+/* Botón de tema en pantalla de Login */
+.login-theme-toggle {
+  position: fixed;
+  top: 18px;
+  right: 20px;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(8px);
+  color: #1e293b;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.login-theme-toggle:hover {
+  background: #ffffff;
+  border-color: rgba(47, 110, 163, 0.4);
+  transform: translateY(-1px);
+}
+
+[data-theme='dark'] .login-theme-toggle {
+  background: rgba(19, 28, 46, 0.88);
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #e2e8f0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme='dark'] .login-theme-toggle:hover {
+  background: rgba(30, 41, 59, 0.96);
+  border-color: rgba(138, 255, 248, 0.4);
+  color: #ffffff;
+}
+
+[data-theme='dark'] .login-theme-toggle svg {
+  color: #8afff8;
+}
+
+/* ==========================================================================
+   Refinamiento de Contraste, Logos, Badges y Bordes de Tablas en Modo Oscuro
+   ========================================================================== */
+
+/* Hero azul: mantener tipografía blanca y legible siempre */
+[data-theme='dark'] .page-hero h1,
+[data-theme='dark'] .page-hero h2,
+[data-theme='dark'] .knowledge-hero h1,
+[data-theme='dark'] .knowledge-hero h2 {
+  color: #ffffff !important;
+}
+
+[data-theme='dark'] .page-hero p,
+[data-theme='dark'] .page-hero-desc,
+[data-theme='dark'] .page-hero-kicker,
+[data-theme='dark'] .knowledge-hero p,
+[data-theme='dark'] .knowledge-kicker {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Números, títulos y textos que tenían #0f172a / #1e293b hardcodeado */
+[data-theme='dark'] .sup-agent-stat-num,
+[data-theme='dark'] .sup-kpi-chip-main strong,
+[data-theme='dark'] .sup-agent-identity h4,
+[data-theme='dark'] .sup-agent-quality-row strong,
+[data-theme='dark'] .sup-overview-title-block h3,
+[data-theme='dark'] .sup-conv-header h3,
+[data-theme='dark'] .sup-contact-name-row strong,
+[data-theme='dark'] .sup-activity-cell strong,
+[data-theme='dark'] .econ-kpi-value,
+[data-theme='dark'] .econ-section-head h3,
+[data-theme='dark'] .econ-model-name-row h3,
+[data-theme='dark'] .econ-rate-item strong,
+[data-theme='dark'] .econ-proj-numbers strong,
+[data-theme='dark'] .econ-tech-grid strong,
+[data-theme='dark'] .econ-tech-grid code,
+[data-theme='dark'] .esc-reason-text,
+[data-theme='dark'] .esc-delegated-name,
+[data-theme='dark'] .esc-detail-identity h2,
+[data-theme='dark'] .esc-card-head h3,
+[data-theme='dark'] .esc-alt-option strong,
+[data-theme='dark'] .esc-doc-preview,
+[data-theme='dark'] .esc-resolved-answer p,
+[data-theme='dark'] .fin-client-name,
+[data-theme='dark'] .fin-product-cell,
+[data-theme='dark'] .fin-amount-cell,
+[data-theme='dark'] .fin-verdict-reason,
+[data-theme='dark'] .fin-verdict-condition,
+[data-theme='dark'] .fin-resolution-summary,
+[data-theme='dark'] .fin-resolution-note,
+[data-theme='dark'] .fin-timeline-title,
+[data-theme='dark'] .fin-draft-datum strong,
+[data-theme='dark'] .fin-draft-title-group h4,
+[data-theme='dark'] .fin-eval-steps li strong,
+[data-theme='dark'] .sim-empty-title,
+[data-theme='dark'] .sim-bubble-author,
+[data-theme='dark'] .webchat-user-title,
+[data-theme='dark'] .emp-dropdown-item,
+[data-theme='dark'] .chat-more-item,
+[data-theme='dark'] .sup-chat-bubble p,
+[data-theme='dark'] .conv-ctrl-note-body p,
+[data-theme='dark'] .conv-ctrl-status-desc,
+[data-theme='dark'] .filter-checkbox-label,
+[data-theme='dark'] .esc-teach-checkbox {
+  color: #e2e8f0 !important;
+}
+
+[data-theme='dark'] .sup-agent-quality-row,
+[data-theme='dark'] .sup-agent-stat-label,
+[data-theme='dark'] .sup-agent-foot,
+[data-theme='dark'] .sup-agent-meta,
+[data-theme='dark'] .sup-overview-footer,
+[data-theme='dark'] .sup-kpi-chip-sub,
+[data-theme='dark'] .sup-conv-legend-chip {
+  color: #94a3b8 !important;
+}
+
+/* Íconos y píldoras de agentes en Panel del Supervisor (sin cajas blancas chillonas) */
+[data-theme='dark'] .sup-agent-icon {
+  background: rgba(59, 130, 246, 0.14) !important;
+  border: 1px solid rgba(96, 165, 250, 0.25) !important;
+}
+
+[data-theme='dark'] .sup-agent-status {
+  background: rgba(148, 163, 184, 0.14) !important;
+  border: 1px solid rgba(148, 163, 184, 0.28) !important;
+  color: #cbd5e1 !important;
+}
+
+[data-theme='dark'] .sup-agent-status.is-active,
+[data-theme='dark'] .sup-live-pill {
+  background: rgba(16, 185, 129, 0.16) !important;
+  border: 1px solid rgba(52, 211, 153, 0.35) !important;
+  color: #6ee7b7 !important;
+}
+
+[data-theme='dark'] .sup-sample-pill,
+[data-theme='dark'] .sup-count-pill {
+  background: rgba(59, 130, 246, 0.16) !important;
+  border: 1px solid rgba(96, 165, 250, 0.3) !important;
+  color: #93c5fd !important;
+}
+
+[data-theme='dark'] .sup-progress-track,
+[data-theme='dark'] .training-progress-track,
+[data-theme='dark'] .knowledge-result-score-track,
+[data-theme='dark'] .econ-agent-bar-track {
+  background: rgba(148, 163, 184, 0.18) !important;
+}
+
+[data-theme='dark'] .sup-agent-conv-divider {
+  background: rgba(148, 163, 184, 0.2) !important;
+}
+
+[data-theme='dark'] .sup-agent-card.is-selected {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.4) !important;
+}
+
+/* Bordes de tablas y separadores suaves en modo oscuro */
+[data-theme='dark'] table,
+[data-theme='dark'] .sales-table-wrap,
+[data-theme='dark'] .commerce-schedule-wrap,
+[data-theme='dark'] .data-table-card,
+[data-theme='dark'] .sup-conv-section,
+[data-theme='dark'] .sup-overview-divider,
+[data-theme='dark'] .sup-overview-footer,
+[data-theme='dark'] hr {
+  border-color: rgba(148, 163, 184, 0.18) !important;
+}
+
+[data-theme='dark'] table th,
+[data-theme='dark'] table td,
+[data-theme='dark'] .custom-data-table th,
+[data-theme='dark'] .custom-data-table td,
+[data-theme='dark'] .sup-modern-table th,
+[data-theme='dark'] .sup-modern-table td,
+[data-theme='dark'] .fin-requests-table th,
+[data-theme='dark'] .fin-requests-table td,
+[data-theme='dark'] .sales-table th,
+[data-theme='dark'] .sales-table td,
+[data-theme='dark'] .collections-panel th,
+[data-theme='dark'] .collections-panel td,
+[data-theme='dark'] .knowledge-page th,
+[data-theme='dark'] .knowledge-page td {
+  border-bottom-color: rgba(148, 163, 184, 0.15) !important;
+  border-top-color: rgba(148, 163, 184, 0.12) !important;
+  border-left-color: rgba(148, 163, 184, 0.12) !important;
+  border-right-color: rgba(148, 163, 184, 0.12) !important;
+}
+
+[data-theme='dark'] .sales-table-wrap,
+[data-theme='dark'] .commerce-schedule-wrap {
+  background: var(--surface) !important;
+}
+
+/* Badges de canal y estado más armoniosos en modo oscuro */
+[data-theme='dark'] .sup-channel-badge.is-web,
+[data-theme='dark'] .badge.status-info {
+  background: rgba(59, 130, 246, 0.16) !important;
+  border-color: rgba(96, 165, 250, 0.3) !important;
+  color: #93c5fd !important;
+}
+
+[data-theme='dark'] .sup-channel-badge.is-wa,
+[data-theme='dark'] .badge.status-active,
+[data-theme='dark'] .fin-pill.is-approved {
+  background: rgba(16, 185, 129, 0.16) !important;
+  border-color: rgba(52, 211, 153, 0.32) !important;
+  color: #6ee7b7 !important;
+}
+
+[data-theme='dark'] .badge.status-warning,
+[data-theme='dark'] .fin-pill.is-pending,
+[data-theme='dark'] .fin-pill.is-conditions {
+  background: rgba(245, 158, 11, 0.16) !important;
+  border-color: rgba(251, 191, 36, 0.32) !important;
+  color: #fcd34d !important;
+}
+
+[data-theme='dark'] .badge.status-error,
+[data-theme='dark'] .fin-pill.is-rejected {
+  background: rgba(239, 68, 68, 0.16) !important;
+  border-color: rgba(248, 113, 113, 0.32) !important;
+  color: #fca5a5 !important;
+}
+
+[data-theme='dark'] .sup-contact-avatar,
+[data-theme='dark'] .fin-client-avatar,
+[data-theme='dark'] .sales-prospect-avatar {
+  background: rgba(59, 130, 246, 0.2) !important;
+  border: 1px solid rgba(96, 165, 250, 0.3) !important;
+  color: #93c5fd !important;
+}
+
+/* Aviso discreto de canal interno / simulador en Chat con el Asistente */
+.webchat-sim-hint {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 10px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(248, 250, 252, 0.85);
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.webchat-sim-hint-text strong {
+  color: #334155;
+  font-weight: 600;
+}
+
+.webchat-sim-hint-btn {
+  background: transparent;
+  color: #2563eb;
+  border: 0;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.webchat-sim-hint-btn:hover {
+  background: rgba(37, 99, 235, 0.08);
+  color: #1d4ed8;
+}
+
+[data-theme='dark'] .webchat-sim-hint {
+  background: rgba(30, 41, 59, 0.55) !important;
+  border-color: rgba(148, 163, 184, 0.16) !important;
+  color: #94a3b8 !important;
+}
+
+[data-theme='dark'] .webchat-sim-hint-text strong {
+  color: #cbd5e1 !important;
+}
+
+[data-theme='dark'] .webchat-sim-hint-btn {
+  background: transparent !important;
+  border: 0 !important;
+  color: #60a5fa !important;
+}
+
+[data-theme='dark'] .webchat-sim-hint-btn:hover {
+  background: rgba(59, 130, 246, 0.14) !important;
+  color: #93c5fd !important;
+}
+
+/* ==========================================================================
+   Legibilidad de mensajes en chat, tarjetas de prospectos y bordes de tablas
+   ========================================================================== */
+
+/* Burbujas del chat (WebChat y Simulador) */
+[data-theme='dark'] .sim-bubble.is-outgoing,
+[data-theme='dark'] .sim-bubble.is-outgoing p,
+[data-theme='dark'] .sim-bubble.is-outgoing .sim-bubble-text {
+  color: #ffffff !important;
+}
+
+[data-theme='dark'] .sim-bubble.is-outgoing .sim-bubble-time,
+[data-theme='dark'] .sim-bubble.is-outgoing .sim-bubble-meta {
+  color: rgba(255, 255, 255, 0.82) !important;
+}
+
+[data-theme='dark'] .sim-bubble.is-incoming,
+[data-theme='dark'] .sim-bubble.is-incoming p,
+[data-theme='dark'] .sim-bubble.is-incoming .sim-bubble-text {
+  color: #f1f5f9 !important;
+}
+
+[data-theme='dark'] .sim-bubble.is-incoming .sim-bubble-author {
+  color: #93c5fd !important;
+}
+
+[data-theme='dark'] .sim-bubble.is-incoming .sim-bubble-time {
+  color: #94a3b8 !important;
+}
+
+/* Píldoras del encabezado del chat en modo oscuro */
+[data-theme='dark'] .webchat-sector-tag,
+[data-theme='dark'] .sim-meta-pill {
+  background: rgba(51, 65, 85, 0.7) !important;
+  border-color: rgba(148, 163, 184, 0.24) !important;
+  color: #e2e8f0 !important;
+}
+
+[data-theme='dark'] .sim-meta-pill.is-employee,
+[data-theme='dark'] .sim-meta-pill.is-waiting {
+  background: rgba(245, 158, 11, 0.16) !important;
+  border-color: rgba(251, 191, 36, 0.32) !important;
+  color: #fcd34d !important;
+}
+
+[data-theme='dark'] .sim-meta-pill.is-agent,
+[data-theme='dark'] .sim-meta-pill.is-client {
+  background: rgba(59, 130, 246, 0.18) !important;
+  border-color: rgba(96, 165, 250, 0.32) !important;
+  color: #93c5fd !important;
+}
+
+[data-theme='dark'] .sim-live-badge.is-live {
+  background: rgba(16, 185, 129, 0.16) !important;
+  border-color: rgba(52, 211, 153, 0.34) !important;
+  color: #6ee7b7 !important;
+}
+
+/* Tarjetas de prospectos en Panel de Ventas */
+[data-theme='dark'] .sales-prospect-interest,
+[data-theme='dark'] .sales-prospect-interest span,
+[data-theme='dark'] .sales-interest-value,
+[data-theme='dark'] .sales-prospect-notes,
+[data-theme='dark'] .sales-prospect-notes span {
+  color: #f1f5f9 !important;
+}
+
+[data-theme='dark'] .sales-interest-kicker {
+  color: #94a3b8 !important;
+}
+
+[data-theme='dark'] .sales-status-pill.is-contact,
+[data-theme='dark'] .sales-status-pill.is-quoted {
+  background: rgba(245, 158, 11, 0.16) !important;
+  border-color: rgba(251, 191, 36, 0.35) !important;
+  color: #fcd34d !important;
+}
+
+[data-theme='dark'] .sales-status-pill.is-new,
+[data-theme='dark'] .sales-status-pill.is-pending,
+[data-theme='dark'] .sales-filter-reset {
+  background: rgba(59, 130, 246, 0.18) !important;
+  border-color: rgba(96, 165, 250, 0.35) !important;
+  color: #93c5fd !important;
+}
+
+[data-theme='dark'] .sales-status-pill.is-qualified {
+  background: rgba(16, 185, 129, 0.16) !important;
+  border-color: rgba(52, 211, 153, 0.35) !important;
+  color: #6ee7b7 !important;
+}
+
+[data-theme='dark'] .sales-status-pill.is-rejected {
+  background: rgba(239, 68, 68, 0.16) !important;
+  border-color: rgba(248, 113, 113, 0.35) !important;
+  color: #fca5a5 !important;
+}
+
+/* Contenedores y bordes de TODAS las tablas en modo oscuro */
+[data-theme='dark'] .knowledge-table-wrap,
+[data-theme='dark'] .fin-table-wrap,
+[data-theme='dark'] .sales-table-wrap,
+[data-theme='dark'] .collection-table-scroll,
+[data-theme='dark'] .commerce-schedule-wrap {
+  background: var(--surface) !important;
+  border: 1px solid rgba(148, 163, 184, 0.18) !important;
+  box-shadow: none !important;
+}
+
+[data-theme='dark'] .knowledge-table,
+[data-theme='dark'] .fin-requests-table,
+[data-theme='dark'] .sales-table,
+[data-theme='dark'] .custom-data-table,
+[data-theme='dark'] .sup-modern-table {
+  border-color: rgba(148, 163, 184, 0.15) !important;
 }

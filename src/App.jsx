@@ -12,6 +12,10 @@ import AdminFinancingPanel from './components/AdminFinancingPanel';
 import EmployeesPanel from './components/EmployeesPanel';
 import TrainingPanel from './components/TrainingPanel';
 import { logout } from './api';
+import {
+  parseRouteFromLocation,
+  navigateToRoute,
+} from './router';
 
 // Iconos SVG limpios y consistentes para cada módulo
 function NavIcon({ type, className = 'sidebar-nav-icon' }) {
@@ -91,12 +95,39 @@ export default function App() {
   const [collectionClientToOpen, setCollectionClientToOpen] = useState(null);
   const [user, setUser] = useState(null);
   const [showLogoutIntro, setShowLogoutIntro] = useState(false);
-  // Sin pestaña elegida se abre la primera del perfil (para el supervisor, su panel).
-  const [tab, setTab] = useState(null);
+  // Sin pestaña elegida se abre la ruta de la URL o la primera del perfil.
+  const [tab, setTab] = useState(() => parseRouteFromLocation().tab);
   const [interviewStart, setInterviewStart] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState('');
+  const [theme, setTheme] = useState(() => {
+    try {
+      return localStorage.getItem('trimia:theme') || 'light';
+    } catch {
+      return 'light';
+    }
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    try {
+      localStorage.setItem('trimia:theme', theme);
+    } catch {
+      // ignore storage errors
+    }
+  }, [theme]);
+
+  useEffect(() => {
+    function handlePopState() {
+      const parsed = parseRouteFromLocation();
+      if (parsed.tab) {
+        setTab(parsed.tab);
+      }
+    }
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   useEffect(() => {
     function endSession(event) {
@@ -105,6 +136,9 @@ export default function App() {
       setUser(null);
       setTab(null);
       setInterviewStart(null);
+      if (window.location.pathname !== '/login') {
+        window.history.replaceState(null, '', '/login');
+      }
     }
     window.addEventListener('trimia:session-ended', endSession);
     return () => window.removeEventListener('trimia:session-ended', endSession);
@@ -129,12 +163,20 @@ export default function App() {
     // Quien entre después arranca en su propia primera pestaña, no en la del anterior.
     setTab(null);
     setInterviewStart(null);
+    if (window.location.pathname !== '/login') {
+      window.history.replaceState(null, '', '/login');
+    }
   }
 
   if (!token) {
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/panel')) {
+      window.history.replaceState(null, '', '/login');
+    }
     return (
       <Login
         showIntro={showLogoutIntro}
+        theme={theme}
+        onToggleTheme={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
         onLogin={(t, u) => {
           setFinancingRequestToOpen(null);
           setCollectionClientToOpen(null);
@@ -234,6 +276,18 @@ export default function App() {
   const defaultTab = visibleTabs[0]?.id;
   const currentTab = visibleTabs.some((t) => t.id === tab) ? tab : defaultTab;
 
+  function selectTab(nextTabId) {
+    setTab(nextTabId);
+    const parsed = parseRouteFromLocation();
+    const keepSubtab = parsed.tab === nextTabId ? parsed.subtab : undefined;
+    navigateToRoute(nextTabId, keepSubtab, { replace: false });
+  }
+
+  const parsedLocation = parseRouteFromLocation();
+  if (currentTab && parsedLocation.tab !== currentTab) {
+    navigateToRoute(currentTab, undefined, { replace: true });
+  }
+
   return (
     <div className={`app-layout${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
       {/* Sidebar Fija Lateral */}
@@ -249,7 +303,7 @@ export default function App() {
               key={t.id}
               className={`sidebar-nav-item${currentTab === t.id ? ' active' : ''}`}
               title={sidebarCollapsed ? t.label : undefined}
-              onClick={() => setTab(t.id)}
+              onClick={() => selectTab(t.id)}
             >
               <NavIcon type={t.icon} />
               <span>{t.label}</span>
@@ -283,8 +337,35 @@ export default function App() {
           </svg>
         </button>
 
-        {/* Perfil de Usuario Inferior */}
+        {/* Perfil de Usuario Inferior + Selector de Tema */}
         <div className="sidebar-user-card">
+          <button
+            type="button"
+            className="sidebar-theme-toggle"
+            onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+            title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+            aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+          >
+            {theme === 'dark' ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <circle cx="12" cy="12" r="5" />
+                <line x1="12" y1="1" x2="12" y2="3" />
+                <line x1="12" y1="21" x2="12" y2="23" />
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                <line x1="1" y1="12" x2="3" y2="12" />
+                <line x1="21" y1="12" x2="23" y2="12" />
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+              </svg>
+            )}
+            <span>{theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}</span>
+          </button>
+
           <div className="user-profile-pill">
             <div className="user-avatar" aria-hidden="true">
               {(user.name || user.email.split('@')[0])
@@ -324,14 +405,14 @@ export default function App() {
           <WebChat
             token={token}
             me={user}
-            onOpenSimulator={isDiego ? () => setTab('chat') : undefined}
+            onOpenSimulator={isDiego ? () => selectTab('chat') : undefined}
           />
         )}
         {currentTab === 'collections' && <CollectionsPanel token={token} me={user} isCollector={isCobranzas} initialClientId={collectionClientToOpen} />}
         {currentTab === 'sales' && <SalesPanel token={token} me={user} />}
-        {currentTab === 'admin_financing' && <AdminFinancingPanel token={token} me={user} initialRequestId={financingRequestToOpen} onOpenCollections={id => { setCollectionClientToOpen(id); setTab('collections'); }} />}
-        {currentTab === 'escalations' && <EscalationsQueue token={token} me={user} onOpenFinancing={id => { setFinancingRequestToOpen(id); setTab('admin_financing'); }} />}
-        {isDiego && currentTab === 'supervisor' && <SupervisorPanel token={token} me={user} onOpenFinancing={id => { setFinancingRequestToOpen(id); setTab('admin_financing'); }} />}
+        {currentTab === 'admin_financing' && <AdminFinancingPanel token={token} me={user} initialRequestId={financingRequestToOpen} onOpenCollections={id => { setCollectionClientToOpen(id); selectTab('collections'); }} />}
+        {currentTab === 'escalations' && <EscalationsQueue token={token} me={user} onOpenFinancing={id => { setFinancingRequestToOpen(id); selectTab('admin_financing'); }} />}
+        {isDiego && currentTab === 'supervisor' && <SupervisorPanel token={token} me={user} onOpenFinancing={id => { setFinancingRequestToOpen(id); selectTab('admin_financing'); }} />}
         {isDiego && currentTab === 'chat' && <ChatSimulator token={token} me={user} />}
         {currentTab === 'knowledge' && (
           <KnowledgeIngest

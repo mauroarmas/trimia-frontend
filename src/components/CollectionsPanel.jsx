@@ -21,6 +21,7 @@ import ActivityFeed from './ActivityFeed';
 import ReminderConfig from './ReminderConfig';
 import PageHero from './PageHero';
 import { formatCalendarDate, formatProofDate } from '../date';
+import { useSubtabRoute } from '../router';
 
 const QUOTA_STATUS_LABELS = {
   PENDING: 'Pendiente',
@@ -85,8 +86,12 @@ export default function CollectionsPanel({ token, me, isCollector, initialClient
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  const [tab, setTab] = useState(isCollector ? 'clients' : 'proofs');
-  useEffect(() => { if (initialClientId) { setTab('clients'); setSelectedClient(initialClientId); } }, [initialClientId]);
+  const [tab, setTab] = useSubtabRoute(
+    'collections',
+    ['proofs', 'impact', 'clients', 'reminders', 'reminder-config', 'activity'],
+    isCollector ? 'clients' : 'proofs',
+  );
+  useEffect(() => { if (initialClientId) { setTab('clients'); setSelectedClient(initialClientId); } }, [initialClientId, setTab]);
   const [proofStatus, setProofStatus] = useState('PENDING_REVIEW');
 
   const [search, setSearch] = useState('');

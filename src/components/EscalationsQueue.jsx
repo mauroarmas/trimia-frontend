@@ -1164,15 +1164,41 @@ export default function EscalationsQueue({ token, me, onOpenFinancing }) {
                   )}
 
                   <form className="esc-resolve-form" onSubmit={handleResolve}>
-                    {isPriceCase && <div className="esc-field">
-                      <label htmlFor="escalation-confirmed-price">Precio confirmado (ARS)</label>
-                      {priceDraft && <p>{priceDraft.productSummary ?? 'Producto del formulario'}</p>}
-                      <input id="escalation-confirmed-price" type="number" min="0.01" step="0.01" required
-                        value={confirmedPrice} onChange={e => setConfirmedPrice(e.target.value)} disabled={!priceDraft || actionBusy} />
-                      {priceError && <p role="alert">{priceError}</p>}
-                      {!priceDraft && !priceError && <p>Cargando formulario de financiación…</p>}
-                      <p>Al resolver se guarda este precio y se envía tu respuesta. El cliente deberá confirmar el resumen para presentar la solicitud; esto no aprueba el crédito.</p>
-                    </div>}
+                    {isPriceCase && (
+                      <div className="esc-price-confirm-card">
+                        <div className="esc-price-confirm-head">
+                          <div className="esc-price-confirm-label">
+                            <span className="esc-price-confirm-kicker">Cotización comercial requerida</span>
+                            <label htmlFor="escalation-confirmed-price">Precio confirmado (ARS)</label>
+                          </div>
+                          {priceDraft && (
+                            <span className="esc-price-product-pill" title={priceDraft.productSummary ?? 'Producto del formulario'}>
+                              {priceDraft.productSummary ?? 'Producto del formulario'}
+                            </span>
+                          )}
+                        </div>
+                        <div className="esc-price-input-wrap">
+                          <span className="esc-price-currency-prefix" aria-hidden="true">$</span>
+                          <input
+                            id="escalation-confirmed-price"
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            required
+                            value={confirmedPrice}
+                            onChange={(e) => setConfirmedPrice(e.target.value)}
+                            disabled={!priceDraft || actionBusy}
+                            placeholder="Ej. 610000"
+                          />
+                          <span className="esc-price-currency-suffix">ARS</span>
+                        </div>
+                        {priceError && <p className="error" role="alert" style={{ margin: 0 }}>{priceError}</p>}
+                        {!priceDraft && !priceError && <p className="esc-price-helper-note">Cargando formulario de financiación…</p>}
+                        <p className="esc-price-helper-note">
+                          Al resolver se guarda este precio y se envía tu respuesta. El cliente deberá confirmar el resumen para presentar la solicitud; esto no aprueba el crédito.
+                        </p>
+                      </div>
+                    )}
                     <textarea
                       className="conv-ctrl-textarea esc-reply-textarea"
                       rows={4}

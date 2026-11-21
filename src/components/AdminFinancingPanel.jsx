@@ -16,6 +16,7 @@ import InfoNotes, { InfoToggle } from './InfoNotes';
 import PageHero from './PageHero';
 import ChatExportMenu from './ChatExportMenu';
 import { buildConversationMarkdown } from '../chatExport';
+import { useSubtabRoute } from '../router';
 
 const LABELS = {
   PENDING_REVIEW: 'Pendiente',
@@ -101,7 +102,11 @@ export default function AdminFinancingPanel({ token, me, initialRequestId, onOpe
   const prevEvalStateRef = useRef(null);
 
   const [detail, setDetail] = useState(null);
-  const [filter, setFilter] = useState('PENDING_REVIEW');
+  const [filter, setFilter] = useSubtabRoute(
+    'admin_financing',
+    ['PENDING_REVIEW', 'APPROVED', 'REJECTED', 'CANCELLED', 'ALL'],
+    'PENDING_REVIEW',
+  );
   const [note, setNote] = useState('');
   const [editing, setEditing] = useState(null);
   const [busyAction, setBusyAction] = useState(null);
