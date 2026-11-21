@@ -21,6 +21,10 @@ import {
 } from '../api';
 import './commercialFlow.css';
 
+const CRM_SHEETS_URL =
+  import.meta.env.VITE_CRM_SHEETS_URL ||
+  'https://docs.google.com/spreadsheets/d/1eU8lXoA6mcSh-s02NElqr8EWl1R2rR3TZAIFX1cENu4/edit';
+
 const INFO_POR_SUBTAB = {
   prospects: [
     [
@@ -751,14 +755,25 @@ export default function SalesPanel({ token, me }) {
                 Sincronizados con el CRM en Google Sheets y auditados en PostgreSQL.
               </p>
             </div>
-            <button
-              type="button"
-              className="btn-pill-action"
-              onClick={loadProspects}
-              disabled={loadingProspects}
-            >
-              {loadingProspects ? 'Actualizando…' : '↻ Actualizar'}
-            </button>
+            <div className="sales-section-actions">
+              <a
+                href={CRM_SHEETS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="sales-crm-sheet-link"
+                title="Abrir CRM en Google Sheets"
+              >
+                Google Sheets ↗
+              </a>
+              <button
+                type="button"
+                className="btn-pill-action"
+                onClick={loadProspects}
+                disabled={loadingProspects}
+              >
+                {loadingProspects ? 'Actualizando…' : '↻ Actualizar'}
+              </button>
+            </div>
           </header>
 
           {followUpRule && (

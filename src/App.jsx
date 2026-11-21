@@ -320,7 +320,13 @@ export default function App() {
       <main className="app-main">
         {logoutError && <p className="error" role="alert">{logoutError}</p>}
         {currentTab === 'training' && <TrainingPanel token={token} me={user} />}
-        {currentTab === 'webchat' && <WebChat token={token} me={user} />}
+        {currentTab === 'webchat' && (
+          <WebChat
+            token={token}
+            me={user}
+            onOpenSimulator={isDiego ? () => setTab('chat') : undefined}
+          />
+        )}
         {currentTab === 'collections' && <CollectionsPanel token={token} me={user} isCollector={isCobranzas} initialClientId={collectionClientToOpen} />}
         {currentTab === 'sales' && <SalesPanel token={token} me={user} />}
         {currentTab === 'admin_financing' && <AdminFinancingPanel token={token} me={user} initialRequestId={financingRequestToOpen} onOpenCollections={id => { setCollectionClientToOpen(id); setTab('collections'); }} />}

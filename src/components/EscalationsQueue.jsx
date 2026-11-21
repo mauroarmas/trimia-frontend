@@ -82,7 +82,7 @@ export default function EscalationsQueue({ token, me, onOpenFinancing }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAreaFilter, setSelectedAreaFilter] = useState('');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(25);
   const [escalations, setEscalations] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -446,32 +446,44 @@ export default function EscalationsQueue({ token, me, onOpenFinancing }) {
   const corrigiendo = knowledgeMode === 'MODIFICAR';
   const puedeEnsenarAlgo = puedeEnsenar || hayCorregibles;
 
-  const filteredEscalations = escalations.filter((e) => {
-    if (selectedAreaFilter) {
-      const matchArea =
-        e.pertenencia === selectedAreaFilter ||
-        e.conversation?.currentAgent === selectedAreaFilter;
-      if (!matchArea) return false;
-    }
-    if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase();
-      const matchReason = e.reason?.toLowerCase().includes(term);
-      const matchClient =
-        e.conversation?.externalId?.toLowerCase().includes(term) ||
-        e.conversation?.employee?.name?.toLowerCase().includes(term) ||
-        e.conversation?.employee?.sector?.name?.toLowerCase().includes(term) ||
-        e.conversation?.client?.name?.toLowerCase().includes(term);
-      const matchChannel = e.conversation?.channel?.toLowerCase().includes(term);
-      const areaName = e.conversation?.currentAgent
-        ? AGENT_META[e.conversation.currentAgent]?.name?.toLowerCase() ?? ''
-        : '';
-      const matchAgent =
-        e.conversation?.currentAgent?.toLowerCase().includes(term) ||
-        areaName.includes(term);
-      if (!matchReason && !matchClient && !matchChannel && !matchAgent) return false;
-    }
-    return true;
-  });
+  const filteredEscalations = escalations
+    .filter((e) => {
+      if (selectedAreaFilter) {
+        const matchArea =
+          e.pertenencia === selectedAreaFilter ||
+          e.conversation?.currentAgent === selectedAreaFilter;
+        if (!matchArea) return false;
+      }
+      if (searchTerm.trim()) {
+        const term = searchTerm.toLowerCase();
+        const matchReason = e.reason?.toLowerCase().includes(term);
+        const matchClient =
+          e.conversation?.externalId?.toLowerCase().includes(term) ||
+          e.conversation?.employee?.name?.toLowerCase().includes(term) ||
+          e.conversation?.employee?.sector?.name?.toLowerCase().includes(term) ||
+          e.conversation?.client?.name?.toLowerCase().includes(term);
+        const matchChannel = e.conversation?.channel?.toLowerCase().includes(term);
+        const areaName = e.conversation?.currentAgent
+          ? AGENT_META[e.conversation.currentAgent]?.name?.toLowerCase() ?? ''
+          : '';
+        const matchAgent =
+          e.conversation?.currentAgent?.toLowerCase().includes(term) ||
+          areaName.includes(term);
+        if (!matchReason && !matchClient && !matchChannel && !matchAgent) return false;
+      }
+      return true;
+    })
+    .slice()
+    .sort((a, b) => {
+      const rank = (item) => {
+        if (item.pertenencia === 'PROPIA') return 0;
+        if (item.pertenencia === 'SIN_AREA') return 1;
+        return 2;
+      };
+      const rankDiff = rank(a) - rank(b);
+      if (rankDiff !== 0) return rankDiff;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
 
   const totalCount = filteredEscalations.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));

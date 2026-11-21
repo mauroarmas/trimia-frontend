@@ -146,8 +146,16 @@ export function resolveMessageActor(m, conversation, me) {
 
   const explicitManualEvent = events.find(
     (ev) =>
-      ev.eventType === 'conversation_manual_reply' &&
+      (ev.eventType === 'conversation_manual_reply' ||
+        ev.eventType === 'escalation_resolved') &&
       ev.payload?.messageId === m.id,
+  );
+
+  const nearResolvedEvent = events.find(
+    (ev) =>
+      ev.eventType === 'escalation_resolved' &&
+      !ev.payload?.messageId &&
+      Math.abs(new Date(ev.createdAt).getTime() - msgTime) <= 2500,
   );
 
   let inTakeoverWindow = false;
@@ -172,7 +180,12 @@ export function resolveMessageActor(m, conversation, me) {
     conversation?.handledAt &&
     msgTime >= new Date(conversation.handledAt).getTime() - 1000;
 
-  if (explicitManualEvent || inTakeoverWindow || inCurrentHandling) {
+  if (
+    explicitManualEvent ||
+    nearResolvedEvent ||
+    inTakeoverWindow ||
+    inCurrentHandling
+  ) {
     const supName =
       conversation?.handledBy?.name ||
       (conversation?.handledById && conversation?.handledById === me?.id ? me?.name : null);
@@ -220,7 +233,7 @@ export function buildConversationFeed(conversation, me) {
   }
 
   for (const ev of conversation?.events ?? []) {
-    if (ev.eventType === 'ESCALATED') {
+    if (ev.eventType === 'ESCALATED' || ev.eventType === 'escalation_created') {
       items.push({
         kind: 'milestone',
         id: `ev-${ev.id}`,
@@ -246,6 +259,15 @@ export function buildConversationFeed(conversation, me) {
         createdAt: ev.createdAt,
         variant: 'release',
         label: 'Control liberado · La atención volvió al Agente IA',
+      });
+    } else if (ev.eventType === 'escalation_resolved') {
+      items.push({
+        kind: 'milestone',
+        id: `ev-${ev.id}`,
+        time: new Date(ev.createdAt).getTime(),
+        createdAt: ev.createdAt,
+        variant: 'release',
+        label: 'Caso resuelto por un responsable · La atención volvió al Agente IA',
       });
     }
   }

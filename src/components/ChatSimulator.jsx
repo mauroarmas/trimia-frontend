@@ -15,6 +15,7 @@ import PageHero from './PageHero';
 const esperaDeReintento = (intentos) => Math.min(1000 * 2 ** intentos, 15000);
 
 const QUICK_PROMPTS = [
+  'Quiero financiar una máquina para cortar fiambres',
   'Hola, quiero consultar por un producto',
   '¿Cuáles son los requisitos para financiar?',
   '¿Cómo informo un comprobante de pago?',
@@ -460,6 +461,16 @@ export default function ChatSimulator({ token, me }) {
             [
               'Conversación real.',
               'Los mensajes se guardan sobre el hilo Web real de ese número para que puedas verificar todo el flujo en el Panel del Supervisor o en Casos Escalados.',
+            ],
+            [
+              'DNIs de prueba para Venta Financiada (Mock Riesgo Online).',
+              <>
+                Usá un teléfono nuevo de cliente y probá cualquiera de estos DNIs al completar los 5 datos (nombre, DNI, producto, comercio/uso personal y localidad):{' '}
+                <strong>90000001 al 90000010</strong> (Aprobado directo),{' '}
+                <strong>90000011 al 90000020</strong> (Aprobado con condiciones / anticipo),{' '}
+                <strong>90000021 al 90000030</strong> (Rechazado). Luego aprobá las ofertas desde{' '}
+                <strong>Aprobación Financiación</strong>.
+              </>,
             ],
           ]}
         />

@@ -54,7 +54,7 @@ function esInformeDeBajaConfianza(m) {
 /**
  * Chat con el Asistente (canal web interno del empleado autenticado).
  */
-export default function WebChat({ token, me }) {
+export default function WebChat({ token, me, onOpenSimulator }) {
   const [text, setText] = useState('');
   const [mostrarInfo, setMostrarInfo] = useState(false);
   const claveConv = claveDeConversacion(me?.id);
@@ -148,6 +148,19 @@ export default function WebChat({ token, me }) {
     let intentos = 0;
     let historialCargado = false;
 
+    async function refrescarContextoSilencioso() {
+      try {
+        const res = await getWebMessages(token, convId, { limit: 100 });
+        if (cancelado) return;
+        agregarMensajes(res.data ?? []);
+        if (res.conversation) {
+          setConversation(res.conversation);
+        }
+      } catch {
+        // Ignorar fallos transitorios de refresco
+      }
+    }
+
     async function conectar() {
       try {
         if (!historialCargado) {
@@ -182,12 +195,20 @@ export default function WebChat({ token, me }) {
                     c ? { ...c, currentAgent: m.agentType } : c,
                   );
                 }
+                refrescarContextoSilencioso();
               }
             },
             onStatus: (s) => {
               if (cancelado) return;
-              setConversation((c) => ({ ...c, ...s }));
+              setConversation((c) => ({
+                ...c,
+                ...s,
+                ...(s.status === 'HUMAN_HANDLING' && !c?.handledAt
+                  ? { handledAt: new Date().toISOString() }
+                  : {}),
+              }));
               if (s.status !== 'ACTIVE') setEsperandoRespuesta(false);
+              refrescarContextoSilencioso();
             },
             onClose: ({ conversacionTerminada, abortado }) => {
               if (cancelado || abortado) return;
@@ -393,6 +414,49 @@ export default function WebChat({ token, me }) {
           />
         }
       />
+
+      {onOpenSimulator && (
+        <div
+          style={{
+            width: '100%',
+            boxSizing: 'border-box',
+            marginBottom: 12,
+            padding: '8px 14px',
+            borderRadius: 10,
+            backgroundColor: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            color: '#475569',
+            fontSize: 12.5,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            flexWrap: 'wrap',
+          }}
+        >
+          <span>
+            <strong style={{ color: '#334155' }}>Canal interno de empleados ({displayName}):</strong>{' '}
+            El asistente responde consultas operativas con conocimiento interno. Para simular compras o financiación como cliente, usá el Simulador de Chat.
+          </span>
+          <button
+            type="button"
+            onClick={onOpenSimulator}
+            style={{
+              background: '#ffffff',
+              color: '#2563eb',
+              border: '1px solid #cbd5e1',
+              borderRadius: 7,
+              padding: '4px 10px',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Ir al Simulador de Chat →
+          </button>
+        </div>
+      )}
 
       {mostrarInfo && (
         <InfoNotes

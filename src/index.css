@@ -11317,6 +11317,34 @@ label {
   line-height: 1.45;
 }
 
+.sales-section-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sales-crm-sheet-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.sales-crm-sheet-link:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #15803d;
+}
+
 .sales-header-badges-row {
   display: flex;
   align-items: center;
