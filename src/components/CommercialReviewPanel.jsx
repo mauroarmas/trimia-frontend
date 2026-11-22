@@ -6,8 +6,10 @@ import {
   reviewCommercialOrder,
   renewCommercialOrder,
   editCommercialOrder,
+  closeCommercialOrder,
   getSalesStock,
   listCollectors,
+  salesProspectAction,
 } from '../api';
 import { contactInitials } from '../conversationHelpers';
 import CommercialOrderCard, {
@@ -120,6 +122,11 @@ export default function CommercialReviewPanel({
   const [notice, setNotice] = useState('');
   const [revision, setRevision] = useState(0);
 
+  // Estado para cierre de venta integrado en pantalla principal
+  const [conversationState, setConversationState] = useState(null);
+  const [closeReference, setCloseReference] = useState('');
+  const [customerMessage, setCustomerMessage] = useState(null);
+
   // Modales
   const [showConvModal, setShowConvModal] = useState(false);
   const [showOrderModal, setShowOrderModal] = useState(false);
@@ -130,6 +137,12 @@ export default function CommercialReviewPanel({
 
   const id = detail.request.id;
   const busy = Boolean(busyAction);
+  const canClose = Boolean(me?.isGeneralSupervisor || me?.sectorName === 'Ventas');
+
+  useEffect(() => {
+    setCustomerMessage(null);
+    setCloseReference('');
+  }, [id]);
 
   useEffect(() => {
     let active = true;
@@ -138,12 +151,20 @@ export default function CommercialReviewPanel({
       getCommercialOffers(token, id),
       listCollectors(token),
     ])
-      .then(([row, choices, people]) => {
+      .then(async ([row, choices, people]) => {
         if (!active) return;
         setOrder(row);
         setOffers(choices);
         setCollectors(people);
         setCollectorId((prev) => prev || row.client.assignedCollectorId || '');
+        if (canClose && row.prospectId) {
+          try {
+            const conv = await salesProspectAction(token, row.prospectId, 'conversation');
+            if (active) setConversationState(conv);
+          } catch {
+            // ignorar si el rol no tiene acceso al hilo comercial
+          }
+        }
       })
       .catch((e) => {
         if (active) setError(e.message);
@@ -151,7 +172,7 @@ export default function CommercialReviewPanel({
     return () => {
       active = false;
     };
-  }, [token, id, detail.request.version, revision]);
+  }, [token, id, detail.request.version, revision, canClose]);
 
   // Cerrar modales con Escape
   useEffect(() => {
@@ -291,6 +312,36 @@ export default function CommercialReviewPanel({
 
   const canSubmitReject = !busy && Boolean(note.trim()) && isEvaluationReady;
 
+  // Datos y estado del cierre de venta
+  const otherOwner =
+    conversationState?.status === 'HUMAN_HANDLING' &&
+    conversationState.handledById !== me.id;
+  const myControl =
+    conversationState?.status === 'HUMAN_HANDLING' &&
+    conversationState.handledById === me.id;
+  const finalMessage = customerMessage ?? order?.suggestedClosingMessage ?? '';
+  const isReadyToClose = Boolean(order && order.flow.stage === 'READY' && !order.expired);
+  const closingNotice = order?.closingNotice;
+  const closingNoticeText = !closingNotice
+    ? 'Aviso aún no registrado.'
+    : {
+        PENDING: 'Aviso pendiente de envío.',
+        SENDING: 'Enviando aviso al cliente…',
+        ACCEPTED:
+          closingNotice.transportMode === 'simulated'
+            ? 'Aviso registrado en el chat de prueba.'
+            : 'Aviso aceptado para envío. Aún no hay confirmación de entrega.',
+        DELIVERED: 'Entrega del aviso confirmada.',
+        FAILED:
+          'El aviso no pudo enviarse. Revisá la conversación para contactar al cliente.',
+        UNCERTAIN:
+          'No se pudo confirmar el envío. Revisá el chat antes de reenviar para evitar duplicados.',
+      }[closingNotice.status] ?? 'Consultando estado del aviso.';
+
+  const selectedOffer = order?.flow?.offers?.find(
+    (o) => o.id === order.flow.selectedOfferId,
+  );
+
   function toggleOffer(offerId, checked) {
     setEnabled((prev) =>
       checked
@@ -428,17 +479,25 @@ export default function CommercialReviewPanel({
             <div className="cr-summary-item">
               <span className="cr-summary-label">Entrega</span>
               <strong>
-                {order.delivery
-                  ? `Envío (${commercialMoney(order.delivery.cost)})`
-                  : 'Retiro en sucursal'}
+                {order.flow.deliveryMode === 'SHIPPING'
+                  ? `Envío (${commercialMoney(order.flow.shippingCost ?? order.delivery?.cost)})`
+                  : order.flow.deliveryMode === 'PICKUP'
+                    ? 'Retiro en sucursal'
+                    : order.delivery
+                      ? `Envío (${commercialMoney(order.delivery.cost)})`
+                      : 'Retiro en sucursal'}
               </strong>
-              <small>{order.locality || 'A confirmar'}</small>
+              <small>{order.flow.deliveryAddress || order.locality || 'A confirmar'}</small>
             </div>
 
             <div className="cr-summary-item cr-summary-price">
-              <span className="cr-summary-label">Precio de lista</span>
-              <strong>{commercialMoney(order.amount)}</strong>
-              <small>Referencia del catálogo</small>
+              <span className="cr-summary-label">
+                {selectedOffer ? selectedOffer.label : 'Precio de lista'}
+              </span>
+              <strong>{commercialMoney(selectedOffer?.total ?? order.amount)}</strong>
+              <small>
+                {selectedOffer ? 'Opción elegida por el cliente' : 'Referencia del catálogo'}
+              </small>
             </div>
           </div>
 
@@ -480,11 +539,12 @@ export default function CommercialReviewPanel({
             </div>
           )}
 
-          {order.flow.stage === 'REVIEW' ? (
-            <div className="cr-workbench">
-              {/* Columna Principal: Ofertas y Resolución */}
-              <div className="cr-main-col">
-                {!order.expired ? (
+          {/* Workbench unificado en 2 columnas para todas las etapas */}
+          <div className="cr-workbench">
+            {/* Columna Principal: Aprobación de ofertas + Cierre de venta */}
+            <div className="cr-main-col">
+              {order.flow.stage === 'REVIEW' ? (
+                !order.expired ? (
                   <form
                     className="cr-form"
                     onSubmit={(event) => {
@@ -704,94 +764,213 @@ export default function CommercialReviewPanel({
                       Renová la vigencia del pedido arriba para revisar las ofertas actualizadas y registrar una decisión.
                     </p>
                   </div>
-                )}
-              </div>
-
-              {/* Columna Lateral: Evaluación crediticia + Botón de Ficha modal */}
-              <aside className="cr-side-col">
-                <div className={`cr-verdict-card ${verdictInfo.tone}`}>
-                  <div className="cr-verdict-head">
-                    <span className="cr-verdict-eyebrow">Evaluación crediticia</span>
-                    {assessment?.createdAt && (
-                      <time>{formatShortExpiry(assessment.createdAt)}</time>
-                    )}
+                )
+              ) : (
+                <div className="cr-resolved-banner">
+                  <div>
+                    <strong>
+                      {order.closedAt
+                        ? 'Venta registrada y cerrada'
+                        : order.flow.stage === 'READY'
+                          ? 'Condiciones aprobadas y confirmadas por el cliente'
+                          : 'Decisión de Administración registrada'}
+                    </strong>
+                    <p>
+                      {detail.request?.reviewNote
+                        ? `Nota de revisión: “${detail.request.reviewNote}”`
+                        : order.flow.stage === 'CHOOSING'
+                          ? 'El cliente está eligiendo plan y entrega desde el chat.'
+                          : 'El pedido avanzó correctamente en el circuito comercial.'}
+                    </p>
                   </div>
+                </div>
+              )}
 
-                  {isEvaluating ? (
-                    <div className="cr-verdict-loading">
-                      <span className="fin-spinner-sm" aria-hidden="true" />
-                      <span>Actualizando evaluación crediticia…</span>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="cr-verdict-status">
-                        <span className={`cr-verdict-dot ${verdictInfo.tone}`} aria-hidden="true" />
-                        <strong>{verdictInfo.label}</strong>
-                      </div>
-
-                      {assessment?.reason && (
-                        <p className="cr-verdict-reason">{assessment.reason}</p>
-                      )}
-
-                      {assessment?.commercialCondition && (
-                        <div className="cr-verdict-suggestion">
-                          <span>Sugerencia</span>
-                          <p>{assessment.commercialCondition}</p>
-                        </div>
-                      )}
-                    </>
-                  )}
-
-                  <p className="cr-verdict-foot">
-                    Uso interno · El cliente solo recibe la decisión comercial.
+              {/* Último paso: Cierre de venta y aviso al cliente integrado en pantalla principal */}
+              {order.closedAt ? (
+                <section className="cr-closed-card">
+                  <div className="cr-closed-head">
+                    <strong>✓ Venta registrada</strong>
+                    <span className="cr-step-badge is-done">Cerrada</span>
+                  </div>
+                  <p>
+                    {order.financing
+                      ? `Plan de ${order.financing.quotaCount} cuotas semanales cargado en la cartera de ${order.collector?.name || 'su cobrador asignado'}.`
+                      : 'Operación registrada al contado.'}
                   </p>
-                </div>
+                  <p
+                    className={`cr-closed-notice${
+                      ['FAILED', 'UNCERTAIN'].includes(closingNotice?.status)
+                        ? ' is-warn'
+                        : ''
+                    }`}
+                    role="status"
+                  >
+                    {closingNoticeText}
+                  </p>
+                </section>
+              ) : (
+                order.status !== 'CANCELLED' &&
+                canClose && (
+                  <form
+                    className={`cr-close-card${isReadyToClose ? ' is-ready' : ' is-locked'}`}
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      run(
+                        'CLOSE',
+                        () =>
+                          closeCommercialOrder(token, id, {
+                            expectedVersion: order.version,
+                            reference: closeReference,
+                            customerMessage: finalMessage,
+                          }),
+                        'Venta cerrada y registrada correctamente.',
+                      );
+                    }}
+                  >
+                    <div className="cr-close-head">
+                      <div>
+                        <h4>Último paso: cerrar y avisar al cliente</h4>
+                        <p>
+                          Al confirmar se registra la venta y, si corresponde, las cuotas del cobrador asignado.
+                        </p>
+                      </div>
+                      <span
+                        className={`cr-step-badge ${
+                          isReadyToClose ? 'is-ready' : 'is-locked'
+                        }`}
+                      >
+                        {isReadyToClose
+                          ? 'Listo para cerrar'
+                          : 'Esperando validación previa'}
+                      </span>
+                    </div>
 
-                <button
-                  type="button"
-                  className="cr-sheet-trigger"
-                  onClick={() => setShowOrderModal(true)}
-                >
-                  <span className="cr-sheet-trigger-icon">
-                    <SheetIcon />
-                  </span>
-                  <span className="cr-sheet-trigger-copy">
-                    <strong>Ficha comercial y entrega</strong>
-                    <small>Ver plan, entrega y estado del cierre</small>
-                  </span>
-                  <span className="cr-sheet-trigger-arrow" aria-hidden="true">→</span>
-                </button>
-              </aside>
+                    {myControl && (
+                      <div className="cr-close-info">
+                        Tenés el control del chat. Se liberará automáticamente al cerrar.
+                      </div>
+                    )}
+                    {otherOwner && (
+                      <div className="cr-close-warn">
+                        Otra persona está atendiendo este chat. Debe liberar el control antes del cierre.
+                      </div>
+                    )}
+
+                    <label className="cr-field">
+                      <span>Mensaje final al cliente</span>
+                      <textarea
+                        value={finalMessage}
+                        onChange={(e) => setCustomerMessage(e.target.value)}
+                        required
+                        maxLength={4000}
+                        rows={4}
+                        disabled={!isReadyToClose || busy}
+                        placeholder="Confirmale cómo continúa su compra…"
+                      />
+                    </label>
+
+                    <label className="cr-field">
+                      <span>Constancia interna del cierre</span>
+                      <textarea
+                        value={closeReference}
+                        onChange={(e) => setCloseReference(e.target.value)}
+                        required
+                        maxLength={2000}
+                        rows={2}
+                        disabled={!isReadyToClose || busy}
+                        placeholder="Ej. Factura / remito acordado en Paljet, observaciones de entrega…"
+                      />
+                    </label>
+
+                    <div className="cr-close-foot">
+                      <button
+                        type="submit"
+                        className="cr-btn-approve"
+                        disabled={
+                          busy ||
+                          !isReadyToClose ||
+                          !closeReference.trim() ||
+                          !finalMessage.trim() ||
+                          otherOwner
+                        }
+                      >
+                        {busyAction === 'CLOSE'
+                          ? 'Registrando…'
+                          : 'Cerrar venta y enviar aviso'}
+                      </button>
+
+                      <span className="cr-close-footnote">
+                        {isReadyToClose
+                          ? 'Registra la operación en TrimIA sin emitir factura fiscal.'
+                          : 'Se habilita cuando Administración autoriza y el cliente confirma su resumen.'}
+                      </span>
+                    </div>
+                  </form>
+                )
+              )}
             </div>
-          ) : (
-            <div className="cr-resolved-wrap">
-              <div className="cr-resolved-banner">
-                <div>
-                  <strong>
-                    {order.closedAt
-                      ? 'La venta ya quedó cerrada.'
-                      : 'Decisión registrada. El agente continuará con la elección del cliente y Ventas verá la ficha para el cierre.'}
-                  </strong>
-                  {detail.request?.reviewNote && (
-                    <p>Nota registrada: “{detail.request.reviewNote}”</p>
+
+            {/* Columna Lateral: Evaluación crediticia + Botón de Ficha modal */}
+            <aside className="cr-side-col">
+              <div className={`cr-verdict-card ${verdictInfo.tone}`}>
+                <div className="cr-verdict-head">
+                  <span className="cr-verdict-eyebrow">Evaluación crediticia</span>
+                  {assessment?.createdAt && (
+                    <time>{formatShortExpiry(assessment.createdAt)}</time>
                   )}
                 </div>
 
-                <button
-                  type="button"
-                  className="cr-btn-outline"
-                  onClick={() => setShowOrderModal(true)}
-                >
-                  <SheetIcon />
-                  <span>Abrir ficha comercial y entrega</span>
-                </button>
+                {isEvaluating ? (
+                  <div className="cr-verdict-loading">
+                    <span className="fin-spinner-sm" aria-hidden="true" />
+                    <span>Actualizando evaluación crediticia…</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="cr-verdict-status">
+                      <span className={`cr-verdict-dot ${verdictInfo.tone}`} aria-hidden="true" />
+                      <strong>{verdictInfo.label}</strong>
+                    </div>
+
+                    {assessment?.reason && (
+                      <p className="cr-verdict-reason">{assessment.reason}</p>
+                    )}
+
+                    {assessment?.commercialCondition && (
+                      <div className="cr-verdict-suggestion">
+                        <span>Sugerencia</span>
+                        <p>{assessment.commercialCondition}</p>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                <p className="cr-verdict-foot">
+                  Uso interno · El cliente solo recibe la decisión comercial.
+                </p>
               </div>
-            </div>
-          )}
+
+              <button
+                type="button"
+                className="cr-sheet-trigger"
+                onClick={() => setShowOrderModal(true)}
+              >
+                <span className="cr-sheet-trigger-icon">
+                  <SheetIcon />
+                </span>
+                <span className="cr-sheet-trigger-copy">
+                  <strong>Ficha comercial y entrega</strong>
+                  <small>Ver cliente, entrega y cronograma de cuotas</small>
+                </span>
+                <span className="cr-sheet-trigger-arrow" aria-hidden="true">→</span>
+              </button>
+            </aside>
+          </div>
         </>
       )}
 
-      {/* Modal 1: Ficha comercial y entrega (sin opción de modificar) */}
+      {/* Modal 1: Ficha comercial y entrega (solo lectura de ficha, entrega y cuotas; sin modificar ni cerrar) */}
       {showOrderModal && order &&
         createPortal(
           <div
@@ -838,6 +1017,7 @@ export default function CommercialReviewPanel({
                   hideConversation
                   hideEdit
                   hideHeader
+                  hideClose
                   onChanged={onChanged}
                 />
               </div>

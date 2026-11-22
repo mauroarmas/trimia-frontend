@@ -50,6 +50,7 @@ export default function CommercialOrderCard({
   hideConversation = false,
   hideEdit = false,
   hideHeader = false,
+  hideClose = false,
   children,
 }) {
   const [order, setOrder] = useState(null);
@@ -445,7 +446,7 @@ export default function CommercialOrderCard({
         </form>
       )}
 
-      {!order.closedAt && order.status !== 'CANCELLED' && canClose && !editing && (
+      {!hideClose && !order.closedAt && order.status !== 'CANCELLED' && canClose && !editing && (
         <form
           className="commerce-form commerce-close-box"
           onSubmit={(event) => {
