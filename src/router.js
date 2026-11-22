@@ -135,9 +135,17 @@ export function useSubtabRoute(tabId, validSubtabs, defaultSubtab) {
   }, [tabId, validSubtabs]);
 
   const setActiveSubtab = useCallback(
-    (nextSubtab) => {
-      setActiveSubtabState(nextSubtab);
-      navigateToRoute(tabId, nextSubtab, { replace: false });
+    (nextOrUpdater) => {
+      setActiveSubtabState((prev) => {
+        const resolved =
+          typeof nextOrUpdater === 'function'
+            ? nextOrUpdater(prev)
+            : nextOrUpdater;
+        if (typeof resolved === 'string') {
+          navigateToRoute(tabId, resolved, { replace: false });
+        }
+        return resolved;
+      });
     },
     [tabId],
   );

@@ -766,24 +766,109 @@ export default function CommercialReviewPanel({
                   </div>
                 )
               ) : (
-                <div className="cr-resolved-banner">
-                  <div>
+                <section className="cr-progress-card">
+                  {/* Progreso del circuito en 3 pasos */}
+                  <ol className="cr-stepper" aria-label="Estado del circuito">
+                    <li className="is-done">
+                      <span className="cr-stepper-dot">✓</span>
+                      <span>Revisión aprobada</span>
+                    </li>
+                    <li
+                      className={
+                        order.closedAt || order.flow.stage === 'READY'
+                          ? 'is-done'
+                          : 'is-current'
+                      }
+                    >
+                      <span className="cr-stepper-dot">
+                        {order.closedAt || order.flow.stage === 'READY' ? '✓' : '2'}
+                      </span>
+                      <span>Confirmación del cliente</span>
+                    </li>
+                    <li
+                      className={
+                        order.closedAt
+                          ? 'is-done'
+                          : order.flow.stage === 'READY'
+                            ? 'is-current'
+                            : ''
+                      }
+                    >
+                      <span className="cr-stepper-dot">
+                        {order.closedAt ? '✓' : '3'}
+                      </span>
+                      <span>Cierre de venta</span>
+                    </li>
+                  </ol>
+
+                  <div className="cr-resolved-copy">
                     <strong>
                       {order.closedAt
                         ? 'Venta registrada y cerrada'
                         : order.flow.stage === 'READY'
-                          ? 'Condiciones aprobadas y confirmadas por el cliente'
-                          : 'Decisión de Administración registrada'}
+                          ? 'El cliente confirmó el resumen. Ya podés registrar el cierre abajo.'
+                          : 'Esperando elección y confirmación del cliente en el chat'}
                     </strong>
-                    <p>
-                      {detail.request?.reviewNote
-                        ? `Nota de revisión: “${detail.request.reviewNote}”`
-                        : order.flow.stage === 'CHOOSING'
-                          ? 'El cliente está eligiendo plan y entrega desde el chat.'
-                          : 'El pedido avanzó correctamente en el circuito comercial.'}
-                    </p>
+                    {detail.request?.reviewNote && (
+                      <p>Nota de Administración: “{detail.request.reviewNote}”</p>
+                    )}
                   </div>
-                </div>
+
+                  {Array.isArray(order.flow.offers) && order.flow.offers.length > 0 && (
+                    <div className="cr-enabled-offers">
+                      <span className="cr-enabled-label">
+                        Ofertas habilitadas ({order.flow.offers.length})
+                      </span>
+                      <div className="cr-enabled-grid">
+                        {order.flow.offers.map((o) => {
+                          const isPicked = o.id === order.flow.selectedOfferId;
+                          const isFin = o.modality === 'FINANCED';
+                          const perQuota = isFin
+                            ? quotaAmountPreview(o.total, o.quotaCount)
+                            : null;
+                          return (
+                            <div
+                              key={o.id}
+                              className={`cr-enabled-item${isPicked ? ' is-picked' : ''}`}
+                            >
+                              <div className="cr-enabled-top">
+                                <strong>{o.label}</strong>
+                                {isPicked && (
+                                  <span className="cr-picked-tag">Elegida</span>
+                                )}
+                              </div>
+                              <div className="cr-enabled-price">
+                                {isFin && perQuota
+                                  ? `${perQuota} / sem`
+                                  : commercialMoney(o.total)}
+                              </div>
+                              <small>
+                                {isFin
+                                  ? `Total ${commercialMoney(o.total)}${o.firstDueDate ? ` · 1er vto ${o.firstDueDate}` : ''}`
+                                  : 'Pago único contado'}
+                              </small>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {order.flow.stage === 'CHOOSING' && !order.closedAt && (
+                    <div className="cr-next-step-bar">
+                      <span>
+                        Cuando el cliente confirme su resumen en el chat, acá se habilitará el formulario de cierre.
+                      </span>
+                      <button
+                        type="button"
+                        className="cr-text-btn"
+                        onClick={() => setShowConvModal(true)}
+                      >
+                        Ver chat →
+                      </button>
+                    </div>
+                  )}
+                </section>
               )}
 
               {/* Último paso: Cierre de venta y aviso al cliente integrado en pantalla principal */}
