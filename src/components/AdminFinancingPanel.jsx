@@ -210,7 +210,9 @@ export default function AdminFinancingPanel({ token, me, initialRequestId, onOpe
       if (e.status === 409) {
         await refresh({ silent: true });
         setError(
-          'El caso cambió mientras lo revisabas. Verificá los datos actualizados antes de decidir nuevamente.',
+          e.message && e.message !== 'STALE_VERSION'
+            ? e.message
+            : 'El caso cambió mientras lo revisabas. Verificá los datos actualizados antes de decidir nuevamente.',
         );
       } else {
         setError(e.message);
