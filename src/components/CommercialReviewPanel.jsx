@@ -811,9 +811,10 @@ export default function CommercialReviewPanel({
                 </section>
               ) : (
                 order.status !== 'CANCELLED' &&
-                canClose && (
+                canClose &&
+                isReadyToClose && (
                   <form
-                    className={`cr-close-card${isReadyToClose ? ' is-ready' : ' is-locked'}`}
+                    className="cr-close-card is-ready"
                     onSubmit={(event) => {
                       event.preventDefault();
                       run(
