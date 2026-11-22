@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   getCommercialOrder,
   getCommercialOffers,
@@ -20,7 +20,7 @@ const VERDICT_META = {
     tone: 'is-approved',
   },
   APPROVED_WITH_CONDITIONS: {
-    label: 'Requiere revisar condiciones',
+    label: 'Con condiciones',
     tone: 'is-conditions',
   },
   REJECTED: {
@@ -33,10 +33,14 @@ const VERDICT_META = {
   },
 };
 
-function formatArDateTime(isoString) {
+function formatShortExpiry(isoString) {
   if (!isoString) return '—';
   return new Date(isoString).toLocaleString('es-AR', {
     timeZone: 'America/Argentina/Tucuman',
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
     hour12: false,
   });
 }
@@ -68,12 +72,14 @@ export default function CommercialReviewPanel({
   const [collectorId, setCollectorId] = useState('');
   const [firstDueDate, setFirstDueDate] = useState('');
   const [note, setNote] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState(null);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [revision, setRevision] = useState(0);
   const [showConvModal, setShowConvModal] = useState(false);
 
   const id = detail.request.id;
+  const busy = Boolean(busyAction);
 
   useEffect(() => {
     let active = true;
@@ -87,7 +93,7 @@ export default function CommercialReviewPanel({
         setOrder(row);
         setOffers(choices);
         setCollectors(people);
-        setCollectorId(row.client.assignedCollectorId || '');
+        setCollectorId((prev) => prev || row.client.assignedCollectorId || '');
       })
       .catch((e) => {
         if (active) setError(e.message);
@@ -97,20 +103,22 @@ export default function CommercialReviewPanel({
     };
   }, [token, id, detail.request.version, revision]);
 
-  async function run(action) {
-    setBusy(true);
+  async function run(actionName, action, successMessage) {
+    setBusyAction(actionName);
     setError('');
+    setNotice('');
     try {
       await action();
       setEnabled([]);
       setNote('');
       setRevision((v) => v + 1);
       await onChanged();
+      if (successMessage) setNotice(successMessage);
     } catch (e) {
       setError(e.message);
       setRevision((v) => v + 1);
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
@@ -119,8 +127,9 @@ export default function CommercialReviewPanel({
   );
   const assessment = detail.assessments.at(-1);
   const isEvaluationReady = detail.request.evaluationState === 'READY';
+  const isEvaluating = detail.request.evaluationState === 'PENDING';
   const verdictInfo = VERDICT_META[assessment?.verdict] ?? {
-    label: isEvaluationReady ? 'Evaluada' : 'En proceso',
+    label: isEvaluationReady ? 'Evaluada' : 'Evaluando…',
     tone: 'is-pending',
   };
 
@@ -129,6 +138,26 @@ export default function CommercialReviewPanel({
     detail.request?.inputSnapshot?.name ||
     detail.request?.client?.name ||
     'Cliente';
+
+  const remainingHours = useMemo(() => {
+    if (!order?.flow?.expiresAt) return null;
+    const diffMs = new Date(order.flow.expiresAt).getTime() - Date.now();
+    return diffMs / (1000 * 60 * 60);
+  }, [order?.flow?.expiresAt]);
+
+  // Mostrar renovación únicamente si venció o si faltan <= 6 horas para vencer
+  const showRenewalBanner =
+    Boolean(order) &&
+    order.flow.stage === 'REVIEW' &&
+    (order.expired || (remainingHours !== null && remainingHours <= 6));
+
+  // Ocultar la leyenda genérica de renovación reciente para evitar ruido innecesario
+  const meaningfulReviewReason = useMemo(() => {
+    const reason = order?.flow?.reviewReason?.trim();
+    if (!reason) return null;
+    if (/^Condiciones renovadas/i.test(reason)) return null;
+    return reason;
+  }, [order?.flow?.reviewReason]);
 
   const canSubmitApprove =
     !busy &&
@@ -161,295 +190,233 @@ export default function CommercialReviewPanel({
   const msgCount = detail.messages?.length ?? 0;
 
   return (
-    <section className="card financing-detail fin-detail-card commerce-review-card commerce-fullscreen-card">
-      <header className="fin-detail-header commerce-heading">
-        <div className="fin-detail-identity">
-          <div className="fin-detail-avatar" aria-hidden="true">
+    <section className="cr-shell">
+      {/* Cabecera limpia y de alto contraste */}
+      <header className="cr-header">
+        <div className="cr-header-left">
+          <div className="cr-avatar" aria-hidden="true">
             {contactInitials(clientDisplayName)}
           </div>
-          <div>
-            <div className="fin-detail-title-row">
-              <h3>Revisión del pedido</h3>
+          <div className="cr-header-copy">
+            <div className="cr-title-row">
+              <h3>{clientDisplayName}</h3>
               {order && (
-                <>
-                  <span
-                    className={`commerce-stage-pill ${commercialStageTone(order)}`}
-                  >
-                    {commercialStage(order)}
-                  </span>
-                  <span className="fin-version-tag">
-                    Versión #{order.version}
-                  </span>
-                  {!order.expired && (
-                    <span className="commerce-validity-pill is-valid">
-                      Vigencia activa (48 h)
-                    </span>
-                  )}
-                </>
+                <span className={`commerce-stage-pill ${commercialStageTone(order)}`}>
+                  {commercialStage(order)}
+                </span>
               )}
             </div>
             {order ? (
-              <p className="fin-detail-sub">
-                Vigencia: {formatArDateTime(order.flow.startedAt)} a{' '}
-                {formatArDateTime(order.flow.expiresAt)}.
+              <p className="cr-meta-line">
+                <span>DNI {order.client.dni}</span>
+                {order.client.phone && <span>{order.client.phone}</span>}
+                <span>
+                  {order.business
+                    ? `${order.business}${order.locality ? ` · ${order.locality}` : ''}`
+                    : order.locality || 'Compra personal'}
+                </span>
+                <span>
+                  {order.expired
+                    ? 'Vigencia vencida'
+                    : `Vigente hasta ${formatShortExpiry(order.flow.expiresAt)}`}
+                </span>
+                <span className="cr-meta-version">v{order.version}</span>
               </p>
             ) : (
-              <p className="fin-detail-sub">
-                Consultando información comercial del pedido…
-              </p>
+              <p className="cr-meta-line">Cargando datos del pedido…</p>
             )}
           </div>
         </div>
 
-        <div className="commerce-head-actions">
+        <div className="cr-header-actions">
           <button
             type="button"
-            className="btn-pill-action commerce-conv-btn"
+            className="cr-btn-outline"
             onClick={() => setShowConvModal(true)}
           >
-            <span>💬 Conversación con el cliente</span>
-            {msgCount > 0 && (
-              <span className="commerce-conv-count">{msgCount}</span>
-            )}
+            <span>Conversación</span>
+            {msgCount > 0 && <span className="cr-count-dot">{msgCount}</span>}
           </button>
 
-          <button type="button" className="secondary" onClick={onClose}>
-            ← Volver a solicitudes
+          <button type="button" className="cr-btn-ghost" onClick={onClose}>
+            ← Volver
           </button>
         </div>
       </header>
 
+      {/* Feedback inmediato tras acciones (renovar, aprobar, rechazar) */}
+      {notice && (
+        <div className="cr-feedback is-success" role="status">
+          <span>✓ {notice}</span>
+          <button
+            type="button"
+            className="cr-feedback-close"
+            onClick={() => setNotice('')}
+            aria-label="Cerrar mensaje"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {error && (
+        <div className="cr-feedback is-error" role="alert">
+          <span>{error}</span>
+          <button
+            type="button"
+            className="cr-feedback-close"
+            onClick={() => setError('')}
+            aria-label="Cerrar error"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {!order && !error && (
-        <div className="fin-empty-box">
+        <div className="cr-loading">
           <span className="fin-spinner-md" aria-hidden="true" />
-          <p>Cargando datos del pedido y ofertas del catálogo…</p>
+          <p>Cargando expediente y ofertas…</p>
         </div>
       )}
 
       {order && (
         <>
-          {/* Resumen estructurado en tarjetas */}
-          <div className="fin-summary-grid commerce-review-summary">
-            <div className="fin-summary-box">
-              <span>Cliente y documento</span>
-              <strong title={order.client.name}>{order.client.name}</strong>
-              <small className="commerce-summary-sub">
-                DNI {order.client.dni}
-                {order.client.phone ? ` · ${order.client.phone}` : ''}
-              </small>
-            </div>
-
-            <div className="fin-summary-box">
-              <span>Comercio y localidad</span>
-              <strong title={order.business}>
-                {order.business || 'Sin especificar'}
-              </strong>
-              <small className="commerce-summary-sub">
-                {order.locality || 'Sin localidad'}
-                {order.delivery
-                  ? ` · Envío ${commercialMoney(order.delivery.cost)}`
-                  : ' · Retiro en sucursal'}
-              </small>
-            </div>
-
-            <div className="fin-summary-box">
-              <span>Producto solicitado</span>
+          {/* Franja compacta del producto y referencia */}
+          <div className="cr-summary-strip">
+            <div className="cr-summary-item cr-summary-product">
+              <span className="cr-summary-label">Producto solicitado</span>
               <strong title={order.productSummary}>{order.productSummary}</strong>
-              <small className="commerce-summary-sub">
-                Una unidad{order.sku ? ` · SKU ${order.sku}` : ''}
-              </small>
+              <small>1 unidad{order.sku ? ` · SKU ${order.sku}` : ''}</small>
             </div>
 
-            <div className="fin-summary-box is-highlight">
-              <span>Importe de referencia</span>
+            <div className="cr-summary-item">
+              <span className="cr-summary-label">Entrega</span>
+              <strong>
+                {order.delivery
+                  ? `Envío (${commercialMoney(order.delivery.cost)})`
+                  : 'Retiro en sucursal'}
+              </strong>
+              <small>{order.locality || 'A confirmar'}</small>
+            </div>
+
+            <div className="cr-summary-item cr-summary-price">
+              <span className="cr-summary-label">Precio de lista</span>
               <strong>{commercialMoney(order.amount)}</strong>
-              <small className="commerce-summary-sub">
-                Precio base del catálogo
-              </small>
+              <small>Referencia del catálogo</small>
             </div>
           </div>
 
-          {order.flow.reviewReason && (
-            <div className="commerce-notice commerce-review-alert">
-              <strong>Motivo de revisión:</strong> {order.flow.reviewReason}
+          {meaningfulReviewReason && (
+            <div className="cr-inline-alert">
+              <strong>Motivo de revisión:</strong> {meaningfulReviewReason}
             </div>
           )}
 
-          {order.flow.stage === 'REVIEW' && (
-            <>
-              {/* Bloque de Evaluación preliminar simulada */}
-              <div className="fin-section-block">
-                <div className="fin-section-head">
-                  <h4>Evaluación crediticia y comercial</h4>
-                  <span className="commerce-internal-badge">
-                    Uso interno de Administración
-                  </span>
-                </div>
-
-                <div className={`fin-verdict-card ${verdictInfo.tone}`}>
-                  <div className="fin-verdict-top">
-                    <div className="fin-verdict-badges">
-                      <span className={`fin-pill ${verdictInfo.tone}`}>
-                        <strong>Evaluación preliminar simulada:</strong>{' '}
-                        {verdictInfo.label}
-                      </span>
-                      <span className="fin-source-tag">Fuente: Simulada</span>
-                      {assessment?.requestVersion != null && (
-                        <span className="fin-source-tag">
-                          Versión #{assessment.requestVersion}
-                        </span>
-                      )}
-                    </div>
-                    {assessment?.createdAt && (
-                      <time className="fin-verdict-time">
-                        {formatArDateTime(assessment.createdAt)}
-                      </time>
-                    )}
-                  </div>
-
-                  {assessment?.reason && (
-                    <p className="fin-verdict-reason">{assessment.reason}</p>
-                  )}
-
-                  {assessment?.commercialCondition && (
-                    <div className="fin-verdict-condition">
-                      <strong>Condición sugerida:</strong>{' '}
-                      {assessment.commercialCondition}
-                    </div>
-                  )}
-
-                  <p className="commerce-verdict-privacy">
-                    Información interna. El agente comunicará únicamente el
-                    resultado comercial y las opciones habilitadas.
-                  </p>
-                </div>
+          {/* Renovación: solo aparece cuando la vigencia venció o está por vencer */}
+          {showRenewalBanner && (
+            <div className={`cr-renewal-bar ${order.expired ? 'is-expired' : 'is-expiring'}`}>
+              <div className="cr-renewal-text">
+                <strong>
+                  {order.expired
+                    ? 'La vigencia de 48 horas venció'
+                    : `La vigencia vence en menos de ${Math.max(1, Math.ceil(remainingHours))} h`}
+                </strong>
+                <span>
+                  Renovar actualiza el precio de lista, relanza la evaluación y reinicia el plazo de 48 horas.
+                </span>
               </div>
-
-              {/* Bloque de renovación cuando venció o requiere revalidación */}
-              {(order.expired || order.flow.reviewReason) && (
-                <div className="commerce-renewal-box">
-                  <div className="commerce-renewal-copy">
-                    <strong>
-                      {order.expired
-                        ? 'La vigencia de 48 horas del pedido está vencida'
-                        : 'Actualización de vigencia y condiciones disponible'}
-                    </strong>
-                    <p className="commerce-inline-note">
-                      La renovación conserva el pedido y obliga a revisar la
-                      evaluación y obtener una aceptación nueva del cliente.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className={order.expired ? 'fin-btn-approve' : 'secondary'}
-                    disabled={busy}
-                    onClick={() =>
-                      run(() =>
-                        renewCommercialOrder(token, id, {
-                          expectedVersion: order.version,
-                        }),
-                      )
-                    }
-                  >
-                    {busy
-                      ? 'Renovando…'
-                      : '↻ Renovar datos y evaluación por 48 horas'}
-                  </button>
-                </div>
-              )}
-
-              {/* Formulario de habilitación de ofertas y resolución */}
-              {!order.expired && (
-                <form
-                  className="commerce-form commerce-review-form"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    run(() =>
-                      reviewCommercialOrder(token, id, {
+              <button
+                type="button"
+                className={order.expired ? 'cr-btn-primary' : 'cr-btn-outline'}
+                disabled={busy}
+                onClick={() =>
+                  run(
+                    'RENEW',
+                    () =>
+                      renewCommercialOrder(token, id, {
                         expectedVersion: order.version,
-                        decision: 'APPROVED',
-                        offerIds: enabled,
-                        ...(financed ? { collectorId, firstDueDate } : {}),
-                        note,
                       }),
-                    );
-                  }}
-                >
-                  {/* Selección de ofertas del catálogo */}
-                  <div className="commerce-offers-section">
-                    <div className="commerce-offers-header">
-                      <div>
-                        <h4>Ofertas del catálogo mock</h4>
-                        <p className="commerce-offers-subtitle">
-                          Marcá las alternativas de pago que querés habilitar para
-                          este cliente.
-                        </p>
-                      </div>
-                      {offers.length > 0 && (
-                        <div className="commerce-offers-controls">
-                          <span className="commerce-offers-count">
-                            {enabled.length} de {offers.length} seleccionadas
-                          </span>
+                    'Vigencia renovada por 48 horas. Se actualizó la evaluación crediticia del pedido.',
+                  )
+                }
+              >
+                {busyAction === 'RENEW' ? 'Renovando…' : '↻ Renovar por 48 horas'}
+              </button>
+            </div>
+          )}
+
+          {order.flow.stage === 'REVIEW' ? (
+            <div className="cr-workbench">
+              {/* Columna Principal: Ofertas y Resolución */}
+              <div className="cr-main-col">
+                {!order.expired ? (
+                  <form
+                    className="cr-form"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      run(
+                        'APPROVE',
+                        () =>
+                          reviewCommercialOrder(token, id, {
+                            expectedVersion: order.version,
+                            decision: 'APPROVED',
+                            offerIds: enabled,
+                            ...(financed ? { collectorId, firstDueDate } : {}),
+                            note,
+                          }),
+                        'Financiación aprobada y ofertas habilitadas para el cliente.',
+                      );
+                    }}
+                  >
+                    <section className="cr-section">
+                      <div className="cr-section-head">
+                        <div>
+                          <h4>Ofertas a habilitar</h4>
+                          <p>Elegí las alternativas de pago que podrá seleccionar el cliente.</p>
+                        </div>
+                        {offers.length > 0 && (
                           <button
                             type="button"
-                            className="secondary fin-btn-sm"
+                            className="cr-text-btn"
                             onClick={selectAllOffers}
                           >
                             {enabled.length === offers.length
                               ? 'Desmarcar todas'
-                              : 'Seleccionar todas'}
+                              : `Seleccionar todas (${offers.length})`}
                           </button>
-                        </div>
-                      )}
-                    </div>
+                        )}
+                      </div>
 
-                    <div className="commerce-offers">
-                      {offers.map((o) => {
-                        const isChecked = enabled.includes(o.id);
-                        const isFinancedOffer = o.modality === 'FINANCED';
-                        const perQuota = isFinancedOffer
-                          ? quotaAmountPreview(o.total, o.quotaCount)
-                          : null;
-                        const cashSavings =
-                          !isFinancedOffer &&
-                          Number(order.amount) > Number(o.total)
-                            ? Number(order.amount) - Number(o.total)
-                            : 0;
+                      <div className="cr-offers-grid">
+                        {offers.map((o) => {
+                          const isChecked = enabled.includes(o.id);
+                          const isFinancedOffer = o.modality === 'FINANCED';
+                          const perQuota = isFinancedOffer
+                            ? quotaAmountPreview(o.total, o.quotaCount)
+                            : null;
+                          const cashSavings =
+                            !isFinancedOffer && Number(order.amount) > Number(o.total)
+                              ? Number(order.amount) - Number(o.total)
+                              : 0;
 
-                        return (
-                          <label
-                            key={o.id}
-                            className={`commerce-offer${
-                              isChecked ? ' is-selected' : ''
-                            }${isFinancedOffer ? ' is-financed' : ' is-cash'}`}
-                          >
-                            <div className="commerce-offer-top">
-                              <span className="commerce-offer-check-wrap">
+                          return (
+                            <label
+                              key={o.id}
+                              className={`cr-offer-card${isChecked ? ' is-selected' : ''}${
+                                isFinancedOffer ? ' is-financed' : ' is-cash'
+                              }`}
+                            >
+                              <div className="cr-offer-head">
                                 <input
                                   type="checkbox"
                                   checked={isChecked}
-                                  onChange={(e) =>
-                                    toggleOffer(o.id, e.target.checked)
-                                  }
+                                  onChange={(e) => toggleOffer(o.id, e.target.checked)}
                                 />
-                                <span className="commerce-offer-title">
-                                  {o.label}
-                                </span>
-                              </span>
+                                <span className="cr-offer-name">{o.label}</span>
+                              </div>
 
-                              <span
-                                className={`commerce-offer-badge ${
-                                  isFinancedOffer ? 'is-financed' : 'is-cash'
-                                }`}
-                              >
-                                {isFinancedOffer
-                                  ? `${o.quotaCount} cuotas`
-                                  : 'Pago contado'}
-                              </span>
-                            </div>
-
-                            <div className="commerce-offer-body">
-                              <div className="commerce-offer-price-main">
+                              <div className="cr-offer-price">
                                 {isFinancedOffer && perQuota ? (
                                   <>
                                     <strong>{perQuota}</strong>
@@ -460,199 +427,235 @@ export default function CommercialReviewPanel({
                                 )}
                               </div>
 
-                              <p className="commerce-offer-desc">
-                                {o.label} · Total {commercialMoney(o.total)}
-                                {isFinancedOffer
-                                  ? ' · Semanal, sin cargos adicionales en esta demo'
-                                  : ''}
-                              </p>
+                              <div className="cr-offer-foot">
+                                {isFinancedOffer ? (
+                                  <span>Total {commercialMoney(o.total)}</span>
+                                ) : cashSavings > 0 ? (
+                                  <span className="cr-saving-text">
+                                    Ahorro {commercialMoney(cashSavings)} vs. lista
+                                  </span>
+                                ) : (
+                                  <span>Pago único</span>
+                                )}
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </section>
 
-                              {cashSavings > 0 && (
-                                <span className="commerce-offer-saving">
-                                  Bonificación contado:{' '}
-                                  {commercialMoney(cashSavings)} vs. precio de
-                                  lista
-                                </span>
-                              )}
-                            </div>
+                    {financed && (
+                      <section className="cr-financed-params">
+                        <div className="cr-section-head">
+                          <div>
+                            <h4>Plan de cuotas</h4>
+                            <p>Cobrador responsable y fecha de inicio del cronograma semanal.</p>
+                          </div>
+                        </div>
+
+                        <div className="cr-params-grid">
+                          <label className="cr-field">
+                            <span>Cobrador asignado</span>
+                            <select
+                              required
+                              value={collectorId}
+                              onChange={(e) => setCollectorId(e.target.value)}
+                            >
+                              <option value="">Elegir cobrador…</option>
+                              {collectors.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name}
+                                </option>
+                              ))}
+                            </select>
                           </label>
-                        );
-                      })}
-                    </div>
+
+                          <label className="cr-field">
+                            <div className="cr-field-top">
+                              <span>Primer vencimiento</span>
+                              <div className="cr-date-chips">
+                                <button
+                                  type="button"
+                                  onClick={() => setFirstDueDate(addDaysIso(7))}
+                                >
+                                  +7 d
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setFirstDueDate(addDaysIso(14))}
+                                >
+                                  +14 d
+                                </button>
+                              </div>
+                            </div>
+                            <input
+                              type="date"
+                              min={tomorrowIso}
+                              required
+                              value={firstDueDate}
+                              onChange={(e) => setFirstDueDate(e.target.value)}
+                            />
+                          </label>
+                        </div>
+                      </section>
+                    )}
+
+                    <section className="cr-decision-panel">
+                      <label className="cr-field">
+                        <div className="cr-field-top">
+                          <span>Nota interna de resolución</span>
+                          <small className="cr-field-hint">
+                            {!isEvaluationReady
+                              ? 'Esperando evaluación…'
+                              : !note.trim()
+                                ? 'Obligatoria'
+                                : enabled.length > 0
+                                  ? `${enabled.length} oferta${enabled.length > 1 ? 's' : ''} lista${enabled.length > 1 ? 's' : ''}`
+                                  : 'Podés rechazar o elegir ofertas'}
+                          </small>
+                        </div>
+                        <textarea
+                          required
+                          rows={3}
+                          value={note}
+                          maxLength={2000}
+                          onChange={(e) => setNote(e.target.value)}
+                          placeholder="Justificación o condiciones confirmadas para auditoría interna…"
+                        />
+                      </label>
+
+                      <div className="cr-decision-actions">
+                        <button
+                          type="submit"
+                          className="cr-btn-approve"
+                          disabled={!canSubmitApprove}
+                        >
+                          {busyAction === 'APPROVE'
+                            ? 'Aprobando…'
+                            : 'Aprobar y habilitar ofertas'}
+                        </button>
+
+                        <button
+                          type="button"
+                          className="cr-btn-reject"
+                          disabled={!canSubmitReject}
+                          onClick={() =>
+                            run(
+                              'REJECT',
+                              () =>
+                                reviewCommercialOrder(token, id, {
+                                  expectedVersion: order.version,
+                                  decision: 'REJECTED',
+                                  offerIds: enabled.filter((key) => key === 'cash'),
+                                  note,
+                                }),
+                              enabled.includes('cash')
+                                ? 'Financiación rechazada. Se habilitó alternativa de contado.'
+                                : 'Solicitud de financiación rechazada.',
+                            )
+                          }
+                        >
+                          {busyAction === 'REJECT'
+                            ? 'Rechazando…'
+                            : enabled.includes('cash')
+                              ? 'Rechazar y ofrecer contado'
+                              : 'Rechazar financiación'}
+                        </button>
+                      </div>
+                    </section>
+                  </form>
+                ) : (
+                  <div className="cr-expired-placeholder">
+                    <p>
+                      Renová la vigencia del pedido arriba para revisar las ofertas actualizadas y registrar una decisión.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Columna Lateral: Dictamen crediticio conciso + Ficha */}
+              <aside className="cr-side-col">
+                <div className={`cr-verdict-card ${verdictInfo.tone}`}>
+                  <div className="cr-verdict-head">
+                    <span className="cr-verdict-eyebrow">Evaluación crediticia</span>
+                    {assessment?.createdAt && (
+                      <time>{formatShortExpiry(assessment.createdAt)}</time>
+                    )}
                   </div>
 
-                  {/* Configuración adicional si hay oferta financiada seleccionada */}
-                  {financed && (
-                    <div className="commerce-financed-box">
-                      <div className="commerce-financed-head">
-                        <h5>Condiciones operativas del plan en cuotas</h5>
-                        <span>
-                          Requerido al habilitar ofertas con financiación semanal
-                        </span>
-                      </div>
-
-                      <div className="commerce-form-grid">
-                        <label className="commerce-field">
-                          <span>Cobrador asignado</span>
-                          <select
-                            required
-                            value={collectorId}
-                            onChange={(e) => setCollectorId(e.target.value)}
-                          >
-                            <option value="">Elegir cobrador…</option>
-                            {collectors.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.name}
-                              </option>
-                            ))}
-                          </select>
-                          {order.client.assignedCollectorId && (
-                            <small className="commerce-field-hint">
-                              Preseleccionado según la cartera actual del cliente.
-                            </small>
-                          )}
-                        </label>
-
-                        <label className="commerce-field">
-                          <div className="commerce-field-label-row">
-                            <span>Primer vencimiento</span>
-                            <div className="commerce-date-shortcuts">
-                              <button
-                                type="button"
-                                className="commerce-date-pill"
-                                onClick={() => setFirstDueDate(addDaysIso(7))}
-                              >
-                                +7 días
-                              </button>
-                              <button
-                                type="button"
-                                className="commerce-date-pill"
-                                onClick={() => setFirstDueDate(addDaysIso(14))}
-                              >
-                                +14 días
-                              </button>
-                            </div>
-                          </div>
-                          <input
-                            type="date"
-                            min={tomorrowIso}
-                            required
-                            value={firstDueDate}
-                            onChange={(e) => setFirstDueDate(e.target.value)}
-                          />
-                          <small className="commerce-field-hint">
-                            Las cuotas siguientes vencerán cada 7 días a partir de
-                            esta fecha.
-                          </small>
-                        </label>
-                      </div>
+                  {isEvaluating ? (
+                    <div className="cr-verdict-loading">
+                      <span className="fin-spinner-sm" aria-hidden="true" />
+                      <span>Actualizando evaluación crediticia…</span>
                     </div>
+                  ) : (
+                    <>
+                      <div className="cr-verdict-status">
+                        <span className={`cr-verdict-dot ${verdictInfo.tone}`} aria-hidden="true" />
+                        <strong>{verdictInfo.label}</strong>
+                      </div>
+
+                      {assessment?.reason && (
+                        <p className="cr-verdict-reason">{assessment.reason}</p>
+                      )}
+
+                      {assessment?.commercialCondition && (
+                        <div className="cr-verdict-suggestion">
+                          <span>Sugerencia</span>
+                          <p>{assessment.commercialCondition}</p>
+                        </div>
+                      )}
+                    </>
                   )}
 
-                  {/* Nota interna y botones de decisión */}
-                  <div className="fin-decision-box commerce-decision-box">
-                    <div className="fin-decision-head">
-                      <h4>Resolución de Administración</h4>
-                      <span className="fin-note-requirement">
-                        {!isEvaluationReady
-                          ? 'Esperando evaluación crediticia…'
-                          : !note.trim()
-                          ? 'Nota interna obligatoria para registrar la decisión'
-                          : !enabled.length
-                          ? 'Seleccioná al menos una oferta para aprobar, o rechazá la financiación'
-                          : 'Listo para confirmar decisión'}
-                      </span>
-                    </div>
+                  <p className="cr-verdict-foot">
+                    Uso interno · El cliente solo recibe la decisión comercial.
+                  </p>
+                </div>
 
-                    <label className="fin-note-field commerce-note-field">
-                      <span>Nota interna de revisión</span>
-                      <textarea
-                        required
-                        rows={3}
-                        value={note}
-                        maxLength={2000}
-                        onChange={(e) => setNote(e.target.value)}
-                        placeholder="Dejá constancia de tu decisión…"
-                      />
-                    </label>
-
-                    <div className="commerce-actions fin-decision-actions">
-                      <button
-                        type="submit"
-                        className="fin-btn-approve"
-                        disabled={!canSubmitApprove}
-                      >
-                        {busy
-                          ? 'Procesando…'
-                          : 'Aprobar y habilitar ofertas'}
-                      </button>
-
-                      <button
-                        type="button"
-                        className="secondary fin-btn-reject"
-                        disabled={!canSubmitReject}
-                        onClick={() =>
-                          run(() =>
-                            reviewCommercialOrder(token, id, {
-                              expectedVersion: order.version,
-                              decision: 'REJECTED',
-                              offerIds: enabled.filter((key) => key === 'cash'),
-                              note,
-                            }),
-                          )
-                        }
-                      >
-                        Rechazar financiación
-                        {enabled.includes('cash') ? ' y ofrecer contado' : ''}
-                      </button>
-
-                      <button
-                        type="button"
-                        className="secondary"
-                        onClick={() => setShowConvModal(true)}
-                      >
-                        💬 Ver conversación e interactuar
-                      </button>
-                    </div>
+                <details className="cr-details-drawer">
+                  <summary>Ficha comercial y entrega</summary>
+                  <div className="cr-details-body">
+                    <CommercialOrderCard
+                      key={`${id}-${revision}`}
+                      token={token}
+                      me={me}
+                      id={id}
+                      hideConversation
+                      onChanged={onChanged}
+                    />
                   </div>
-                </form>
-              )}
-            </>
-          )}
+                </details>
+              </aside>
+            </div>
+          ) : (
+            <div className="cr-resolved-wrap">
+              <div className="cr-resolved-banner">
+                <strong>
+                  {order.closedAt
+                    ? 'La venta ya quedó cerrada.'
+                    : 'Decisión registrada. El agente continuará con la elección del cliente y Ventas verá la ficha para el cierre.'}
+                </strong>
+                {detail.request?.reviewNote && (
+                  <p>Nota registrada: “{detail.request.reviewNote}”</p>
+                )}
+              </div>
 
-          {order.flow.stage !== 'REVIEW' && (
-            <div className="fin-resolution-summary commerce-resolution-banner">
-              <strong>
-                {order.closedAt
-                  ? 'La venta ya quedó cerrada.'
-                  : 'La decisión está registrada. El agente continuará con la elección y confirmación del cliente; Ventas verá la ficha para el cierre.'}
-              </strong>
-              {detail.request?.reviewNote && (
-                <p className="fin-resolution-note">
-                  Nota registrada: “{detail.request.reviewNote}”
-                </p>
-              )}
+              <details className="cr-details-drawer" open>
+                <summary>Ficha comercial y entrega</summary>
+                <div className="cr-details-body">
+                  <CommercialOrderCard
+                    key={`${id}-${revision}`}
+                    token={token}
+                    me={me}
+                    id={id}
+                    hideConversation
+                    onChanged={onChanged}
+                  />
+                </div>
+              </details>
             </div>
           )}
-
-          <details className="commerce-details-drawer">
-            <summary className="commerce-details-summary">
-              <span>Ver ficha comercial y datos de entrega</span>
-              <small>
-                Condiciones elegidas, modalidad de entrega y cronograma de cuotas
-              </small>
-            </summary>
-            <div className="commerce-details-body">
-              <CommercialOrderCard
-                key={`${id}-${revision}`}
-                token={token}
-                me={me}
-                id={id}
-                hideConversation
-                onChanged={onChanged}
-              />
-            </div>
-          </details>
         </>
       )}
 
@@ -670,12 +673,6 @@ export default function CommercialReviewPanel({
           fallbackMessages={detail.messages}
           onClose={() => setShowConvModal(false)}
         />
-      )}
-
-      {error && (
-        <p role="alert" className="error">
-          {error}
-        </p>
       )}
     </section>
   );
