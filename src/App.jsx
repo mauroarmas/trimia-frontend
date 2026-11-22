@@ -93,6 +93,7 @@ export default function App() {
   const [token, setToken] = useState(null);
   const [financingRequestToOpen, setFinancingRequestToOpen] = useState(null);
   const [collectionClientToOpen, setCollectionClientToOpen] = useState(null);
+  const [knowledgeTarget, setKnowledgeTarget] = useState(null);
   const [user, setUser] = useState(null);
   const [showLogoutIntro, setShowLogoutIntro] = useState(false);
   // Sin pestaña elegida se abre la ruta de la URL o la primera del perfil.
@@ -163,6 +164,7 @@ export default function App() {
     // Quien entre después arranca en su propia primera pestaña, no en la del anterior.
     setTab(null);
     setInterviewStart(null);
+    setKnowledgeTarget(null);
     if (window.location.pathname !== '/login') {
       window.history.replaceState(null, '', '/login');
     }
@@ -180,6 +182,7 @@ export default function App() {
         onLogin={(t, u) => {
           setFinancingRequestToOpen(null);
           setCollectionClientToOpen(null);
+          setKnowledgeTarget(null);
           setShowLogoutIntro(false);
           setToken(t);
           setUser(u);
@@ -412,13 +415,28 @@ export default function App() {
         {currentTab === 'sales' && <SalesPanel token={token} me={user} />}
         {currentTab === 'admin_financing' && <AdminFinancingPanel token={token} me={user} initialRequestId={financingRequestToOpen} onOpenCollections={id => { setCollectionClientToOpen(id); selectTab('collections'); }} />}
         {currentTab === 'escalations' && <EscalationsQueue token={token} me={user} onOpenFinancing={id => { setFinancingRequestToOpen(id); selectTab('admin_financing'); }} />}
-        {isDiego && currentTab === 'supervisor' && <SupervisorPanel token={token} me={user} onOpenFinancing={id => { setFinancingRequestToOpen(id); selectTab('admin_financing'); }} />}
+        {isDiego && currentTab === 'supervisor' && (
+          <SupervisorPanel
+            token={token}
+            me={user}
+            onOpenFinancing={(id) => {
+              setFinancingRequestToOpen(id);
+              selectTab('admin_financing');
+            }}
+            onOpenKnowledge={({ agentType, view = 'lista' } = {}) => {
+              setKnowledgeTarget({ agentType: agentType || '', view, nonce: Date.now() });
+              selectTab('knowledge');
+            }}
+            onOpenEscalations={() => selectTab('escalations')}
+          />
+        )}
         {isDiego && currentTab === 'chat' && <ChatSimulator token={token} me={user} />}
         {currentTab === 'knowledge' && (
           <KnowledgeIngest
             token={token}
             me={user}
             showImprovements={isDiego}
+            initialTarget={knowledgeTarget}
             interviewStart={interviewStart}
             onEntrevistar={(sectorId, itemId) => setInterviewStart({ sectorId, itemId })}
             onRetomar={(sectorId) => setInterviewStart({ sectorId })}

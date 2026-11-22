@@ -33,12 +33,100 @@ const STATUS_FILTER_PILLS = [
   ['CLOSED', 'Cerradas'],
 ];
 
-function AgentIllustration({ agentType }) {
+const ROBOT_PALETTES = {
+  SALES: {
+    shell: '#eff6ff',
+    shellBorder: '#93c5fd',
+    accent: '#2563eb',
+    eye: '#60a5fa',
+  },
+  COLLECTIONS: {
+    shell: '#f0fdfa',
+    shellBorder: '#99f6e4',
+    accent: '#0d9488',
+    eye: '#2dd4bf',
+  },
+  ADMIN: {
+    shell: '#f5f3ff',
+    shellBorder: '#c4b5fd',
+    accent: '#7c3aed',
+    eye: '#a78bfa',
+  },
+  LOGISTICS: {
+    shell: '#fffbeb',
+    shellBorder: '#fcd34d',
+    accent: '#d97706',
+    eye: '#fbbf24',
+  },
+  DEPOSITS: {
+    shell: '#f0f9ff',
+    shellBorder: '#7dd3fc',
+    accent: '#0284c7',
+    eye: '#38bdf8',
+  },
+};
+
+function AgentRobotAvatar({ agentType, size = 'sm' }) {
+  const p = ROBOT_PALETTES[agentType] || ROBOT_PALETTES.SALES;
+  return (
+    <svg
+      viewBox="0 0 40 40"
+      className={`sup-agent-robot-svg${size === 'lg' ? ' is-lg' : ''}`}
+      aria-hidden="true"
+    >
+      {/* Antena */}
+      <line
+        x1="20"
+        y1="11"
+        x2="20"
+        y2="6.5"
+        stroke={p.accent}
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <circle cx="20" cy="5.5" r="2.2" fill={p.accent} />
+      {/* Orejeras laterales */}
+      <rect x="4" y="17.5" width="3.5" height="7" rx="1.75" fill={p.accent} opacity="0.85" />
+      <rect x="32.5" y="17.5" width="3.5" height="7" rx="1.75" fill={p.accent} opacity="0.85" />
+      {/* Cabeza del agente robot */}
+      <rect
+        x="7.5"
+        y="11"
+        width="25"
+        height="20.5"
+        rx="7"
+        fill={p.shell}
+        stroke={p.shellBorder}
+        strokeWidth="1.6"
+      />
+      {/* Visor */}
+      <rect x="11" y="15.5" width="18" height="10.5" rx="4.2" fill="#0f172a" />
+      {/* Ojos luminosos */}
+      <circle cx="16.2" cy="20.4" r="2" fill={p.eye} />
+      <circle cx="23.8" cy="20.4" r="2" fill={p.eye} />
+      <circle cx="16.8" cy="19.8" r="0.65" fill="#ffffff" opacity="0.9" />
+      <circle cx="24.4" cy="19.8" r="0.65" fill="#ffffff" opacity="0.9" />
+      {/* Indicador de voz/sonrisa sutil */}
+      <path
+        d="M17.4 23.4c.7.7 1.6 1 2.6 1s1.9-.3 2.6-1"
+        fill="none"
+        stroke={p.eye}
+        strokeWidth="1.35"
+        strokeLinecap="round"
+        opacity="0.85"
+      />
+      {/* Cuello / base discreta */}
+      <rect x="14.5" y="33.2" width="11" height="2.6" rx="1.3" fill={p.accent} opacity="0.35" />
+    </svg>
+  );
+}
+
+function AgentAreaIcon({ agentType }) {
   switch (agentType) {
     case 'SALES':
       return (
-        <svg viewBox="0 0 48 48" className="sup-agent-svg" aria-hidden="true">
-          <rect width="48" height="48" rx="14" fill="url(#gradSales)" />
+        <svg viewBox="0 0 48 48" className="sup-agent-area-svg" aria-hidden="true">
+          <rect width="48" height="48" rx="13" fill="url(#gradSales)" />
           <defs>
             <linearGradient id="gradSales" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
               <stop offset="0%" stopColor="#dbeafe" />
@@ -73,8 +161,8 @@ function AgentIllustration({ agentType }) {
       );
     case 'COLLECTIONS':
       return (
-        <svg viewBox="0 0 48 48" className="sup-agent-svg" aria-hidden="true">
-          <rect width="48" height="48" rx="14" fill="url(#gradCol)" />
+        <svg viewBox="0 0 48 48" className="sup-agent-area-svg" aria-hidden="true">
+          <rect width="48" height="48" rx="13" fill="url(#gradCol)" />
           <defs>
             <linearGradient id="gradCol" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
               <stop offset="0%" stopColor="#ccfbf1" />
@@ -106,8 +194,8 @@ function AgentIllustration({ agentType }) {
       );
     case 'ADMIN':
       return (
-        <svg viewBox="0 0 48 48" className="sup-agent-svg" aria-hidden="true">
-          <rect width="48" height="48" rx="14" fill="url(#gradAdmin)" />
+        <svg viewBox="0 0 48 48" className="sup-agent-area-svg" aria-hidden="true">
+          <rect width="48" height="48" rx="13" fill="url(#gradAdmin)" />
           <defs>
             <linearGradient id="gradAdmin" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
               <stop offset="0%" stopColor="#ede9fe" />
@@ -138,8 +226,8 @@ function AgentIllustration({ agentType }) {
       );
     case 'LOGISTICS':
       return (
-        <svg viewBox="0 0 48 48" className="sup-agent-svg" aria-hidden="true">
-          <rect width="48" height="48" rx="14" fill="url(#gradLog)" />
+        <svg viewBox="0 0 48 48" className="sup-agent-area-svg" aria-hidden="true">
+          <rect width="48" height="48" rx="13" fill="url(#gradLog)" />
           <defs>
             <linearGradient id="gradLog" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
               <stop offset="0%" stopColor="#fef3c7" />
@@ -171,8 +259,8 @@ function AgentIllustration({ agentType }) {
     case 'DEPOSITS':
     default:
       return (
-        <svg viewBox="0 0 48 48" className="sup-agent-svg" aria-hidden="true">
-          <rect width="48" height="48" rx="14" fill="url(#gradDep)" />
+        <svg viewBox="0 0 48 48" className="sup-agent-area-svg" aria-hidden="true">
+          <rect width="48" height="48" rx="13" fill="url(#gradDep)" />
           <defs>
             <linearGradient id="gradDep" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
               <stop offset="0%" stopColor="#e0f2fe" />
@@ -204,7 +292,13 @@ function AgentIllustration({ agentType }) {
   }
 }
 
-export default function SupervisorPanel({ token, me, onOpenFinancing }) {
+export default function SupervisorPanel({
+  token,
+  me,
+  onOpenFinancing,
+  onOpenKnowledge,
+  onOpenEscalations,
+}) {
   const canSelectAiModel = Boolean(me?.isGeneralSupervisor || me?.email === 'diego.bazan@credimision.com');
   const [agents, setAgents] = useState(null);
   const [metrics, setMetrics] = useState(null);
@@ -231,6 +325,7 @@ export default function SupervisorPanel({ token, me, onOpenFinancing }) {
 
   // Modales
   const [showEconomicsModal, setShowEconomicsModal] = useState(false);
+  const [infoAgentType, setInfoAgentType] = useState(null);
   const [selectedConv, setSelectedConv] = useState(null);
   const [timeline, setTimeline] = useState(null);
   // Debounce del texto de búsqueda (300ms)
@@ -451,7 +546,7 @@ export default function SupervisorPanel({ token, me, onOpenFinancing }) {
           </div>
         </div>
 
-        {/* Tarjetas modernas e ilustradas de los agentes */}
+        {/* Tarjetas compactas de agentes robots */}
         <div className="sup-agents-grid">
           {agentList.map((agent) => {
             const meta = AGENT_META[agent.agentType] || {
@@ -463,14 +558,6 @@ export default function SupervisorPanel({ token, me, onOpenFinancing }) {
             };
             const isSelected = agentFilter === agent.agentType;
             const isActive = agent.status === 'active';
-            const coveragePct =
-              agent.hasData && agent.coverage != null
-                ? Math.round(agent.coverage * 100)
-                : null;
-            const samplePct =
-              !agent.hasData && agent.minimumSample > 0
-                ? Math.min(100, Math.round((agent.sampleSize / agent.minimumSample) * 100))
-                : 0;
 
             return (
               <article
@@ -492,82 +579,69 @@ export default function SupervisorPanel({ token, me, onOpenFinancing }) {
                   }
                 }}
               >
-                <div className="sup-agent-card-head">
-                  <AgentIllustration agentType={agent.agentType} />
-                  <span className={`sup-agent-status${isActive ? ' is-active' : ''}`}>
-                    <span className="sup-agent-status-dot" />
-                    {isActive ? 'Activo' : 'En espera'}
-                  </span>
-                </div>
-
-                <div className="sup-agent-identity">
-                  <h4>{meta.name}</h4>
-                  <p>{meta.subtitle}</p>
-                </div>
-
-                <div className="sup-agent-conv-box">
-                  <div>
-                    <span className="sup-agent-stat-num">{agent.totalConversations}</span>
-                    <span className="sup-agent-stat-lbl">conversaciones</span>
+                <div className="sup-agent-compact-main">
+                  <div
+                    className="sup-agent-robot-wrap"
+                    title={isActive ? 'Agente activo' : 'Agente en espera'}
+                  >
+                    <AgentRobotAvatar agentType={agent.agentType} size="sm" />
+                    <span
+                      className={`sup-agent-robot-dot${isActive ? ' is-active' : ''}`}
+                      aria-label={isActive ? 'Activo' : 'En espera'}
+                    />
                   </div>
-                  <div className="sup-agent-conv-divider" />
-                  <div>
-                    <span className="sup-agent-stat-num is-accent">
-                      {agent.activeConversations}
+
+                  <div className="sup-agent-identity">
+                    <h4>{meta.name}</h4>
+                    <div
+                      className="sup-agent-compact-convs"
+                      title={`${agent.totalConversations} conversaciones totales (${agent.activeConversations} en curso)`}
+                    >
+                      <span className="sup-agent-conv-total">
+                        <strong>{agent.totalConversations}</strong> conv.
+                      </span>
+                      <span className="sup-agent-conv-active">
+                        <strong>{agent.activeConversations}</strong> en curso
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="sup-agent-area-badge" aria-hidden="true">
+                    <AgentAreaIcon agentType={agent.agentType} />
+                  </div>
+                </div>
+
+                <div className="sup-agent-compact-footer">
+                  <button
+                    type="button"
+                    className="sup-agent-info-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setInfoAgentType(agent.agentType);
+                    }}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    aria-label={`Más información sobre ${meta.name}`}
+                  >
+                    <span className="sup-agent-info-btn-left">
+                      <svg
+                        width="13"
+                        height="13"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.1"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 16v-4" />
+                        <path d="M12 8h.01" />
+                      </svg>
+                      <span>Más información</span>
                     </span>
-                    <span className="sup-agent-stat-lbl">en curso</span>
-                  </div>
-                </div>
-
-                {/* Cobertura / Muestra (Spec 009 respetada estrictamente) */}
-                <div className="sup-agent-quality">
-                  {agent.hasData ? (
-                    <>
-                      <div className="sup-agent-quality-row">
-                        <span>Cobertura documental</span>
-                        <strong>{coveragePct}%</strong>
-                      </div>
-                      <div className="sup-progress-track">
-                        <div
-                          className={`sup-progress-fill${
-                            coveragePct >= 75
-                              ? ' is-good'
-                              : coveragePct >= 50
-                                ? ' is-warn'
-                                : ' is-low'
-                          }`}
-                          style={{ width: `${coveragePct}%` }}
-                        />
-                      </div>
-                      <div className="sup-agent-footer-meta">
-                        <span>
-                          {agent.marginPoints != null
-                            ? `${agent.marginPoints > 0 ? '+' : ''}${agent.marginPoints.toFixed(1)} pts s/meta`
-                            : 'En meta'}
-                        </span>
-                        <span>{agent.escalations} escaladas</span>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="sup-agent-quality-row">
-                        <span className="sup-muted">Reuniendo muestra</span>
-                        <span className="sup-sample-pill">
-                          {agent.sampleSize} de {agent.minimumSample}
-                        </span>
-                      </div>
-                      <div className="sup-progress-track is-sample">
-                        <div
-                          className="sup-progress-fill is-sample"
-                          style={{ width: `${samplePct}%` }}
-                        />
-                      </div>
-                      <div className="sup-agent-footer-meta">
-                        <span>{formatRelativeTime(agent.lastActivityAt)}</span>
-                        <span>{agent.escalations} escaladas</span>
-                      </div>
-                    </>
-                  )}
+                    <span className="sup-agent-info-arrow" aria-hidden="true">›</span>
+                  </button>
                 </div>
               </article>
             );
@@ -910,6 +984,21 @@ export default function SupervisorPanel({ token, me, onOpenFinancing }) {
         </div>
       </section>
 
+      {/* Modal de Información y Mejora de Agente */}
+      {infoAgentType && (() => {
+        const selectedAgent = agentList.find((a) => a.agentType === infoAgentType);
+        if (!selectedAgent) return null;
+        return (
+          <AgentInfoModal
+            agent={selectedAgent}
+            confidenceThreshold={agents?.confidenceThreshold ?? 0.65}
+            onClose={() => setInfoAgentType(null)}
+            onOpenKnowledge={onOpenKnowledge}
+            onOpenEscalations={onOpenEscalations}
+          />
+        );
+      })()}
+
       {/* Modal de Consumo e Impacto Económico de IA */}
       {showEconomicsModal && (
         <TokenEconomicsModal
@@ -1144,6 +1233,291 @@ function ContactTimelineModal({ data, onClose }) {
               );
             })}
           </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function AgentInfoModal({
+  agent,
+  confidenceThreshold,
+  onClose,
+  onOpenKnowledge,
+  onOpenEscalations,
+}) {
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === 'Escape') onClose();
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const meta = AGENT_META[agent.agentType] || {
+    name: agent.agentType,
+    subtitle: 'Agente especializado',
+    accent: '#2563eb',
+    bgSoft: '#eff6ff',
+    borderSoft: '#bfdbfe',
+  };
+  const isActive = agent.status === 'active';
+  const thresholdPct = Math.round((confidenceThreshold ?? 0.65) * 100);
+  const coveragePct =
+    agent.hasData && agent.coverage != null ? Math.round(agent.coverage * 100) : null;
+  const samplePct =
+    !agent.hasData && agent.minimumSample > 0
+      ? Math.min(100, Math.round((agent.sampleSize / agent.minimumSample) * 100))
+      : 0;
+
+  let healthLabel = 'Reuniendo consultas';
+  let healthTone = 'is-sample';
+  if (coveragePct != null) {
+    if (coveragePct >= 85) {
+      healthLabel = 'Excelente respaldo';
+      healthTone = 'is-good';
+    } else if (coveragePct >= 75) {
+      healthLabel = 'Buen respaldo';
+      healthTone = 'is-good';
+    } else if (coveragePct >= 50) {
+      healthLabel = 'Para reforzar';
+      healthTone = 'is-warn';
+    } else {
+      healthLabel = 'Necesita documentación';
+      healthTone = 'is-low';
+    }
+  }
+
+  const margin = agent.marginPoints;
+  const marginLabel =
+    margin == null
+      ? 'Sin datos suficientes'
+      : margin > 0
+        ? `+${margin.toFixed(1)} pts por encima de la meta`
+        : margin < 0
+          ? `${margin.toFixed(1)} pts por debajo de la meta`
+          : 'Justo en la meta';
+
+  return createPortal(
+    <div
+      className="econ-modal-overlay"
+      role="presentation"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="econ-modal agent-info-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="agent-info-modal-title"
+        style={{ '--agent-accent': meta.accent }}
+      >
+        <header className="econ-modal-header agent-info-header">
+          <div className="agent-info-header-main">
+            <AgentRobotAvatar agentType={agent.agentType} size="lg" />
+            <div>
+              <div className="agent-info-kicker-row">
+                <span className="econ-modal-kicker">Agente virtual especializado</span>
+                <span className={`agent-info-status-pill${isActive ? ' is-active' : ''}`}>
+                  <span className="sup-agent-status-dot" />
+                  {isActive ? 'Activo' : 'En espera'}
+                </span>
+              </div>
+              <h2 id="agent-info-modal-title">Agente de {meta.name}</h2>
+              <p>
+                {meta.subtitle} · Última actividad: {formatRelativeTime(agent.lastActivityAt)}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="econ-modal-close"
+            onClick={onClose}
+            aria-label="Cerrar información del agente"
+          >
+            ✕
+          </button>
+        </header>
+
+        <div className="econ-modal-body agent-info-body">
+          {/* Resumen de actividad */}
+          <div className="agent-info-stats-row">
+            <div className="agent-info-stat-tile">
+              <span>Conversaciones totales</span>
+              <strong>{agent.totalConversations}</strong>
+            </div>
+            <div className="agent-info-stat-tile">
+              <span>Conversaciones en curso</span>
+              <strong className="is-accent">{agent.activeConversations}</strong>
+            </div>
+            <div className="agent-info-stat-tile">
+              <span>Consultas evaluadas (30 días)</span>
+              <strong>{agent.sampleSize}</strong>
+            </div>
+          </div>
+
+          {/* Qué significan sus métricas en lenguaje cotidiano */}
+          <section className="econ-section-card agent-info-section">
+            <div className="agent-info-section-head">
+              <h3>¿Cómo está respondiendo este agente?</h3>
+              <span className={`agent-info-health-badge ${healthTone}`}>{healthLabel}</span>
+            </div>
+
+            {agent.hasData ? (
+              <div className="agent-info-metrics-list">
+                <div className="agent-info-metric-item">
+                  <div className="agent-info-metric-top">
+                    <span className="agent-info-metric-title">Respuestas con respaldo documental</span>
+                    <strong>{coveragePct}%</strong>
+                  </div>
+                  <div className="sup-progress-track">
+                    <div
+                      className={`sup-progress-fill ${healthTone}`}
+                      style={{ width: `${coveragePct}%` }}
+                    />
+                  </div>
+                  <p>
+                    De cada 100 consultas recientes, en <strong>{coveragePct}</strong> el agente
+                    encontró información clara en tus documentos para responder por sí solo con
+                    seguridad.
+                  </p>
+                </div>
+
+                <div className="agent-info-metric-item">
+                  <div className="agent-info-metric-top">
+                    <span className="agent-info-metric-title">Margen respecto a la meta mínima</span>
+                    <strong>{marginLabel}</strong>
+                  </div>
+                  <p>
+                    Para evitar respuestas inventadas, el asistente exige al menos un{' '}
+                    <strong>{thresholdPct}%</strong> de coincidencia con tus documentos.{' '}
+                    {margin != null && margin >= 0
+                      ? 'Un margen positivo indica que el agente encuentra respuestas claras y con holgura.'
+                      : 'Un margen bajo indica que conviene aclarar o completar los documentos de esta área.'}
+                  </p>
+                </div>
+
+                <div className="agent-info-metric-item">
+                  <div className="agent-info-metric-top">
+                    <span className="agent-info-metric-title">Consultas derivadas a una persona</span>
+                    <strong>
+                      {agent.escalations}{' '}
+                      {agent.escalations === 1 ? 'derivación' : 'derivaciones'}
+                    </strong>
+                  </div>
+                  <p>
+                    Son las consultas de los últimos 30 días en las que el agente prefirió avisar a
+                    un responsable humano porque faltaba información o era necesaria una decisión
+                    manual.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="agent-info-metrics-list">
+                <div className="agent-info-metric-item">
+                  <div className="agent-info-metric-top">
+                    <span className="agent-info-metric-title">Reuniendo consultas iniciales</span>
+                    <strong>
+                      {agent.sampleSize} de {agent.minimumSample}
+                    </strong>
+                  </div>
+                  <div className="sup-progress-track is-sample">
+                    <div
+                      className="sup-progress-fill is-sample"
+                      style={{ width: `${samplePct}%` }}
+                    />
+                  </div>
+                  <p>
+                    El sistema necesita al menos <strong>{agent.minimumSample} consultas</strong> en
+                    los últimos 30 días para calcular un porcentaje confiable. Así evitamos mostrar
+                    notas engañosas cuando todavía hubo pocas conversaciones.
+                  </p>
+                </div>
+
+                <div className="agent-info-metric-item">
+                  <div className="agent-info-metric-top">
+                    <span className="agent-info-metric-title">Consultas derivadas a una persona</span>
+                    <strong>
+                      {agent.escalations}{' '}
+                      {agent.escalations === 1 ? 'derivación' : 'derivaciones'}
+                    </strong>
+                  </div>
+                  <p>
+                    Consultas recientes que pasaron a un responsable humano para ser respondidas.
+                  </p>
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* Consejos accionables en lenguaje no técnico */}
+          <section className="econ-section-card agent-info-section">
+            <div className="agent-info-section-head">
+              <h3>¿Cómo mejorar este agente?</h3>
+            </div>
+            <ol className="agent-info-tips">
+              <li>
+                <strong>Sumá o actualizá documentos de {meta.name}:</strong> cargá guías, políticas,
+                precios o preguntas frecuentes en la Base de Conocimiento. Si un documento ya existe
+                y quedó incompleto, conviene editarlo en lugar de crear uno repetido.
+              </li>
+              <li>
+                <strong>Guardá las respuestas de los casos derivados:</strong> cada vez que un
+                responsable responde una consulta derivada, podés incorporar esa respuesta a la base
+                para que el agente la resuelva solo la próxima vez.
+              </li>
+              <li>
+                <strong>Usá “Mejorar conocimiento”:</strong> revisá los temas donde el agente dudó
+                y completalos con una entrevista guiada
+                {!agent.hasData
+                  ? ', o hacé consultas frecuentes del área para terminar de reunir muestra y medir su rendimiento.'
+                  : '.'}
+              </li>
+            </ol>
+          </section>
+
+          {/* Enlaces directos */}
+          <footer className="agent-info-footer">
+            {onOpenKnowledge && (
+              <button
+                type="button"
+                className="agent-info-primary-btn"
+                onClick={() => {
+                  onClose();
+                  onOpenKnowledge({ agentType: agent.agentType, view: 'lista' });
+                }}
+              >
+                <span>Ir a Base de Conocimiento ({meta.name})</span>
+                <span aria-hidden="true">↗</span>
+              </button>
+            )}
+            {onOpenKnowledge && (
+              <button
+                type="button"
+                className="secondary agent-info-secondary-btn"
+                onClick={() => {
+                  onClose();
+                  onOpenKnowledge({ agentType: agent.agentType, view: 'mejorar' });
+                }}
+              >
+                Ver qué falta mejorar
+              </button>
+            )}
+            {agent.escalations > 0 && onOpenEscalations && (
+              <button
+                type="button"
+                className="secondary agent-info-secondary-btn"
+                onClick={() => {
+                  onClose();
+                  onOpenEscalations();
+                }}
+              >
+                Ver casos derivados ({agent.escalations})
+              </button>
+            )}
+          </footer>
         </div>
       </div>
     </div>,

@@ -88,14 +88,21 @@ export default function KnowledgeIngest({
   token,
   me,
   showImprovements = false,
+  initialTarget = null,
   interviewStart,
   onEntrevistar,
   onRetomar,
   onSalirEntrevista,
 }) {
-  const [view, setView] = useState('lista'); // lista | subir | alta | buscar
+  const [view, setView] = useState(initialTarget?.view || 'lista'); // lista | subir | alta | buscar
   const [selectedId, setSelectedId] = useState(null);
   const [mostrarInfo, setMostrarInfo] = useState(false);
+
+  useEffect(() => {
+    if (!initialTarget?.nonce) return;
+    setSelectedId(null);
+    setView(initialTarget.view || 'lista');
+  }, [initialTarget?.nonce, initialTarget?.view]);
   // Umbral vigente (spec 006). No hace falta endpoint nuevo: `agents/status` ya
   // lo devuelve y el Panel del Supervisor ya lo pinta. Vive acá y no en la
   // búsqueda porque también lo cita la nota de «Info».
@@ -214,7 +221,13 @@ export default function KnowledgeIngest({
       )}
 
       {view === 'lista' && (
-        <KnowledgeList token={token} alcance={alcance} onSelect={setSelectedId} />
+        <KnowledgeList
+          token={token}
+          alcance={alcance}
+          onSelect={setSelectedId}
+          initialAgentType={initialTarget?.agentType || ''}
+          initialNonce={initialTarget?.nonce || 0}
+        />
       )}
       {view === 'higiene' && me?.isGeneralSupervisor && <KnowledgeHygiene token={token} />}
       {view === 'mejorar' && showImprovements && (
@@ -240,16 +253,22 @@ export default function KnowledgeIngest({
 }
 
 /** Listado con filtros por área, categoría y estado (FR-019). */
-function KnowledgeList({ token, alcance, onSelect }) {
+function KnowledgeList({ token, alcance, onSelect, initialAgentType = '', initialNonce = 0 }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
-  const [agentType, setAgentType] = useState('');
+  const [agentType, setAgentType] = useState(initialAgentType);
   const [category, setCategory] = useState('');
   const [isActive, setIsActive] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    if (!initialNonce) return;
+    setAgentType(initialAgentType || '');
+    setPage(1);
+  }, [initialNonce, initialAgentType]);
 
   const load = useCallback(async () => {
     setLoading(true);

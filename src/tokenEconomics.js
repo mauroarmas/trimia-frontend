@@ -5,6 +5,13 @@
 const flash38Introductory = Date.now() < Date.UTC(2027, 0, 1);
 const MODEL_PRICING = {
   // https://ai.google.dev/gemini-api/docs/pricing — tarifa de referencia, no factura.
+  'gemini-4-hydrogen': {
+    label: 'Google Gemini 4 Hydrogen',
+    badge: 'Gemini 4',
+    inputPer1M: 1.50,
+    outputPer1M: 7.50,
+    summary: 'Modelo Gemini 4 de alta eficiencia y razonamiento. Referencia de pago por uso; no representa cargos de la cuenta gratuita.',
+  },
   'gemini-3.8-flash': {
     label: 'Google Gemini 3.8 Flash',
     badge: 'Flash',
