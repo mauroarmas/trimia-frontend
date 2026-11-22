@@ -1,11 +1,12 @@
 import { defineConfig } from 'cypress';
 
 /**
- * Configuración oficial de Cypress para TrimIA (TAS26 — Unidad 6 y 7).
+ * Configuración oficial de Cypress para TrimIA (PT-TrimIA-2026-01).
  *
- * Cubre dos niveles de la pirámide de pruebas (Cohn, 2009):
- * 1. Pruebas E2E de Sistema sobre la interfaz web React + Vite (`baseUrl`: http://localhost:5173).
- * 2. Pruebas de Integración y Seguridad sobre la API REST NestJS (`env.apiUrl`: http://localhost:3000).
+ * Cubre la pirámide de pruebas de negocio sobre el despliegue real:
+ * 1. Pruebas E2E de Sistema sobre el panel web React (`baseUrl`: http://localhost:8080).
+ * 2. Pruebas de Integración, Seguridad y Orquestación IA sobre la API REST NestJS
+ *    (`expose.apiUrl`: http://localhost:3000).
  */
 export default defineConfig({
   e2e: {
@@ -15,9 +16,9 @@ export default defineConfig({
     fixturesFolder: 'cypress/fixtures',
     viewportWidth: 1280,
     viewportHeight: 800,
-    defaultCommandTimeout: 10000,
-    requestTimeout: 15000,
-    responseTimeout: 30000,
+    defaultCommandTimeout: 12000,
+    requestTimeout: 20000,
+    responseTimeout: 45000,
     video: false,
     screenshotOnRunFailure: true,
     expose: {

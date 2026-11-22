@@ -1,11 +1,12 @@
 {
-  "_comentario": "Datos de prueba ficticios y anonimizados conforme a la Ley 25.326 y al Anexo B del Plan de Testing PT-TrimIA-2026-01 (Sección 5.6 de TAS26).",
+  "_comentario": "Datos de prueba ficticios y anonimizados conforme a la Ley 25.326, Anexo B de PT-TrimIA-2026-01 y Proceso_venta_financiada_MVP.md.",
   "passwordDefault": "trimia2026",
   "passwordInvalida": "ClaveIncorrecta999!",
   "usuarios": {
     "supervisorGeneral": {
       "nombre": "Diego Bazán",
       "email": "diego.bazan@credimision.com",
+      "telefono": "5491100006666",
       "rol": "SUPERVISOR",
       "sector": "Ventas",
       "esGerente": true,
@@ -22,16 +23,10 @@
         "Chat con el Asistente"
       ]
     },
-    "gerentePrueba": {
-      "nombre": "[QA] Gerente de pruebas",
-      "email": "gerente.prueba@credimision.com",
-      "rol": "SUPERVISOR",
-      "sector": "Ventas",
-      "esGerente": true
-    },
     "supervisoraCobranzas": {
       "nombre": "Silvia Ríos",
       "email": "silvia.rios@credimision.com",
+      "telefono": "5491100008888",
       "rol": "SUPERVISOR",
       "sector": "Cobranzas",
       "esGerente": false,
@@ -45,12 +40,14 @@
       "pestanasProhibidas": [
         "Empleados y Áreas",
         "Simulador de Chat",
-        "Panel del Supervisor"
+        "Panel del Supervisor",
+        "Aprobación Financiación"
       ]
     },
     "vendedora": {
       "nombre": "Laura Gómez",
       "email": "laura.gomez@credimision.com",
+      "telefono": "5491100001111",
       "rol": "EMPLEADO",
       "sector": "Ventas",
       "pestanasEsperadas": [
@@ -62,12 +59,32 @@
         "Panel de Cobranzas",
         "Base de Conocimiento",
         "Casos escalados",
-        "Empleados y Áreas"
+        "Empleados y Áreas",
+        "Simulador de Chat"
+      ]
+    },
+    "administrativa": {
+      "nombre": "Graciela Medina",
+      "email": "graciela.medina@credimision.com",
+      "telefono": "5491100003333",
+      "rol": "EMPLEADO",
+      "sector": "Administración",
+      "pestanasEsperadas": [
+        "Aprobación Financiación",
+        "Mi Capacitación",
+        "Chat con el Asistente"
+      ],
+      "pestanasProhibidas": [
+        "Panel de Cobranzas",
+        "Empleados y Áreas",
+        "Simulador de Chat",
+        "Base de Conocimiento"
       ]
     },
     "cobrador": {
       "nombre": "Roberto Sosa",
       "email": "roberto.sosa@credimision.com",
+      "telefono": "5493865570995",
       "rol": "EMPLEADO",
       "sector": "Cobranzas",
       "esControlador": false,
@@ -84,6 +101,7 @@
     "cobradoraControladora": {
       "nombre": "Marisa Paz",
       "email": "marisa.paz@credimision.com",
+      "telefono": "5491100007777",
       "rol": "EMPLEADO",
       "sector": "Cobranzas",
       "esControlador": true,
@@ -101,27 +119,30 @@
         "Registro de Actividad"
       ]
     },
-    "empleadaCapacitacion": {
-      "nombre": "Sofía Ramírez",
-      "email": "sofia.ramirez@credimision.com",
+    "deposito": {
+      "nombre": "Ana Torres",
+      "email": "ana.torres@credimision.com",
       "rol": "EMPLEADO",
-      "sector": "Ventas"
+      "sector": "Depósito"
     },
-    "vendedorInactivo": {
-      "nombre": "Vendedor Inactivo",
-      "email": "vendedor.inactivo@credimision.com",
+    "logistica": {
+      "nombre": "Carlos Ruiz",
+      "email": "carlos.ruiz@credimision.com",
       "rol": "EMPLEADO",
-      "sector": "Ventas",
+      "sector": "Logística"
+    },
+    "supervisorInactivo": {
+      "nombre": "Supervisor Dos",
+      "email": "test.supervisor2@credimision.com",
+      "rol": "SUPERVISOR",
+      "sector": "Administración",
       "activo": false
     }
   },
   "nuevoEmpleadoAlta": {
     "nombre": "Empleado Prueba Cypress",
-    "email": "cypress.alta@credimision.com",
-    "telefono": "5493815559900",
     "password": "Password123!",
-    "rol": "EMPLEADO",
-    "sector": "Ventas"
+    "rol": "EMPLEADO"
   },
   "clientes": {
     "clienteConCuotas": {
@@ -130,50 +151,52 @@
       "cobradorAsignado": "Roberto Sosa",
       "montoCuota": 120000
     },
-    "clienteDerivado": {
-      "nombre": "Valentina Herrera",
-      "motivo": "pidió hablar con un vendedor"
-    },
-    "clienteNuevo": {
-      "nombre": "Cliente Prueba Uno",
-      "dniNormal": "30111222",
-      "dniIrregular": "30999888"
-    }
-  },
-  "paljetStock": {
-    "categoria": "SMART_TV",
-    "productos": {
-      "disponible": {
-        "nombre": "Samsung 55\" 4K",
-        "unidades": 4,
-        "estadoTexto": "Disponible"
+    "perfilesRiesgoOnline": {
+      "aprobado": {
+        "dni": "90000001",
+        "veredictoEsperado": "APPROVED"
       },
-      "bajoStock": {
-        "nombre": "LG 50\" Full HD",
-        "unidades": 1,
-        "estadoTexto": "Bajo stock"
+      "condicionado": {
+        "dni": "90000011",
+        "veredictoEsperado": "APPROVED_WITH_CONDITIONS"
       },
-      "sinStock": {
-        "nombre": "Philips 43\"",
-        "unidades": 0,
-        "estadoTexto": "Sin stock"
+      "rechazado": {
+        "dni": "90000021",
+        "veredictoEsperado": "REJECTED"
+      },
+      "noDisponible": {
+        "dni": "90000031",
+        "veredictoEsperado": "UNAVAILABLE"
       }
     }
   },
-  "baseConocimiento": {
-    "docVentasPublico": {
-      "titulo": "Circuito de Ventas",
-      "area": "SALES",
-      "audiencia": "PUBLICO"
+  "catalogoPaljet": {
+    "balanzaCuora": {
+      "sku": "BAL-SYS-CUORA",
+      "nombre": "Balanza Electrónica Systel Cuora 30kg con Impresor",
+      "precioLista": 420000,
+      "precioContado": 350000
     },
-    "docAdminInterno": {
-      "titulo": "Facturación y documentación",
-      "area": "ADMIN",
-      "audiencia": "INTERNO"
+    "balanzaCroma": {
+      "sku": "BAL-SYS-CROMA",
+      "nombre": "Balanza Electrónica Systel Croma 30kg Batería",
+      "precioLista": 280000,
+      "precioContado": 235000
+    },
+    "exhibidoraBriket": {
+      "sku": "EXH-BRI-390",
+      "nombre": "Heladera Exhibidora Vertical Briket 390 Litros Led",
+      "precioLista": 780000,
+      "precioContado": 650000
+    },
+    "cortadoraSinStock": {
+      "sku": "COR-MAR-330",
+      "nombre": "Cortadora de Fiambre Marani 330mm Hoja Acero Inox",
+      "sustitutoSku": "COR-TRI-300"
     }
   },
   "valoresLimiteRecordatorios": {
-    "diasValidos": [0, 7, 30],
-    "diasInvalidos": [-1, 31]
+    "diasValidos": [7, 3, 0],
+    "diasInvalidos": ["-1", "31"]
   }
 }
