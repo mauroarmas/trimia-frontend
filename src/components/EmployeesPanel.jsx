@@ -252,7 +252,7 @@ export default function EmployeesPanel({ token, me }) {
           <button type="button" onClick={() => setFormEmployee({})}>Nuevo empleado</button>
           <InfoToggle open={mostrarInfo} onToggle={() => setMostrarInfo((v) => !v)} />
           <button type="button" className="btn-pill-action" onClick={load} disabled={loading}>
-            <span>🔄</span>
+            <span aria-hidden="true">↻</span>
             <span>{loading ? 'Cargando…' : 'Refrescar'}</span>
           </button>
         </div>

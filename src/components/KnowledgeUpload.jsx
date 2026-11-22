@@ -25,7 +25,6 @@ const FILE_STATUS_CLASS = {
 export default function KnowledgeUpload({ token, alcance, onIngested }) {
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('');
   const [audience, setAudience] = useState('INTERNO');
   const [agentType, setAgentType] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -63,7 +62,7 @@ export default function KnowledgeUpload({ token, alcance, onIngested }) {
     try {
       await uploadKnowledgeFile(
         token,
-        { file, title, category, audience, agentType: agentType || undefined },
+        { file, title, audience, agentType: agentType || undefined },
         force,
       );
       setFile(null);
@@ -101,19 +100,13 @@ export default function KnowledgeUpload({ token, alcance, onIngested }) {
             required
           />
         </div>
-        <div className="field-row">
-          <div className="field">
-            <label>Título (opcional)</label>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Si se omite, se usa el nombre del archivo"
-            />
-          </div>
-          <div className="field">
-            <label>Categoría</label>
-            <input value={category} onChange={(e) => setCategory(e.target.value)} required />
-          </div>
+        <div className="field">
+          <label>Título (opcional)</label>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Si se omite, se usa el nombre del archivo"
+          />
         </div>
         <div className="field-row">
           <div className="field">

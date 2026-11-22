@@ -81,13 +81,8 @@ export function buildPathForRoute(tabId, subtabId) {
   const tabSlug = TAB_TO_SLUG[tabId];
   if (!tabSlug) return '/panel';
   const subMap = SUBTAB_TO_SLUG[tabId];
-  if (subMap) {
-    const effectiveSub =
-      subtabId && subMap[subtabId] ? subtabId : DEFAULT_SUBTAB_BY_TAB[tabId];
-    const subSlug = subMap[effectiveSub];
-    if (subSlug) {
-      return `/panel/${tabSlug}/${subSlug}`;
-    }
+  if (subMap && subtabId && subMap[subtabId]) {
+    return `/panel/${tabSlug}/${subMap[subtabId]}`;
   }
   return `/panel/${tabSlug}`;
 }

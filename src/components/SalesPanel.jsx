@@ -53,8 +53,8 @@ const INFO_POR_SUBTAB = {
   ],
   close_sale: [
     [
-      'Cierre manual (Tarea 6.9).',
-      'Asentá en TrimIA la venta acordada y facturada manualmente en Paljet. Referencia: Tarea 6.9.',
+      'Cierre de venta manual.',
+      'Asentá en TrimIA una venta acordada y facturada manualmente en Paljet (por fuera del flujo de financiación con cuotas).',
     ],
   ],
   new_client: [
@@ -720,7 +720,7 @@ export default function SalesPanel({ token, me }) {
                 className={`submenu-pill${activeSubtab === 'close_sale' ? ' active' : ''}`}
                 onClick={() => selectLegacySubtab('close_sale')}
               >
-                Cierre manual anterior
+                Cierre de venta manual
               </button>
               <button
                 type="button"
@@ -1884,7 +1884,7 @@ export default function SalesPanel({ token, me }) {
           <header className="sales-form-heading">
             <div>
               <span className="sales-form-eyebrow">Registro y auditoría</span>
-              <h3 id="sales-close-title">Cierre de venta</h3>
+              <h3 id="sales-close-title">Cierre de venta manual</h3>
             </div>
           </header>
 

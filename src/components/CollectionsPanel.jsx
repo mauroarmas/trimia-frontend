@@ -285,7 +285,7 @@ export default function CollectionsPanel({ token, me, isCollector, initialClient
         description="Gestión de cartera, validación de comprobantes y seguimiento de cuotas."
         action={
           <button className="knowledge-hero-action" onClick={() => loadAll()} disabled={loading}>
-            <span>🔄</span> {loading ? 'Cargando...' : 'Refrescar'}
+            <span aria-hidden="true">↻</span> {loading ? 'Cargando...' : 'Refrescar'}
           </button>
         }
       />

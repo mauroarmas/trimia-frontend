@@ -252,14 +252,13 @@ export default function KnowledgeIngest({
   );
 }
 
-/** Listado con filtros por área, categoría y estado (FR-019). */
+/** Listado con filtros por área y estado (FR-019). */
 function KnowledgeList({ token, alcance, onSelect, initialAgentType = '', initialNonce = 0 }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [agentType, setAgentType] = useState(initialAgentType);
-  const [category, setCategory] = useState('');
   const [isActive, setIsActive] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
@@ -276,7 +275,6 @@ function KnowledgeList({ token, alcance, onSelect, initialAgentType = '', initia
     try {
       const params = { page, limit: PAGE_SIZE };
       if (agentType) params.agentType = agentType;
-      if (category) params.category = category;
       if (isActive !== '') params.isActive = isActive;
       if (search) params.search = search;
       setData(await listKnowledge(token, params));
@@ -285,7 +283,7 @@ function KnowledgeList({ token, alcance, onSelect, initialAgentType = '', initia
     } finally {
       setLoading(false);
     }
-  }, [token, page, agentType, category, isActive, search]);
+  }, [token, page, agentType, isActive, search]);
 
   // Búsqueda con debounce: no dispara un pedido por cada tecla.
   useEffect(() => {
@@ -325,14 +323,6 @@ function KnowledgeList({ token, alcance, onSelect, initialAgentType = '', initia
             <option value="">Todas</option>
             {AGENT_TYPES.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
-        </div>
-        <div className="knowledge-filter">
-          <label>Categoría</label>
-          <input
-            value={category}
-            onChange={(e) => { setPage(1); setCategory(e.target.value); }}
-            placeholder="Todas"
-          />
         </div>
         <div className="knowledge-filter">
           <label>Estado</label>
@@ -460,7 +450,6 @@ function UsoCorto({ usage }) {
 function TextIngestForm({ token, alcance }) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [category, setCategory] = useState('');
   const [audience, setAudience] = useState('PUBLICO');
   const [agentType, setAgentType] = useState('');
   const [busy, setBusy] = useState(false);
@@ -472,9 +461,9 @@ function TextIngestForm({ token, alcance }) {
     setBusy(true); setError(''); setResult(null);
     try {
       setResult(await ingestKnowledge(token, {
-        title, content, category, audience, agentType: agentType || undefined,
+        title, content, audience, agentType: agentType || undefined,
       }));
-      setTitle(''); setContent(''); setCategory('');
+      setTitle(''); setContent('');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -492,15 +481,9 @@ function TextIngestForm({ token, alcance }) {
     <div className="card">
       <h3>Cargar conocimiento como texto</h3>
       <form onSubmit={handleIngest}>
-        <div className="field-row">
-          <div className="field">
-            <label>Título</label>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} required />
-          </div>
-          <div className="field">
-            <label>Categoría</label>
-            <input value={category} onChange={(e) => setCategory(e.target.value)} required />
-          </div>
+        <div className="field">
+          <label>Título</label>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} required />
         </div>
         <div className="field">
           <label>Contenido</label>

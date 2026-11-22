@@ -20,7 +20,7 @@ export default defineConfig({
     responseTimeout: 30000,
     video: false,
     screenshotOnRunFailure: true,
-    env: {
+    expose: {
       apiUrl: 'http://localhost:3000',
     },
     setupNodeEvents(on, config) {

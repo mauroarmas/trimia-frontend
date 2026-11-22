@@ -94,7 +94,7 @@ describe('Módulo 04 — Supervisión, Casos Escalados, Base de Conocimiento y C
    *      lateral izquierdo de la supervisora permanece exactamente igual.
    * --------------------------------------------------------------------------
    */
-  it('TC-TRIMIA-RNF02-06 (Regresión DM-TRIMIA-008 y 009): Debe ocultar "Limpiar base" a supervisores de área, mostrar en solo lectura documentos ajenos y mantener el menú estable', () => {
+  it('TC-TRIMIA-RNF02-06 (Regresión DM-TRIMIA-008 y 009): Debe ocultar "Limpiar base" a supervisores de área, aislar documentos ajenos y mantener el menú estable', () => {
     const supCobranzas = datos.usuarios.supervisoraCobranzas;
     cy.loginUI(supCobranzas.email, datos.passwordDefault);
 
@@ -113,19 +113,22 @@ describe('Módulo 04 — Supervisión, Casos Escalados, Base de Conocimiento y C
     cy.get('aside.app-sidebar .sidebar-nav button.sidebar-nav-item').then(($itemsAntes) => {
       const menuAntes = [...$itemsAntes].map((el) => el.innerText.trim());
 
-      // 2. Buscamos una fila marcada como "Solo lectura" (de otra área distinta a Cobranzas)
-      cy.contains('tr', 'Solo lectura')
-        .first()
-        .within(() => {
-          cy.contains('button', 'Ver detalle').click();
+      // 2. Aislamiento estricto por área (RNF-02): solo ve documentos de COLLECTIONS y no expone áreas ajenas
+      cy.get('tbody tr .knowledge-area')
+        .should('have.length.at.least', 1)
+        .each(($area) => {
+          expect($area.text().trim()).to.eq('COLLECTIONS');
         });
 
-      // Verifica en la Ventana 14 que el documento se abre en modo Solo Lectura
-      cy.contains('.knowledge-detail-alert', 'Solo lectura.').should('be.visible');
-      cy.contains('button', 'Guardar cambios').should('be.disabled');
-      cy.contains('button', 'Desactivar documento').should('be.disabled');
-      cy.contains('button', 'Borrar definitivamente').should('be.disabled');
-      cy.contains('section.knowledge-panel', 'Editar con la IA').should('contain.text', 'No disponible');
+      cy.contains('.knowledge-filter', 'Área').find('select').select('SALES');
+      cy.contains('tr.knowledge-table-empty', 'No hay documentos con esos filtros.').should('be.visible');
+
+      // Volvemos a ver todos los de su área y abrimos el detalle de un documento
+      cy.contains('.knowledge-filter', 'Área').find('select').select('');
+      cy.get('tbody tr').first().within(() => {
+        cy.contains('button', 'Ver detalle').click();
+      });
+      cy.contains('button', 'Guardar cambios').should('be.visible');
 
       // 3. Regresión DM-TRIMIA-009: El menú lateral debe seguir teniendo exactamente las mismas opciones
       cy.get('aside.app-sidebar .sidebar-nav button.sidebar-nav-item').then(($itemsDespues) => {

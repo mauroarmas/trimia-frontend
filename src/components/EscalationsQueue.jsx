@@ -18,11 +18,14 @@ import {
   getEscalationHygieneWarning,
   getLatestHygieneScan,
   addInternalNote,
+  takeoverConversation,
 } from '../api';
+import { statusBadgeClass } from '../statusBadge';
 import ConversationControls from './ConversationControls';
 import FinancingDraftEditor from './FinancingDraftEditor';
 import CommercialCasePanel from './CommercialCasePanel';
 import ConversationThread from './ConversationThread';
+import EscalationTakeoverModal from './EscalationTakeoverModal';
 import ChatExportMenu from './ChatExportMenu';
 import { buildConversationMarkdown } from '../chatExport';
 import {
@@ -98,11 +101,13 @@ export default function EscalationsQueue({ token, me, onOpenFinancing }) {
   const [replyMessage, setReplyMessage] = useState('');
   const [teachAgent, setTeachAgent] = useState(false);
   const [knowledgeTitle, setKnowledgeTitle] = useState('');
-  const [knowledgeCategory, setKnowledgeCategory] = useState('');
   const [knowledgeAudience, setKnowledgeAudience] = useState('INTERNO');
   const [knowledgeAgentType, setKnowledgeAgentType] = useState('');
   const [delegateTo, setDelegateTo] = useState('');
   const [mostrarMasCierres, setMostrarMasCierres] = useState(false);
+  const [actionTab, setActionTab] = useState('resolve');
+  const [takeoverModalOpen, setTakeoverModalOpen] = useState(false);
+  const [takingControl, setTakingControl] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState('');
   const [priceDraft, setPriceDraft] = useState(null);
@@ -113,6 +118,8 @@ export default function EscalationsQueue({ token, me, onOpenFinancing }) {
   const ResolvePanel = isApprovedSale ? 'details' : 'div';
   useEffect(() => {
     let active = true;
+    setActionTab('resolve');
+    setTakeoverModalOpen(false);
     setPriceDraft(null); setConfirmedPrice(''); setPriceError('');
     if (selected?.conversationId) {
       getFinancingDraft(token, selected.conversationId).then(d => {
@@ -200,7 +207,6 @@ export default function EscalationsQueue({ token, me, onOpenFinancing }) {
     setReplyMessage('');
     setTeachAgent(false);
     setKnowledgeTitle('');
-    setKnowledgeCategory('');
     setKnowledgeAudience('INTERNO');
     setKnowledgeAgentType('');
     setDelegateTo('');
@@ -296,12 +302,8 @@ export default function EscalationsQueue({ token, me, onOpenFinancing }) {
       setActionError('Elegí qué documento corregir, o pasá a «Documento nuevo».');
       return;
     }
-    if (
-      teachAgent &&
-      !corrigiendo &&
-      (!knowledgeTitle.trim() || !knowledgeCategory.trim())
-    ) {
-      setActionError('Título y categoría del conocimiento son obligatorios.');
+    if (teachAgent && !corrigiendo && !knowledgeTitle.trim()) {
+      setActionError('El título del conocimiento es obligatorio.');
       return;
     }
     if (isPriceCase && (!priceDraft || !(Number(confirmedPrice) > 0))) {
@@ -325,7 +327,6 @@ export default function EscalationsQueue({ token, me, onOpenFinancing }) {
         message: replyMessage,
         teachAgent: !isPriceCase && teachAgent && !corrigiendo,
         title: knowledgeTitle,
-        category: knowledgeCategory,
         audience: knowledgeAudience || undefined,
         agentType: knowledgeAgentType || undefined,
         correctKnowledge:
@@ -366,11 +367,11 @@ export default function EscalationsQueue({ token, me, onOpenFinancing }) {
   }
 
   async function handleSaveUnsent() {
-    if (!knowledgeTitle.trim() || !knowledgeCategory.trim()) {
+    if (!knowledgeTitle.trim()) {
       setActionError(
         corrigiendo
-          ? 'Guardar sin enviar siempre crea un documento nuevo, así que pide título y categoría. Activá «Guardar en la Base de Conocimiento», pasá el selector a «Documento nuevo» y completalos.'
-          : 'Para guardar sin enviar hacen falta título y categoría: activá «Guardar en la Base de Conocimiento» arriba para completarlos.',
+          ? 'Guardar sin enviar siempre crea un documento nuevo, así que pide título. Activá «Guardar en la Base de Conocimiento», pasá el selector a «Documento nuevo» y completalo.'
+          : 'Para guardar sin enviar hace falta el título: activá «Guardar en la Base de Conocimiento» arriba para completarlo.',
       );
       return;
     }
@@ -380,7 +381,6 @@ export default function EscalationsQueue({ token, me, onOpenFinancing }) {
       await saveEscalationUnsent(token, selected.id, {
         message: replyMessage,
         title: knowledgeTitle,
-        category: knowledgeCategory,
         agentType: knowledgeAgentType || undefined,
       });
       setSelected(null);
@@ -1107,8 +1107,9 @@ export default function EscalationsQueue({ token, me, onOpenFinancing }) {
                     me={me}
                     onRefresh={refreshConversation}
                     compact
+                    hideControlBar
+                    hideReply
                   />
-                  {!isPriceCase && !priceDraft?.request && <FinancingDraftEditor token={token} me={me} conversation={conversation} />}
                 </>
               ) : (
                 !detailLoading && (
@@ -1117,11 +1118,151 @@ export default function EscalationsQueue({ token, me, onOpenFinancing }) {
               )}
             </section>
 
-            {/* Columna derecha: Panel enfocado de resolución */}
+            {/* Columna derecha: Panel enfocado con slide de sección (Resolver y Responder / Tomar control) */}
             <section className="esc-card esc-resolve-card">
-              <CommercialCasePanel key={selected.id} token={token} me={me} draft={priceDraft} escalation={selected}
-                onOpenFinancing={onOpenFinancing} onResolved={async () => { setSelected(null); setConversation(null); await loadQueue(); }} />
-              {selected.status === 'PENDING' ? (
+              <div
+                className={`esc-mode-switch${actionTab === 'control' ? ' is-control' : ''}`}
+                role="tablist"
+                aria-label="Modo de atención del caso"
+              >
+                <span className="esc-mode-thumb" aria-hidden="true" />
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={actionTab === 'resolve'}
+                  className={`esc-mode-tab${actionTab === 'resolve' ? ' is-active' : ''}`}
+                  onClick={() => setActionTab('resolve')}
+                >
+                  Resolver y Responder
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={actionTab === 'control'}
+                  className={`esc-mode-tab${actionTab === 'control' ? ' is-active' : ''}`}
+                  onClick={() => setActionTab('control')}
+                >
+                  <span>Tomar control</span>
+                  {conversation?.status === 'HUMAN_HANDLING' && (
+                    <span className="esc-mode-dot is-live" aria-label="Control manual activo" />
+                  )}
+                  {conversation?.status === 'WAITING_HUMAN' && (
+                    <span className="esc-mode-dot is-waiting" aria-label="Esperando humano" />
+                  )}
+                </button>
+              </div>
+
+              {actionTab === 'control' ? (
+                <div className="esc-control-panel">
+                  <div className="esc-card-head">
+                    <div>
+                      <h3>Tomar control de la conversación</h3>
+                      <p>
+                        Al tomar el control se abrirá una ventana grande de chat en vivo con el
+                        cliente. Cuando liberes el control podrás generar un documento nuevo con IA
+                        para la Base de Conocimiento.
+                      </p>
+                    </div>
+                  </div>
+                  {conversation ? (
+                    (() => {
+                      const iHoldControl =
+                        conversation.status === 'HUMAN_HANDLING' &&
+                        conversation.handledById === me?.id;
+                      const someoneElseHolds =
+                        conversation.status === 'HUMAN_HANDLING' &&
+                        conversation.handledById !== me?.id;
+                      const canTakeOver =
+                        conversation.status !== 'CLOSED' && !someoneElseHolds;
+                      const statusLabel =
+                        conversation.status === 'HUMAN_HANDLING'
+                          ? 'Control manual'
+                          : conversation.status === 'WAITING_HUMAN'
+                            ? 'Esperando humano'
+                            : conversation.status === 'CLOSED'
+                              ? 'Cerrada'
+                              : 'Activa (IA)';
+
+                      return (
+                        <div className="esc-control-launch-card">
+                          <div className="esc-control-launch-status">
+                            <span className={statusBadgeClass(conversation.status)}>
+                              {statusLabel}
+                            </span>
+                            <span className="esc-muted-text" style={{ margin: 0 }}>
+                              {iHoldControl
+                                ? 'Tenés el control manual activo en esta conversación.'
+                                : someoneElseHolds
+                                  ? `Tomado por ${conversation.handledBy?.name || 'otro supervisor'}.`
+                                  : conversation.status === 'CLOSED'
+                                    ? 'La conversación está finalizada.'
+                                    : 'Derivada por el agente · lista para atención directa en vivo.'}
+                            </span>
+                          </div>
+                          <div className="esc-control-launch-actions">
+                            <button
+                              type="button"
+                              className="conv-ctrl-takeover-btn"
+                              disabled={takingControl || (!iHoldControl && !canTakeOver)}
+                              onClick={async () => {
+                                if (iHoldControl) {
+                                  setTakeoverModalOpen(true);
+                                  return;
+                                }
+                                setTakingControl(true);
+                                setActionError('');
+                                try {
+                                  await takeoverConversation(token, conversation.id);
+                                  await refreshConversation();
+                                  setTakeoverModalOpen(true);
+                                } catch (err) {
+                                  setActionError(
+                                    err.message || 'No se pudo tomar el control de la conversación.',
+                                  );
+                                } finally {
+                                  setTakingControl(false);
+                                }
+                              }}
+                            >
+                              <svg
+                                width="15"
+                                height="15"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.2"
+                                aria-hidden="true"
+                              >
+                                <path
+                                  d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                              <span>
+                                {takingControl
+                                  ? 'Tomando control…'
+                                  : iHoldControl
+                                    ? 'Abrir chat en vivo'
+                                    : 'Tomar control'}
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    !detailLoading && (
+                      <p className="esc-muted-text">
+                        No se pudo cargar el estado de la conversación.
+                      </p>
+                    )
+                  )}
+                </div>
+              ) : (
+                <>
+                  <CommercialCasePanel key={selected.id} token={token} me={me} draft={priceDraft} escalation={selected}
+                    onOpenFinancing={onOpenFinancing} onResolved={async () => { setSelected(null); setConversation(null); await loadQueue(); }} />
+                  {selected.status === 'PENDING' ? (
                 <ResolvePanel>
                   {isApprovedSale && <summary style={{ cursor: 'pointer', marginTop: 16 }}>Responder sin registrar el cierre</summary>}
                   <div className="esc-card-head">
@@ -1268,23 +1409,13 @@ export default function EscalationsQueue({ token, me, onOpenFinancing }) {
                               </div>
                             )}
 
-                            <div className="esc-two-fields">
-                              <div className="esc-field">
-                                <label>Título del documento *</label>
-                                <input
-                                  value={knowledgeTitle}
-                                  onChange={(e) => setKnowledgeTitle(e.target.value)}
-                                  placeholder="Ej. Financiación de heladeras"
-                                />
-                              </div>
-                              <div className="esc-field">
-                                <label>Categoría *</label>
-                                <input
-                                  value={knowledgeCategory}
-                                  onChange={(e) => setKnowledgeCategory(e.target.value)}
-                                  placeholder="Ej. financiación, políticas"
-                                />
-                              </div>
+                            <div className="esc-field">
+                              <label>Título del documento *</label>
+                              <input
+                                value={knowledgeTitle}
+                                onChange={(e) => setKnowledgeTitle(e.target.value)}
+                                placeholder="Ej. Financiación de heladeras"
+                              />
                             </div>
 
                             <div className="esc-two-fields">
@@ -1475,6 +1606,11 @@ export default function EscalationsQueue({ token, me, onOpenFinancing }) {
                   )}
                 </div>
               )}
+                  {conversation && !isPriceCase && !priceDraft?.request && (
+                    <FinancingDraftEditor token={token} me={me} conversation={conversation} />
+                  )}
+                </>
+              )}
             </section>
           </div>
 
@@ -1500,6 +1636,23 @@ export default function EscalationsQueue({ token, me, onOpenFinancing }) {
                 ))}
               </div>
             </section>
+          )}
+          {/* Modal grande de chat al Tomar control + generación de documento IA al liberar */}
+          {takeoverModalOpen && conversation && (
+            <EscalationTakeoverModal
+              token={token}
+              me={me}
+              escalation={selected}
+              conversation={conversation}
+              onRefresh={refreshConversation}
+              onClose={() => setTakeoverModalOpen(false)}
+              onEscalationResolved={async () => {
+                setTakeoverModalOpen(false);
+                setSelected(null);
+                setConversation(null);
+                await loadQueue();
+              }}
+            />
           )}
         </div>
       )}
@@ -1574,16 +1727,17 @@ function ModificarDocumento({
 }
 
 function SuggestionPanel({ suggestion }) {
+  const sourcesTitle = suggestion.sources?.length
+    ? `Fuentes: ${suggestion.sources.map((s) => `${s.title} (${s.score}%)`).join(' · ')}`
+    : undefined;
+
   if (!suggestion.hasContext) {
     return (
-      <div className="esc-suggestion-box is-empty">
-        <strong>Sin respaldo suficiente para redactar automáticamente</strong>
-        <p>{suggestion.reason}</p>
-        <span className="esc-suggestion-meta">
-          Audiencia consultada: <strong>{suggestion.audienceUsed}</strong>
-          {suggestion.sources?.length > 0
-            ? ` · Mejor coincidencia: ${suggestion.confidence}% (${suggestion.sources[0].title})`
-            : ''}
+      <div className="esc-suggestion-inline is-empty" title={sourcesTitle}>
+        <span className="esc-suggestion-dot" aria-hidden="true" />
+        <span>
+          Sin respaldo suficiente para sugerir
+          {typeof suggestion.confidence === 'number' ? ` · Confianza ${suggestion.confidence}%` : ''}
         </span>
       </div>
     );
@@ -1591,24 +1745,13 @@ function SuggestionPanel({ suggestion }) {
 
   return (
     <div
-      className={`esc-suggestion-box ${
-        suggestion.respaldoDebil ? 'is-weak' : 'is-ready'
-      }`}
+      className={`esc-suggestion-inline ${suggestion.respaldoDebil ? 'is-weak' : 'is-ready'}`}
+      title={sourcesTitle}
     >
-      <div className="esc-suggestion-top">
-        <strong>
-          {suggestion.respaldoDebil
-            ? `⚠️ Propuesta con respaldo parcial (${suggestion.confidence}%)`
-            : '✓ Propuesta cargada en el editor (podés editarla antes de enviar)'}
-        </strong>
-        <span className="esc-suggestion-aud">{suggestion.audienceUsed}</span>
-      </div>
-      {suggestion.respaldoDebil && <p>{suggestion.reason}</p>}
-      {suggestion.sources?.length > 0 && (
-        <span className="esc-suggestion-meta">
-          Fuentes: {suggestion.sources.map((s) => `${s.title} (${s.score}%)`).join(' · ')}
-        </span>
-      )}
+      <span className="esc-suggestion-dot" aria-hidden="true" />
+      <span>
+        Confianza IA: <strong>{suggestion.confidence}%</strong>
+      </span>
     </div>
   );
 }

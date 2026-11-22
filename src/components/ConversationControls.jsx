@@ -84,6 +84,7 @@ export default function ConversationControls({
   onRefresh,
   hideReplyAndNotes = false,
   hideReply = false,
+  hideControlBar = false,
   compact = false,
   hideNotes = false,
   actions,
@@ -206,6 +207,7 @@ export default function ConversationControls({
       )}
 
       {/* 1. Barra horizontal de estado y toma/liberación de control */}
+      {!hideControlBar && (
       <div className={`conv-ctrl-status-bar${iHoldControl ? ' is-manual' : ''}`}>
         <div className="conv-ctrl-status-left">
           <span className={statusBadgeClass(conversation.status)}>
@@ -264,6 +266,7 @@ export default function ConversationControls({
           )}
         </div>
       </div>
+      )}
 
       {error && (
         <p className="error" style={{ margin: 0 }}>

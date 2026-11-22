@@ -46,7 +46,6 @@ export default function KnowledgeDetail({ token, id, alcance, onClose, onChanged
       setForm({
         title: d.title,
         content: d.content,
-        category: d.category,
         audience: d.audience,
         agentType: d.agentType ?? '',
       });
@@ -134,7 +133,6 @@ export default function KnowledgeDetail({ token, id, alcance, onClose, onChanged
         <span className="knowledge-hero-kicker">Documento · versión {doc.version}</span>
         <h2 className="knowledge-hero-title">{doc.title}</h2>
         <div className="knowledge-detail-meta">
-          <span className="knowledge-detail-chip">{doc.category}</span>
           <span className="knowledge-detail-chip">{doc.agentType ?? 'General'}</span>
           <span className="knowledge-detail-chip">{doc.audience}</span>
           <span className={`knowledge-detail-chip${doc.isActive ? ' is-active' : ' is-off'}`}>
@@ -168,10 +166,6 @@ export default function KnowledgeDetail({ token, id, alcance, onClose, onChanged
               <div className="knowledge-filter">
                 <label>Título</label>
                 <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-              </div>
-              <div className="knowledge-filter">
-                <label>Categoría</label>
-                <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
               </div>
               <div className="knowledge-filter">
                 <label>Audiencia</label>

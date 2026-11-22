@@ -48,7 +48,7 @@ Cypress.Commands.add('loginUI', (email, password = 'trimia2026') => {
  * @param {string} [password='trimia2026'] - Contraseña del usuario.
  */
 Cypress.Commands.add('loginAPI', (email, password = 'trimia2026') => {
-  const apiUrl = Cypress.env('apiUrl') || 'http://localhost:3000';
+  const apiUrl = Cypress.expose('apiUrl') || 'http://localhost:3000';
   return cy
     .request({
       method: 'POST',

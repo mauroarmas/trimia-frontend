@@ -322,7 +322,7 @@ export function HygienePairCard({ token, pair, onResolved }) {
                   {d.title} sobrevive
                 </label>
                 <div className="hint">
-                  {d.category} · {d.agentType ?? 'general'} · {d.audience} · versión {d.version}
+                  {d.agentType ?? 'general'} · {d.audience} · versión {d.version}
                   <br />
                   {!d.hasData ? 'sin datos de uso todavía' : `consultado ${d.retrievedCount} vez/veces`}
                 </div>

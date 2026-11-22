@@ -33,263 +33,137 @@ const STATUS_FILTER_PILLS = [
   ['CLOSED', 'Cerradas'],
 ];
 
-const ROBOT_PALETTES = {
+const AGENT_BOT_THEMES = {
   SALES: {
-    shell: '#eff6ff',
-    shellBorder: '#93c5fd',
-    accent: '#2563eb',
-    eye: '#60a5fa',
-  },
-  COLLECTIONS: {
-    shell: '#f0fdfa',
-    shellBorder: '#99f6e4',
-    accent: '#0d9488',
-    eye: '#2dd4bf',
+    c: '#2563eb',
+    soft: '#dbeafe',
+    ink: '#1d4ed8',
+    chestPath: 'M42 78 l4 4 l8 -8',
   },
   ADMIN: {
-    shell: '#f5f3ff',
-    shellBorder: '#c4b5fd',
-    accent: '#7c3aed',
-    eye: '#a78bfa',
+    c: '#7c3aed',
+    soft: '#ede9fe',
+    ink: '#6d28d9',
+    chestPath: 'M42 74v8 M48 74v8 M54 74v8',
+  },
+  COLLECTIONS: {
+    c: '#0d9488',
+    soft: '#ccfbf1',
+    ink: '#0f766e',
+    chestPath: 'M43 78 a5 5 0 1 0 10 0 a5 5 0 1 0 -10 0',
   },
   LOGISTICS: {
-    shell: '#fffbeb',
-    shellBorder: '#fcd34d',
-    accent: '#d97706',
-    eye: '#fbbf24',
+    c: '#ea580c',
+    soft: '#ffedd5',
+    ink: '#9a3412',
+    chestPath: 'M41 75h12v8h-12z',
   },
   DEPOSITS: {
-    shell: '#f0f9ff',
-    shellBorder: '#7dd3fc',
-    accent: '#0284c7',
-    eye: '#38bdf8',
+    c: '#0891b2',
+    soft: '#cffafe',
+    ink: '#155e75',
+    chestPath: 'M43 74h10v10h-10z M43 79h10',
   },
 };
 
-function AgentRobotAvatar({ agentType, size = 'sm' }) {
-  const p = ROBOT_PALETTES[agentType] || ROBOT_PALETTES.SALES;
-  return (
+function AgentRobotAvatar({ agentType, label, size = 'card' }) {
+  const theme = AGENT_BOT_THEMES[agentType] || AGENT_BOT_THEMES.SALES;
+  const isModal = size === 'lg';
+  const svg = (
     <svg
-      viewBox="0 0 40 40"
-      className={`sup-agent-robot-svg${size === 'lg' ? ' is-lg' : ''}`}
-      aria-hidden="true"
+      className={`sup-bot-svg${isModal ? ' is-lg' : ''}`}
+      viewBox="0 0 96 98"
+      width={isModal ? 50 : 96}
+      height={isModal ? 50 : 98}
+      role={isModal ? undefined : 'img'}
+      aria-label={isModal ? undefined : label}
+      aria-hidden={isModal ? 'true' : undefined}
+      style={
+        isModal
+          ? { '--agent-c': theme.c, '--agent-soft': theme.soft, '--agent-ink': theme.ink }
+          : undefined
+      }
     >
-      {/* Antena */}
-      <line
-        x1="20"
-        y1="11"
-        x2="20"
-        y2="6.5"
-        stroke={p.accent}
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <circle cx="20" cy="5.5" r="2.2" fill={p.accent} />
-      {/* Orejeras laterales */}
-      <rect x="4" y="17.5" width="3.5" height="7" rx="1.75" fill={p.accent} opacity="0.85" />
-      <rect x="32.5" y="17.5" width="3.5" height="7" rx="1.75" fill={p.accent} opacity="0.85" />
-      {/* Cabeza del agente robot */}
-      <rect
-        x="7.5"
-        y="11"
-        width="25"
-        height="20.5"
-        rx="7"
-        fill={p.shell}
-        stroke={p.shellBorder}
-        strokeWidth="1.6"
-      />
-      {/* Visor */}
-      <rect x="11" y="15.5" width="18" height="10.5" rx="4.2" fill="#0f172a" />
-      {/* Ojos luminosos */}
-      <circle cx="16.2" cy="20.4" r="2" fill={p.eye} />
-      <circle cx="23.8" cy="20.4" r="2" fill={p.eye} />
-      <circle cx="16.8" cy="19.8" r="0.65" fill="#ffffff" opacity="0.9" />
-      <circle cx="24.4" cy="19.8" r="0.65" fill="#ffffff" opacity="0.9" />
-      {/* Indicador de voz/sonrisa sutil */}
-      <path
-        d="M17.4 23.4c.7.7 1.6 1 2.6 1s1.9-.3 2.6-1"
-        fill="none"
-        stroke={p.eye}
-        strokeWidth="1.35"
-        strokeLinecap="round"
-        opacity="0.85"
-      />
-      {/* Cuello / base discreta */}
-      <rect x="14.5" y="33.2" width="11" height="2.6" rx="1.3" fill={p.accent} opacity="0.35" />
+      {!isModal && (
+        <ellipse
+          className="sup-bot-shadow"
+          cx="48"
+          cy="94"
+          rx="18"
+          ry="3"
+          fill="#0f172a"
+          opacity=".14"
+        />
+      )}
+      <g className={isModal ? undefined : 'sup-bot-float'}>
+        <line
+          x1="48"
+          y1="11"
+          x2="48"
+          y2="21"
+          stroke="var(--agent-c)"
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
+        <circle
+          className={isModal ? undefined : 'sup-bot-ant'}
+          cx="48"
+          cy="8"
+          r="4.5"
+          fill="var(--agent-c)"
+        />
+        <rect x="12" y="34" width="7" height="14" rx="3.5" fill="var(--agent-c)" />
+        <rect x="77" y="34" width="7" height="14" rx="3.5" fill="var(--agent-c)" />
+        <rect
+          x="20"
+          y="20"
+          width="56"
+          height="44"
+          rx="16"
+          fill="var(--agent-soft)"
+          stroke="var(--agent-c)"
+          strokeWidth="3"
+        />
+        <rect x="28" y="29" width="40" height="26" rx="11" fill="#0f172a" />
+        <g className={isModal ? undefined : 'sup-bot-eyes'}>
+          <ellipse cx="40" cy="41" rx="4.5" ry="5.5" fill="#ffffff" />
+          <ellipse cx="56" cy="41" rx="4.5" ry="5.5" fill="#ffffff" />
+        </g>
+        <path
+          d="M42 50 q6 4 12 0"
+          fill="none"
+          stroke="#ffffff"
+          strokeWidth="2"
+          strokeLinecap="round"
+          opacity=".8"
+        />
+        <rect x="30" y="67" width="36" height="22" rx="10" fill="var(--agent-c)" />
+        <path
+          d={theme.chestPath}
+          fill="none"
+          stroke="#ffffff"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <rect
+          className={isModal ? undefined : 'sup-bot-arm'}
+          x="64"
+          y="70"
+          width="16"
+          height="7"
+          rx="3.5"
+          fill="var(--agent-c)"
+        />
+      </g>
     </svg>
   );
-}
 
-function AgentAreaIcon({ agentType }) {
-  switch (agentType) {
-    case 'SALES':
-      return (
-        <svg viewBox="0 0 48 48" className="sup-agent-area-svg" aria-hidden="true">
-          <rect width="48" height="48" rx="13" fill="url(#gradSales)" />
-          <defs>
-            <linearGradient id="gradSales" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor="#dbeafe" />
-              <stop offset="100%" stopColor="#eff6ff" />
-            </linearGradient>
-          </defs>
-          <circle cx="37" cy="12" r="7" fill="#93c5fd" opacity="0.35" />
-          <path
-            d="M15 19h18l-1.6 15.2a2 2 0 01-2 1.8H18.6a2 2 0 01-2-1.8L15 19z"
-            fill="#ffffff"
-            stroke="#2563eb"
-            strokeWidth="2"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M19.5 19v-2.5a4.5 4.5 0 019 0V19"
-            fill="none"
-            stroke="#2563eb"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          <path
-            d="M19.5 29l3.2-3.2 2.4 2.2 4-4.2"
-            fill="none"
-            stroke="#1d4ed8"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <circle cx="29.1" cy="23.8" r="1.6" fill="#2563eb" />
-        </svg>
-      );
-    case 'COLLECTIONS':
-      return (
-        <svg viewBox="0 0 48 48" className="sup-agent-area-svg" aria-hidden="true">
-          <rect width="48" height="48" rx="13" fill="url(#gradCol)" />
-          <defs>
-            <linearGradient id="gradCol" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor="#ccfbf1" />
-              <stop offset="100%" stopColor="#f0fdfa" />
-            </linearGradient>
-          </defs>
-          <rect
-            x="12"
-            y="15"
-            width="21"
-            height="17"
-            rx="3.5"
-            fill="#ffffff"
-            stroke="#0d9488"
-            strokeWidth="2"
-          />
-          <path d="M12 20.5h21" stroke="#0d9488" strokeWidth="2" />
-          <path d="M16 26h6" stroke="#14b8a6" strokeWidth="2" strokeLinecap="round" />
-          <circle cx="32.5" cy="30.5" r="6.5" fill="#0d9488" />
-          <path
-            d="M29.8 30.6l1.9 1.9 3.6-3.8"
-            fill="none"
-            stroke="#ffffff"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      );
-    case 'ADMIN':
-      return (
-        <svg viewBox="0 0 48 48" className="sup-agent-area-svg" aria-hidden="true">
-          <rect width="48" height="48" rx="13" fill="url(#gradAdmin)" />
-          <defs>
-            <linearGradient id="gradAdmin" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor="#ede9fe" />
-              <stop offset="100%" stopColor="#f5f3ff" />
-            </linearGradient>
-          </defs>
-          <path
-            d="M24 12l12 6v2H12v-2l12-6z"
-            fill="#ffffff"
-            stroke="#7c3aed"
-            strokeWidth="2"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M16 20v11M21.3 20v11M26.7 20v11M32 20v11"
-            stroke="#7c3aed"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          <path
-            d="M13 33h22"
-            stroke="#6d28d9"
-            strokeWidth="2.4"
-            strokeLinecap="round"
-          />
-          <circle cx="24" cy="16.3" r="1.4" fill="#7c3aed" />
-        </svg>
-      );
-    case 'LOGISTICS':
-      return (
-        <svg viewBox="0 0 48 48" className="sup-agent-area-svg" aria-hidden="true">
-          <rect width="48" height="48" rx="13" fill="url(#gradLog)" />
-          <defs>
-            <linearGradient id="gradLog" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor="#fef3c7" />
-              <stop offset="100%" stopColor="#fffbeb" />
-            </linearGradient>
-          </defs>
-          <rect
-            x="10"
-            y="17"
-            width="17"
-            height="13"
-            rx="2.5"
-            fill="#ffffff"
-            stroke="#d97706"
-            strokeWidth="2"
-          />
-          <path
-            d="M27 21h6.2l3.8 4.4V30H27v-9z"
-            fill="#fde68a"
-            stroke="#d97706"
-            strokeWidth="2"
-            strokeLinejoin="round"
-          />
-          <circle cx="16.5" cy="31.5" r="3" fill="#ffffff" stroke="#b45309" strokeWidth="2" />
-          <circle cx="31.5" cy="31.5" r="3" fill="#ffffff" stroke="#b45309" strokeWidth="2" />
-          <path d="M14 22h7" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-      );
-    case 'DEPOSITS':
-    default:
-      return (
-        <svg viewBox="0 0 48 48" className="sup-agent-area-svg" aria-hidden="true">
-          <rect width="48" height="48" rx="13" fill="url(#gradDep)" />
-          <defs>
-            <linearGradient id="gradDep" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor="#e0f2fe" />
-              <stop offset="100%" stopColor="#f0f9ff" />
-            </linearGradient>
-          </defs>
-          <path
-            d="M24 13l11 6v10l-11 6-11-6V19l11-6z"
-            fill="#ffffff"
-            stroke="#0284c7"
-            strokeWidth="2"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M13 19l11 6 11-6M24 25v10"
-            stroke="#0284c7"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M18.5 16l11 6"
-            stroke="#38bdf8"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-          />
-        </svg>
-      );
+  if (isModal) {
+    return <span className="sup-agent-modal-avatar">{svg}</span>;
   }
+
+  return svg;
 }
 
 export default function SupervisorPanel({
@@ -501,69 +375,108 @@ export default function SupervisorPanel({
             </p>
           </div>
 
-          <div className="sup-kpi-strip">
-            <div className="sup-kpi-chip">
-              <span className="sup-kpi-chip-label">Conversaciones</span>
-              <div className="sup-kpi-chip-main">
-                <strong>{totalConvs}</strong>
-                <span className="sup-live-pill">
-                  <span className="sup-live-dot" />
-                  {activeConvs} activas
-                </span>
-              </div>
-              {(waitingHumanConvs > 0 || humanHandlingConvs > 0) && (
-                <span className="sup-kpi-chip-sub">
-                  {waitingHumanConvs > 0 ? `${waitingHumanConvs} esperando humano` : ''}
-                  {waitingHumanConvs > 0 && humanHandlingConvs > 0 ? ' · ' : ''}
-                  {humanHandlingConvs > 0 ? `${humanHandlingConvs} manual` : ''}
-                </span>
-              )}
-            </div>
-
-            <div className="sup-kpi-chip">
-              <span className="sup-kpi-chip-label">Resolución autónoma</span>
-              <div className="sup-kpi-chip-main">
-                <strong>{autonomousRate != null ? `${autonomousRate}%` : '—'}</strong>
-              </div>
-              <span className="sup-kpi-chip-sub">
-                {totalRouted > 0
-                  ? `${totalRouted - totalEscalations} de ${totalRouted} turnos sin derivar`
-                  : 'Sin turnos en ventana'}
+          <div className="sup-kpi-chip">
+            <span className="sup-kpi-chip-label">Conversaciones</span>
+            <div className="sup-kpi-chip-main">
+              <strong>{totalConvs}</strong>
+              <span className={`sup-live-pill${activeConvs > 0 ? ' is-live' : ''}`}>
+                <span className="sup-live-dot" aria-hidden="true" />
+                {activeConvs} activas
               </span>
             </div>
+            {(waitingHumanConvs > 0 || humanHandlingConvs > 0) && (
+              <span className="sup-kpi-chip-sub">
+                {waitingHumanConvs > 0 ? `${waitingHumanConvs} esperando humano` : ''}
+                {waitingHumanConvs > 0 && humanHandlingConvs > 0 ? ' · ' : ''}
+                {humanHandlingConvs > 0 ? `${humanHandlingConvs} manual` : ''}
+              </span>
+            )}
+          </div>
 
-            <div className="sup-kpi-chip">
-              <span className="sup-kpi-chip-label">Meta de seguridad</span>
-              <div className="sup-kpi-chip-main">
-                <strong>
-                  {agents?.confidenceThreshold != null
-                    ? `${Math.round(agents.confidenceThreshold * 100)}%`
-                    : '—'}
-                </strong>
-              </div>
-              <span className="sup-kpi-chip-sub">Confianza mínima exigida</span>
+          <div className="sup-kpi-chip">
+            <span className="sup-kpi-chip-label">Resolución autónoma</span>
+            <div className="sup-kpi-chip-main">
+              <strong>{autonomousRate != null ? `${autonomousRate}%` : '—'}</strong>
             </div>
+            <span className="sup-kpi-chip-sub">
+              {totalRouted > 0
+                ? `${totalRouted - totalEscalations} de ${totalRouted} turnos sin derivar`
+                : 'Sin turnos en ventana'}
+            </span>
+          </div>
+
+          <div className="sup-kpi-chip">
+            <span className="sup-kpi-chip-label">Meta de seguridad</span>
+            <div className="sup-kpi-chip-main">
+              <strong>
+                {agents?.confidenceThreshold != null
+                  ? `${Math.round(agents.confidenceThreshold * 100)}%`
+                  : '—'}
+              </strong>
+            </div>
+            <span className="sup-kpi-chip-sub">Confianza mínima exigida</span>
           </div>
         </div>
 
-        {/* Tarjetas compactas de agentes robots */}
+        {/* Flujo animado desde Recepción inicial hacia los agentes */}
+        <div className="sup-route-bar">
+          <span className="sup-route-recv">
+            Recepción inicial · <strong>{unassignedConvs}</strong> sin derivar a un agente
+          </span>
+          <span className="sup-route-track" aria-hidden="true" />
+          {agentFilter && (
+            <button
+              type="button"
+              className="sup-clear-agent-btn"
+              onClick={() => {
+                setAgentFilter('');
+                setPage(1);
+              }}
+            >
+              Filtrando por {AGENT_META[agentFilter]?.name ?? agentFilter} ✕
+            </button>
+          )}
+        </div>
+
+        {/* Tarjetas de agentes robots animados */}
         <div className="sup-agents-grid">
-          {agentList.map((agent) => {
+          {agentList.map((agent, index) => {
+            const theme = AGENT_BOT_THEMES[agent.agentType] || AGENT_BOT_THEMES.SALES;
             const meta = AGENT_META[agent.agentType] || {
               name: agent.agentType,
               subtitle: 'Agente especializado',
-              accent: '#2563eb',
-              bgSoft: '#eff6ff',
-              borderSoft: '#bfdbfe',
+              accent: theme.c,
+              bgSoft: theme.soft,
+              borderSoft: theme.c,
             };
             const isSelected = agentFilter === agent.agentType;
-            const isActive = agent.status === 'active';
+            const activeCount = agent.activeConversations ?? 0;
+            const isAttending = activeCount > 0;
+            const coveragePct =
+              agent.hasData && agent.coverage != null
+                ? Math.min(100, Math.max(0, Math.round(agent.coverage * 100)))
+                : null;
+            const samplePct =
+              !agent.hasData && agent.minimumSample > 0
+                ? Math.min(100, Math.round(((agent.sampleSize ?? 0) / agent.minimumSample) * 100))
+                : 0;
+            const barPct = coveragePct ?? samplePct;
+            const coverageTitle =
+              coveragePct != null
+                ? `Respuestas con respaldo documental: ${coveragePct}%`
+                : `Reuniendo consultas iniciales (${agent.sampleSize ?? 0} de ${agent.minimumSample ?? 0}) para calcular el respaldo documental`;
 
             return (
               <article
                 key={agent.agentType}
                 className={`sup-agent-card${isSelected ? ' is-selected' : ''}`}
-                style={{ '--agent-accent': meta.accent }}
+                style={{
+                  '--agent-c': theme.c,
+                  '--agent-soft': theme.soft,
+                  '--agent-ink': theme.ink,
+                  '--agent-d': `${(index * 0.7).toFixed(1)}s`,
+                  '--agent-i': `${(index * 0.12).toFixed(2)}s`,
+                }}
                 onClick={() => {
                   setAgentFilter((prev) => (prev === agent.agentType ? '' : agent.agentType));
                   setPage(1);
@@ -579,101 +492,79 @@ export default function SupervisorPanel({
                   }
                 }}
               >
-                <div className="sup-agent-compact-main">
-                  <div
-                    className="sup-agent-robot-wrap"
-                    title={isActive ? 'Agente activo' : 'Agente en espera'}
-                  >
-                    <AgentRobotAvatar agentType={agent.agentType} size="sm" />
+                <div className="sup-agent-stage">
+                  {isAttending && (
+                    <div className="sup-agent-bubble" aria-hidden="true">
+                      <span />
+                      <span />
+                      <span />
+                    </div>
+                  )}
+                  <AgentRobotAvatar
+                    agentType={agent.agentType}
+                    label={`Agente de ${meta.name}`}
+                  />
+                  {isAttending && (
                     <span
-                      className={`sup-agent-robot-dot${isActive ? ' is-active' : ''}`}
-                      aria-label={isActive ? 'Activo' : 'En espera'}
+                      className="sup-agent-live"
+                      aria-label="En línea"
+                      title="Atendiendo conversaciones en curso"
+                    />
+                  )}
+                </div>
+
+                <h4 className="sup-agent-name">{meta.name}</h4>
+                <span className={`sup-agent-pill-active${isAttending ? '' : ' is-idle'}`}>
+                  {activeCount}{' '}
+                  {activeCount === 1 ? 'conversación en curso' : 'conversaciones en curso'}
+                </span>
+
+                <div className="sup-agent-coverage" title={coverageTitle}>
+                  <div className="sup-agent-coverage-head">
+                    <span>Respaldo documental</span>
+                    <strong className="sup-agent-coverage-val">
+                      {coveragePct != null
+                        ? `${coveragePct}%`
+                        : `${agent.sampleSize ?? 0}/${agent.minimumSample ?? 0}`}
+                    </strong>
+                  </div>
+                  <div className="sup-agent-bar" aria-hidden="true">
+                    <div
+                      className="sup-agent-bar-fill"
+                      style={{ width: `${barPct}%` }}
                     />
                   </div>
-
-                  <div className="sup-agent-identity">
-                    <h4>{meta.name}</h4>
-                    <div
-                      className="sup-agent-compact-convs"
-                      title={`${agent.totalConversations} conversaciones totales (${agent.activeConversations} en curso)`}
-                    >
-                      <span className="sup-agent-conv-total">
-                        <strong>{agent.totalConversations}</strong> conv.
-                      </span>
-                      <span className="sup-agent-conv-active">
-                        <strong>{agent.activeConversations}</strong> en curso
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="sup-agent-area-badge" aria-hidden="true">
-                    <AgentAreaIcon agentType={agent.agentType} />
-                  </div>
                 </div>
 
-                <div className="sup-agent-compact-footer">
-                  <button
-                    type="button"
-                    className="sup-agent-info-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setInfoAgentType(agent.agentType);
-                    }}
-                    onKeyDown={(e) => e.stopPropagation()}
-                    aria-label={`Más información sobre ${meta.name}`}
+                <button
+                  type="button"
+                  className="sup-agent-info-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setInfoAgentType(agent.agentType);
+                  }}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  aria-label={`Más información sobre ${meta.name}`}
+                >
+                  <span>Más información</span>
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
                   >
-                    <span className="sup-agent-info-btn-left">
-                      <svg
-                        width="13"
-                        height="13"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.1"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <circle cx="12" cy="12" r="10" />
-                        <path d="M12 16v-4" />
-                        <path d="M12 8h.01" />
-                      </svg>
-                      <span>Más información</span>
-                    </span>
-                    <span className="sup-agent-info-arrow" aria-hidden="true">›</span>
-                  </button>
-                </div>
+                    <path d="M9 6l6 6-6 6" />
+                  </svg>
+                </button>
               </article>
             );
           })}
         </div>
-
-        {(unassignedConvs > 0 || agentFilter) && (
-          <div className="sup-overview-footnote">
-            {unassignedConvs > 0 ? (
-              <span>
-                Recepción inicial: <strong>{unassignedConvs}</strong>{' '}
-                {unassignedConvs === 1
-                  ? 'conversación aún sin derivar a un agente.'
-                  : 'conversaciones aún sin derivar a un agente.'}
-              </span>
-            ) : (
-              <span />
-            )}
-            {agentFilter && (
-              <button
-                type="button"
-                className="sup-clear-agent-btn"
-                onClick={() => {
-                  setAgentFilter('');
-                  setPage(1);
-                }}
-              >
-                Filtrando por {AGENT_META[agentFilter]?.name ?? agentFilter} ✕
-              </button>
-            )}
-          </div>
-        )}
       </section>
 
       {/* EXPLORADOR DE CONVERSACIONES CON BÚSQUEDA, FILTROS Y PAGINACIÓN */}
@@ -1149,18 +1040,6 @@ function ContactTimelineModal({ data, onClose }) {
               {data.contact.externalId}
               {data.contact.employee ? ` · ${data.contact.employee.name}` : ''}
             </h2>
-            <p>
-              {data.conversations.length} hilo(s) combinados cronológicamente (
-              {data.conversations
-                .map(
-                  (c) =>
-                    `${c.channel === 'WHATSAPP' ? 'WhatsApp' : 'Web'} · ${
-                      AGENT_META[c.currentAgent]?.name ?? 'Sin área'
-                    }`,
-                )
-                .join(' / ')}
-              ).
-            </p>
           </div>
           <div className="econ-modal-actions">
             <ChatExportMenu

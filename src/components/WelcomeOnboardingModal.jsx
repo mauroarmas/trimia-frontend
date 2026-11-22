@@ -108,7 +108,7 @@ export default function WelcomeOnboardingModal({ me, hasDiagnostic = true, onCom
               fontSize: 26,
               fontWeight: 700,
               color: '#17305A',
-              fontFamily: 'var(--font-title, "Lexend", sans-serif)',
+              fontFamily: 'var(--font-display)',
             }}
           >
             {currentStepData.title}
@@ -183,7 +183,7 @@ export default function WelcomeOnboardingModal({ me, hasDiagnostic = true, onCom
                 color: '#17305A',
                 textAlign: 'justify',
                 hyphens: 'auto',
-                fontFamily: 'var(--font-body, "Nunito Sans", sans-serif)',
+                fontFamily: 'var(--font-sans)',
               }}
             >
               {currentStepData.dialogue}

@@ -21,7 +21,6 @@ const FILE_STATUS_LABEL = {
 
 export default function KnowledgeIngestForm({ token, alcance, onIngested, onViewAll, onSearch }) {
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('');
   const [audience, setAudience] = useState('PUBLICO');
   const [agentType, setAgentType] = useState('');
 
@@ -76,8 +75,8 @@ export default function KnowledgeIngestForm({ token, alcance, onIngested, onView
     }
 
     if (hasText) {
-      if (!title.trim() || !content.trim() || !category.trim()) {
-        setError({ message: 'Título, categoría y contenido son obligatorios para cargar texto.' });
+      if (!title.trim() || !content.trim()) {
+        setError({ message: 'Título y contenido son obligatorios para cargar texto.' });
         return;
       }
       setBusy(true);
@@ -85,14 +84,12 @@ export default function KnowledgeIngestForm({ token, alcance, onIngested, onView
         const res = await ingestKnowledge(token, {
           title: title.trim(),
           content: content.trim(),
-          category: category.trim(),
           audience,
           agentType: agentType || undefined,
         });
         setResultMsg(`Documento creado correctamente con ${res.chunks ?? 1} fragmento(s) en la base de conocimiento.`);
         setTitle('');
         setContent('');
-        setCategory('');
         onIngested?.();
       } catch (err) {
         setError(err);
@@ -105,15 +102,11 @@ export default function KnowledgeIngestForm({ token, alcance, onIngested, onView
         setError({ message: 'Seleccioná un archivo para subir.' });
         return;
       }
-      if (!category.trim()) {
-        setError({ message: 'La categoría es obligatoria.' });
-        return;
-      }
       setBusy(true);
       try {
         await uploadKnowledgeFile(
           token,
-          { file, title: title.trim() || undefined, category: category.trim(), audience, agentType: agentType || undefined },
+          { file, title: title.trim() || undefined, audience, agentType: agentType || undefined },
           force,
         );
         setResultMsg('Archivo subido. El texto se está extrayendo y vectorizando en segundo plano.');
@@ -167,15 +160,6 @@ export default function KnowledgeIngestForm({ token, alcance, onIngested, onView
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder={usandoArchivo ? 'Si se omite, se usa el nombre del archivo' : 'Ej: Política de entregas'}
                 required={!file}
-              />
-            </div>
-            <div className="knowledge-filter">
-              <label>Categoría</label>
-              <input
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                placeholder="Ej: Cobranzas, Planes, FAQs"
-                required
               />
             </div>
             <div className="knowledge-filter">

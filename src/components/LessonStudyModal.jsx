@@ -724,7 +724,7 @@ export default function LessonStudyModal({
               fontSize: 21,
               fontWeight: 700,
               color: '#0F172A',
-              fontFamily: 'var(--font-title, "Lexend", sans-serif)',
+              fontFamily: 'var(--font-display)',
             }}
           >
             {pill?.title || pillData?.title || 'Recopilación de datos para concretar una venta'}

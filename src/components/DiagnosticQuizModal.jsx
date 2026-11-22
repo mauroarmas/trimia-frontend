@@ -170,7 +170,7 @@ export default function DiagnosticQuizModal({ token, onClose, onComplete }) {
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
               <Trimi mood="saluda" size={90} />
             </div>
-            <h3 style={{ margin: '0 0 10px', color: '#17305A', fontSize: 22, fontFamily: 'var(--font-title, "Lexend", sans-serif)' }}>
+            <h3 style={{ margin: '0 0 10px', color: '#17305A', fontSize: 22, fontFamily: 'var(--font-display)' }}>
               ¡Tu ruta está lista para comenzar!
             </h3>
             <p className="hint" style={{ margin: '0 auto 24px', maxWidth: 480, fontSize: 14, color: '#64748B', lineHeight: 1.55 }}>
@@ -234,7 +234,7 @@ export default function DiagnosticQuizModal({ token, onClose, onComplete }) {
                     fontSize: 22,
                     fontWeight: 700,
                     color: '#17305A',
-                    fontFamily: 'var(--font-title, "Lexend", sans-serif)',
+                    fontFamily: 'var(--font-display)',
                   }}
                 >
                   Veamos qué ya sabés
@@ -543,7 +543,7 @@ export default function DiagnosticQuizModal({ token, onClose, onComplete }) {
               <Trimi mood={result.exemptedModules?.length > 0 ? 'festeja' : 'saluda'} size={90} />
             </div>
 
-            <h3 style={{ margin: '0 0 6px', fontSize: 22, color: '#17305A', fontFamily: 'var(--font-title, "Lexend", sans-serif)' }}>
+            <h3 style={{ margin: '0 0 6px', fontSize: 22, color: '#17305A', fontFamily: 'var(--font-display)' }}>
               ¡Diagnóstico completado!
             </h3>
             <p className="hint" style={{ margin: '0 auto 20px', maxWidth: 540 }}>

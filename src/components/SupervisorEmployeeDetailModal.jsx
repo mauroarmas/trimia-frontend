@@ -133,7 +133,7 @@ export default function SupervisorEmployeeDetailModal({
         >
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontFamily: 'Lexend, sans-serif', color: '#0f172a' }}>
+              <h3 style={{ margin: 0, fontSize: 17, fontFamily: 'var(--font-display)', color: '#0f172a' }}>
                 {employee.name}
               </h3>
               <span
@@ -375,7 +375,7 @@ export default function SupervisorEmployeeDetailModal({
 
               {diagnosticData?.lastSession?.answers?.length > 0 && (
                 <div>
-                  <h4 style={{ margin: '0 0 10px', fontSize: 14, fontFamily: 'Lexend, sans-serif' }}>
+                  <h4 style={{ margin: '0 0 10px', fontSize: 14, fontFamily: 'var(--font-display)' }}>
                     Respuestas de la evaluación ({diagnosticData.lastSession.answers.length} preguntas)
                   </h4>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -475,7 +475,7 @@ export default function SupervisorEmployeeDetailModal({
                             <span style={{ fontSize: 11, fontWeight: 700, color: '#2b6fc0', textTransform: 'uppercase' }}>
                               {selectedSim.mode === 'GUIDED' ? 'Práctica Guiada' : 'Simulación Libre'}
                             </span>
-                            <h4 style={{ margin: '2px 0 0', fontSize: 15, fontFamily: 'Lexend, sans-serif' }}>
+                            <h4 style={{ margin: '2px 0 0', fontSize: 15, fontFamily: 'var(--font-display)' }}>
                               {selectedSim.scenarioTitle || 'Escenario'}
                             </h4>
                           </div>

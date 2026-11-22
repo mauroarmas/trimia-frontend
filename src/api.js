@@ -117,8 +117,8 @@ export function checkHealth() {
   return request('/health');
 }
 
-export function ingestKnowledge(token, { title, content, category, audience, agentType }) {
-  const body = { title, content, category };
+export function ingestKnowledge(token, { title, content, audience, agentType }) {
+  const body = { title, content };
   if (audience) body.audience = audience;
   if (agentType) body.agentType = agentType;
   return request('/knowledge', { method: 'POST', token, body });
@@ -159,11 +159,10 @@ export function getEscalation(token, id) {
   return request(`/supervisor/escalations/${id}`, { token });
 }
 
-export function resolveEscalation(token, id, { message, teachAgent, title, category, audience, agentType, correctKnowledge }) {
+export function resolveEscalation(token, id, { message, teachAgent, title, audience, agentType, correctKnowledge }) {
   const body = { message, teachAgent };
   if (teachAgent) {
     body.title = title;
-    body.category = category;
     if (audience) body.audience = audience;
     if (agentType) body.agentType = agentType;
   }
@@ -471,10 +470,9 @@ export function reindexKnowledgeDoc(token, id) {
  *
  * `force` reintenta un archivo que el backend ya vio (409 por checksum).
  */
-export function uploadKnowledgeFile(token, { file, title, category, audience, agentType }, force = false) {
+export function uploadKnowledgeFile(token, { file, title, audience, agentType }, force = false) {
   const form = new FormData();
   form.append('file', file);
-  form.append('category', category);
   if (title) form.append('title', title);
   if (audience) form.append('audience', audience);
   if (agentType) form.append('agentType', agentType);
@@ -606,12 +604,25 @@ export function getEscalationSuggestion(token, id) {
 }
 
 /**
- * Aprobar y guardar SIN enviar: no le llega nada al usuario, la respuesta se
- * incorpora al RAG y la conversación vuelve al asistente. `title` y `category`
- * son obligatorios acá (la ingesta es la acción entera, no un opcional).
+ * Genera un borrador de documento nuevo para la Base de Conocimiento con IA a
+ * partir de la pregunta que provocó la derivación, las notas internas y las
+ * respuestas que acaba de dar el supervisor al tomar el control.
  */
-export function saveEscalationUnsent(token, id, { message, title, category, agentType }) {
-  const body = { message, title, category };
+export function generateEscalationKnowledgeDraft(token, id, { supervisorReplies = [] } = {}) {
+  return request(`/supervisor/escalations/${encodeURIComponent(id)}/knowledge-draft`, {
+    method: 'POST',
+    token,
+    body: { supervisorReplies },
+  });
+}
+
+/**
+ * Aprobar y guardar SIN enviar: no le llega nada al usuario, la respuesta se
+ * incorpora al RAG y la conversación vuelve al asistente. `title` es obligatorio
+ * acá (la ingesta es la acción entera, no un opcional).
+ */
+export function saveEscalationUnsent(token, id, { message, title, agentType }) {
+  const body = { message, title };
   if (agentType) body.agentType = agentType;
   return request(`/supervisor/escalations/${id}/save-unsent`, {
     method: 'POST',
@@ -626,6 +637,18 @@ export function discardEscalation(token, id, reason) {
     method: 'POST',
     token,
     body: { reason },
+  });
+}
+
+/**
+ * Marca el caso escalado como resuelto tras atenderlo manualmente en vivo
+ * (Tomar control → responder → Liberar control), sin reenviar mensajes.
+ */
+export function resolveEscalationManual(token, id, { resolution } = {}) {
+  return request(`/supervisor/escalations/${encodeURIComponent(id)}/resolve-manual`, {
+    method: 'POST',
+    token,
+    body: resolution ? { resolution } : {},
   });
 }
 

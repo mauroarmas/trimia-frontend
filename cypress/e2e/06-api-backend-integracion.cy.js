@@ -24,7 +24,7 @@
 
 describe('Módulo 06 — Pruebas de Integración, Seguridad y Rendimiento sobre la API REST (Backend NestJS)', () => {
   let datos;
-  const apiUrl = Cypress.env('apiUrl') || 'http://localhost:3000';
+  const apiUrl = Cypress.expose('apiUrl') || 'http://localhost:3000';
 
   before(() => {
     cy.fixture('datos_prueba').then((fixtureData) => {
@@ -131,7 +131,7 @@ describe('Módulo 06 — Pruebas de Integración, Seguridad y Rendimiento sobre 
         method: 'PUT',
         url: `${apiUrl}/collections/reminder-config`,
         headers: { Authorization: `Bearer ${tokenCobrador}` },
-        body: { daysBeforeDue: 5, isActive: true },
+        body: { daysBefore: [5], maxAttempts: 3 },
         failOnStatusCode: false,
       }).then((res) => {
         expect(res.status).to.eq(403);

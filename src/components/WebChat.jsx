@@ -945,7 +945,6 @@ function AccionesDelInforme({
 /** Alta rápida de documento en el área del agente que respondió. */
 function FormularioDeCarga({ token, agentType, onHecho }) {
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('');
   const [content, setContent] = useState('');
   const [audience, setAudience] = useState('INTERNO');
   const [guardando, setGuardando] = useState(false);
@@ -959,7 +958,6 @@ function FormularioDeCarga({ token, agentType, onHecho }) {
       await ingestKnowledge(token, {
         title,
         content,
-        category,
         audience,
         agentType,
       });
@@ -983,10 +981,6 @@ function FormularioDeCarga({ token, agentType, onHecho }) {
           <input value={title} onChange={(e) => setTitle(e.target.value)} />
         </div>
         <div className="field">
-          <label>Categoría</label>
-          <input value={category} onChange={(e) => setCategory(e.target.value)} />
-        </div>
-        <div className="field">
           <label>Audiencia</label>
           <select value={audience} onChange={(e) => setAudience(e.target.value)}>
             <option value="INTERNO">INTERNO — solo empleados</option>
@@ -1005,7 +999,7 @@ function FormularioDeCarga({ token, agentType, onHecho }) {
       {error && <p className="error">{error}</p>}
       <button
         type="submit"
-        disabled={guardando || !title || !category || !content}
+        disabled={guardando || !title || !content}
       >
         {guardando ? 'Guardando…' : 'Guardar documento'}
       </button>

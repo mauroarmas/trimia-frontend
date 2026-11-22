@@ -562,7 +562,7 @@ export default function TrainingPanel({ token, me }) {
                   fontSize: 26,
                   fontWeight: 700,
                   color: '#0F172A',
-                  fontFamily: 'var(--font-title, "Lexend", sans-serif)',
+                  fontFamily: 'var(--font-display)',
                 }}
               >
                 Mi ruta de aprendizaje
@@ -1136,7 +1136,7 @@ export default function TrainingPanel({ token, me }) {
                         <span style={{ fontSize: 12, color: '#64748B', fontWeight: 600, display: 'block', marginBottom: 2 }}>
                           Módulo de capacitación
                         </span>
-                        <h4 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, color: '#0F172A', fontFamily: 'Lexend, sans-serif' }}>
+                        <h4 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, color: '#0F172A', fontFamily: 'var(--font-display)' }}>
                           {m.title}
                         </h4>
                         <span style={{ fontSize: 13, color: '#64748B' }}>
@@ -1400,217 +1400,76 @@ export default function TrainingPanel({ token, me }) {
       {isSupervisor && supervisorTab === 'tracking' && (
         <div className="training-supervisor-tracking">
           {/* Tarjetas resumen: En capacitación, Necesitan ayuda, Listos para atender */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-              gap: 16,
-              marginBottom: 20,
-            }}
-          >
-            {/* 1. En capacitación */}
-            <div
+          <div className="sales-kpi-strip training-tracking-kpis">
+            <button
+              type="button"
+              className={`sales-kpi-card-btn is-blue${trackingFilter === 'IN_TRAINING' ? ' is-active' : ''}`}
               onClick={() => setTrackingFilter(trackingFilter === 'IN_TRAINING' ? 'ALL' : 'IN_TRAINING')}
-              style={{
-                background: '#ffffff',
-                border: trackingFilter === 'IN_TRAINING' ? '2px solid #2b6fc0' : '1px solid #cfe0f3',
-                borderRadius: 14,
-                padding: '20px',
-                cursor: 'pointer',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                transition: 'all 0.15s ease',
-              }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  En capacitación
-                </span>
-                <span
-                  style={{
-                    background: '#eef5fc',
-                    color: '#2b6fc0',
-                    borderRadius: '50%',
-                    width: 32,
-                    height: 32,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <TrainingIcon type="book" size={16} />
-                </span>
-              </div>
-              <div style={{ fontSize: 28, fontWeight: 800, color: '#17305a', margin: '8px 0 2px', fontFamily: 'Lexend, sans-serif' }}>
-                {trackingData?.summary?.inTraining ?? 0}
-              </div>
-              <div style={{ fontSize: 12.5, color: '#64748b' }}>
-                Colaboradores cursando su ruta activa
-              </div>
-            </div>
+              <span className="sales-kpi-label">En capacitación</span>
+              <span className="sales-kpi-val">{trackingData?.summary?.inTraining ?? 0}</span>
+              <span className="sup-kpi-chip-sub">Colaboradores cursando su ruta activa</span>
+            </button>
 
-            {/* 2. Necesitan ayuda */}
-            <div
+            <button
+              type="button"
+              className={`sales-kpi-card-btn is-amber${trackingFilter === 'NEEDS_HELP' ? ' is-active' : ''}`}
               onClick={() => setTrackingFilter(trackingFilter === 'NEEDS_HELP' ? 'ALL' : 'NEEDS_HELP')}
-              style={{
-                background: '#ffffff',
-                border: trackingFilter === 'NEEDS_HELP' ? '2px solid #b45309' : '1px solid #fde68a',
-                borderRadius: 14,
-                padding: '20px',
-                cursor: 'pointer',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                transition: 'all 0.15s ease',
-              }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: '#b45309', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Necesitan ayuda
-                </span>
-                <span
-                  style={{
-                    background: '#fffdf5',
-                    color: '#b45309',
-                    border: '1px solid #fde68a',
-                    borderRadius: '50%',
-                    width: 32,
-                    height: 32,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 700,
-                  }}
-                >
-                  ⚠️
-                </span>
-              </div>
-              <div style={{ fontSize: 28, fontWeight: 800, color: '#92400e', margin: '8px 0 2px', fontFamily: 'Lexend, sans-serif' }}>
-                {trackingData?.summary?.needsHelp ?? 0}
-              </div>
-              <div style={{ fontSize: 12.5, color: '#92400e' }}>
-                &gt;3 días sin avance o 2 simulaciones no aprobadas
-              </div>
-            </div>
+              <span className="sales-kpi-label">Necesitan ayuda</span>
+              <span className="sales-kpi-val">{trackingData?.summary?.needsHelp ?? 0}</span>
+              <span className="sup-kpi-chip-sub">&gt;3 días sin avance o 2 simulaciones no aprobadas</span>
+            </button>
 
-            {/* 3. Listos para atender */}
-            <div
+            <button
+              type="button"
+              className={`sales-kpi-card-btn is-emerald${trackingFilter === 'READY' ? ' is-active' : ''}`}
               onClick={() => setTrackingFilter(trackingFilter === 'READY' ? 'ALL' : 'READY')}
-              style={{
-                background: '#ffffff',
-                border: trackingFilter === 'READY' ? '2px solid #05968d' : '1px solid #a7f3ee',
-                borderRadius: 14,
-                padding: '20px',
-                cursor: 'pointer',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                transition: 'all 0.15s ease',
-              }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: '#05968d', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Listos para atender
-                </span>
-                <span
-                  style={{
-                    background: '#ecfdf5',
-                    color: '#05968d',
-                    borderRadius: '50%',
-                    width: 32,
-                    height: 32,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <TrainingIcon type="check" size={16} />
-                </span>
-              </div>
-              <div style={{ fontSize: 28, fontWeight: 800, color: '#065f5a', margin: '8px 0 2px', fontFamily: 'Lexend, sans-serif' }}>
-                {trackingData?.summary?.readyToServe ?? 0}
-              </div>
-              <div style={{ fontSize: 12.5, color: '#05968d' }}>
-                100% de la ruta completada con éxito
-              </div>
-            </div>
+              <span className="sales-kpi-label">Listos para atender</span>
+              <span className="sales-kpi-val">{trackingData?.summary?.readyToServe ?? 0}</span>
+              <span className="sup-kpi-chip-sub">100% de la ruta completada con éxito</span>
+            </button>
           </div>
 
           {/* Tabla de Ingresantes */}
-          <div className="card" style={{ padding: 24, borderRadius: 14 }}>
+          <div className="card" style={{ padding: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: 17, fontFamily: 'Lexend, sans-serif', color: '#17305a' }}>
-                  Ingresantes y Estado de Avance
-                </h3>
-                <p className="hint" style={{ margin: '4px 0 0' }}>
+                <h3 style={{ margin: 0 }}>Ingresantes y Estado de Avance</h3>
+                <p style={{ margin: '4px 0 0', fontSize: 13 }}>
                   Monitoreá las paradas, última actividad y resultados de prácticas.
                 </p>
               </div>
 
               {/* Filtros rápidos por estado */}
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: 8, padding: 3 }}>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                <div className="submenu-pills">
                   <button
                     type="button"
+                    className={`submenu-pill${trackingFilter === 'ALL' ? ' active' : ''}`}
                     onClick={() => { setTrackingFilter('ALL'); setTrackingPage(1); }}
-                    style={{
-                      border: 'none',
-                      background: trackingFilter === 'ALL' ? '#ffffff' : 'transparent',
-                      color: trackingFilter === 'ALL' ? '#0f172a' : '#64748b',
-                      fontWeight: trackingFilter === 'ALL' ? 700 : 500,
-                      padding: '6px 12px',
-                      borderRadius: 6,
-                      fontSize: 12,
-                      cursor: 'pointer',
-                      boxShadow: trackingFilter === 'ALL' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
-                    }}
                   >
                     Todos ({filteredTrackingEmployees.length})
                   </button>
                   <button
                     type="button"
+                    className={`submenu-pill${trackingFilter === 'IN_TRAINING' ? ' active' : ''}`}
                     onClick={() => { setTrackingFilter('IN_TRAINING'); setTrackingPage(1); }}
-                    style={{
-                      border: 'none',
-                      background: trackingFilter === 'IN_TRAINING' ? '#ffffff' : 'transparent',
-                      color: trackingFilter === 'IN_TRAINING' ? '#2b6fc0' : '#64748b',
-                      fontWeight: trackingFilter === 'IN_TRAINING' ? 700 : 500,
-                      padding: '6px 12px',
-                      borderRadius: 6,
-                      fontSize: 12,
-                      cursor: 'pointer',
-                      boxShadow: trackingFilter === 'IN_TRAINING' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
-                    }}
                   >
                     En capacitación ({trackingData?.summary?.inTraining ?? 0})
                   </button>
                   <button
                     type="button"
+                    className={`submenu-pill${trackingFilter === 'NEEDS_HELP' ? ' active' : ''}`}
                     onClick={() => { setTrackingFilter('NEEDS_HELP'); setTrackingPage(1); }}
-                    style={{
-                      border: 'none',
-                      background: trackingFilter === 'NEEDS_HELP' ? '#ffffff' : 'transparent',
-                      color: trackingFilter === 'NEEDS_HELP' ? '#b45309' : '#64748b',
-                      fontWeight: trackingFilter === 'NEEDS_HELP' ? 700 : 500,
-                      padding: '6px 12px',
-                      borderRadius: 6,
-                      fontSize: 12,
-                      cursor: 'pointer',
-                      boxShadow: trackingFilter === 'NEEDS_HELP' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
-                    }}
                   >
                     Necesitan ayuda ({trackingData?.summary?.needsHelp ?? 0})
                   </button>
                   <button
                     type="button"
+                    className={`submenu-pill${trackingFilter === 'READY' ? ' active' : ''}`}
                     onClick={() => { setTrackingFilter('READY'); setTrackingPage(1); }}
-                    style={{
-                      border: 'none',
-                      background: trackingFilter === 'READY' ? '#ffffff' : 'transparent',
-                      color: trackingFilter === 'READY' ? '#05968d' : '#64748b',
-                      fontWeight: trackingFilter === 'READY' ? 700 : 500,
-                      padding: '6px 12px',
-                      borderRadius: 6,
-                      fontSize: 12,
-                      cursor: 'pointer',
-                      boxShadow: trackingFilter === 'READY' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
-                    }}
                   >
                     Listos ({trackingData?.summary?.readyToServe ?? 0})
                   </button>
@@ -1621,7 +1480,7 @@ export default function TrainingPanel({ token, me }) {
                   className="secondary"
                   onClick={loadTrackingData}
                   disabled={loadingEmployees}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 36, padding: '6px 14px' }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
                 >
                   <TrainingIcon type="refresh" size={13} />
                   <span>Actualizar</span>
@@ -1630,20 +1489,20 @@ export default function TrainingPanel({ token, me }) {
             </div>
 
             {loadingEmployees ? (
-              <p style={{ textAlign: 'center', padding: 30, color: '#64748b' }}>Cargando seguimiento de ingresantes...</p>
+              <p style={{ textAlign: 'center', padding: 30 }}>Cargando seguimiento de ingresantes...</p>
             ) : employees.length === 0 ? (
               <p className="hint" style={{ textAlign: 'center', padding: 20 }}>No hay colaboradores registrados en el sistema.</p>
             ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <div className="sup-table-wrap">
+                <table className="custom-data-table">
                   <thead>
-                    <tr style={{ borderBottom: '2px solid #E2E8F0', textAlign: 'left', color: '#64748B' }}>
-                      <th style={{ padding: '12px 14px' }}>Persona y puesto</th>
-                      <th style={{ padding: '12px 14px' }}>Parada actual</th>
-                      <th style={{ padding: '12px 14px', width: 170 }}>Avance</th>
-                      <th style={{ padding: '12px 14px' }}>Última actividad</th>
-                      <th style={{ padding: '12px 14px' }}>Estado</th>
-                      <th style={{ padding: '12px 14px', textAlign: 'right' }}>Acciones</th>
+                    <tr>
+                      <th>Persona y puesto</th>
+                      <th>Parada actual</th>
+                      <th style={{ width: 170 }}>Avance</th>
+                      <th>Última actividad</th>
+                      <th>Estado</th>
+                      <th style={{ textAlign: 'right' }}>Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1651,102 +1510,70 @@ export default function TrainingPanel({ token, me }) {
                         const statusConfig = (() => {
                           switch (emp.trackingStatus) {
                             case 'READY':
-                              return { label: 'Listo para atender', bg: '#ecfdf5', color: '#05968d', border: '#a7f3ee', icon: 'check' };
+                              return { label: 'Listo para atender', cls: 'badge status-active' };
                             case 'NEEDS_HELP':
-                              return { label: 'Necesita ayuda', bg: '#fffdf5', color: '#b45309', border: '#fde68a', icon: 'clock' };
+                              return { label: 'Necesita ayuda', cls: 'badge status-warning' };
                             default:
-                              return { label: 'En capacitación', bg: '#eef5fc', color: '#2b6fc0', border: '#cfe0f3', icon: 'book' };
+                              return { label: 'En capacitación', cls: 'badge status-info' };
                           }
                         })();
 
                         const isStalled = emp.daysWithoutProgress !== null && emp.daysWithoutProgress >= 3;
 
                         return (
-                          <tr key={emp.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                            <td style={{ padding: '14px' }}>
-                              <strong style={{ color: '#0f172a', fontSize: 13.5 }}>{emp.name}</strong>
-                              <div style={{ fontSize: 11.5, color: '#475569', marginTop: 1 }}>
-                                {emp.role || 'Vendedor/a'} · <span style={{ color: '#64748b' }}>{emp.sectorName || 'Transversal'}</span>
+                          <tr key={emp.id}>
+                            <td>
+                              <strong>{emp.name}</strong>
+                              <div style={{ fontSize: 12, marginTop: 2, opacity: 0.78 }}>
+                                {emp.role || 'Vendedor/a'} · {emp.sectorName || 'Transversal'}
                               </div>
                             </td>
 
-                            <td style={{ padding: '14px', color: '#334155' }}>
-                              <span style={{ fontWeight: 600, fontSize: 13 }}>
+                            <td>
+                              <span style={{ fontWeight: 500 }}>
                                 {emp.currentParada || 'Parada inicial'}
                               </span>
                             </td>
 
-                            <td style={{ padding: '14px' }}>
+                            <td>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                                <div style={{ flex: 1, height: 6, background: '#e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
+                                <div className="training-tracking-progress-track">
                                   <div
-                                    style={{
-                                      width: `${emp.percentage ?? 0}%`,
-                                      height: '100%',
-                                      background: emp.percentage === 100 ? '#05968d' : '#2b6fc0',
-                                      borderRadius: 3,
-                                      transition: 'width 0.3s ease',
-                                    }}
+                                    className={`training-tracking-progress-fill${emp.percentage === 100 ? ' is-done' : ''}`}
+                                    style={{ width: `${emp.percentage ?? 0}%` }}
                                   />
                                 </div>
-                                <span style={{ fontSize: 12, fontWeight: 700, color: '#17305a', minWidth: 32 }}>
+                                <span className="training-tracking-pct">
                                   {emp.percentage ?? 0}%
                                 </span>
                               </div>
-                              <div style={{ fontSize: 11, color: '#64748b' }}>
+                              <div style={{ fontSize: 11.5, opacity: 0.72 }}>
                                 {emp.completedPills ?? 0} de {emp.totalPills ?? 0} paradas
                               </div>
                             </td>
 
-                            <td style={{ padding: '14px' }}>
-                              <div
-                                style={{
-                                  fontSize: 12.5,
-                                  color: isStalled ? '#b45309' : '#334155',
-                                  fontWeight: isStalled ? 700 : 500,
-                                }}
-                              >
+                            <td>
+                              <div className={isStalled ? 'training-tracking-stalled' : ''}>
                                 {formatRelativeTime(emp.lastActivity, emp.daysWithoutProgress)}
                               </div>
                               {emp.failedFreeSimulationsCount > 0 && (
-                                <div style={{ fontSize: 11, color: '#b91c1c', marginTop: 2 }}>
+                                <div className="training-tracking-failed">
                                   {emp.failedFreeSimulationsCount} simulación{emp.failedFreeSimulationsCount > 1 ? 'es' : ''} libre sin aprobar
                                 </div>
                               )}
                             </td>
 
-                            <td style={{ padding: '14px' }}>
-                              <span
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: 4,
-                                  padding: '3px 10px',
-                                  borderRadius: 12,
-                                  fontSize: 11.5,
-                                  fontWeight: 700,
-                                  background: statusConfig.bg,
-                                  color: statusConfig.color,
-                                  border: `1px solid ${statusConfig.border}`,
-                                }}
-                              >
+                            <td>
+                              <span className={statusConfig.cls}>
                                 {statusConfig.label}
                               </span>
                             </td>
 
-                            <td style={{ padding: '14px', textAlign: 'right' }}>
+                            <td style={{ textAlign: 'right' }}>
                               <button
                                 type="button"
-                                className="secondary"
+                                className="secondary btn-table-action"
                                 onClick={() => setDetailEmployee(emp)}
-                                style={{
-                                  padding: '6px 14px',
-                                  fontSize: 12.5,
-                                  fontWeight: 600,
-                                  minHeight: 34,
-                                  color: '#2b6fc0',
-                                  borderColor: '#cfe0f3',
-                                }}
                               >
                                 Ver detalle
                               </button>

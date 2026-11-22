@@ -303,7 +303,7 @@ export default function SimulationModal({
                   margin: 0,
                   fontSize: 17,
                   fontWeight: 700,
-                  fontFamily: 'Lexend, sans-serif',
+                  fontFamily: 'var(--font-display)',
                   color: '#0f172a',
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
@@ -485,7 +485,7 @@ export default function SimulationModal({
                       textTransform: 'uppercase',
                       letterSpacing: '0.04em',
                       marginBottom: 8,
-                      fontFamily: 'Lexend, sans-serif',
+                      fontFamily: 'var(--font-display)',
                     }}
                   >
                     Trimi
@@ -530,7 +530,7 @@ export default function SimulationModal({
                       fontSize: 14,
                       fontWeight: 700,
                       color: '#0f172a',
-                      fontFamily: 'Lexend, sans-serif',
+                      fontFamily: 'var(--font-display)',
                     }}
                   >
                     {isGuided ? 'Lo que vas a practicar' : 'Competencias que se evaluarán'}
@@ -747,7 +747,7 @@ export default function SimulationModal({
                       fontSize: 14,
                       fontWeight: 700,
                       color: '#0f172a',
-                      fontFamily: 'Lexend, sans-serif',
+                      fontFamily: 'var(--font-display)',
                     }}
                   >
                     Objetivos cumplidos: {completedGoalsCount} de {goals.length}
@@ -828,7 +828,7 @@ export default function SimulationModal({
                       display: 'flex',
                       alignItems: 'center',
                       gap: 8,
-                      fontFamily: 'Lexend, sans-serif',
+                      fontFamily: 'var(--font-display)',
                     }}
                   >
                     <TrainingIcon type="star" size={16} style={{ color: '#10b9af' }} /> Qué hiciste
@@ -866,7 +866,7 @@ export default function SimulationModal({
                       display: 'flex',
                       alignItems: 'center',
                       gap: 8,
-                      fontFamily: 'Lexend, sans-serif',
+                      fontFamily: 'var(--font-display)',
                     }}
                   >
                     <TrainingIcon type="lightbulb" size={16} style={{ color: '#2b6fc0' }} /> Aspectos
@@ -904,7 +904,7 @@ export default function SimulationModal({
                       display: 'flex',
                       alignItems: 'center',
                       gap: 8,
-                      fontFamily: 'Lexend, sans-serif',
+                      fontFamily: 'var(--font-display)',
                     }}
                   >
                     <TrainingIcon type="scale" size={16} style={{ color: '#64748b' }} /> Reglas del
@@ -1322,7 +1322,7 @@ export default function SimulationModal({
                       display: 'flex',
                       alignItems: 'center',
                       gap: 8,
-                      fontFamily: 'Lexend, sans-serif',
+                      fontFamily: 'var(--font-display)',
                     }}
                   >
                     <TrainingIcon type="clipboard" size={15} style={{ color: '#2b6fc0' }} /> Objetivos
@@ -1392,7 +1392,7 @@ export default function SimulationModal({
                       fontWeight: 700,
                       color: '#64748b',
                       textTransform: 'uppercase',
-                      fontFamily: 'Lexend, sans-serif',
+                      fontFamily: 'var(--font-display)',
                     }}
                   >
                     Perfil del Caso
