@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   getCommercialOrder,
   getCommercialOffers,
   reviewCommercialOrder,
   renewCommercialOrder,
+  editCommercialOrder,
+  getSalesStock,
   listCollectors,
 } from '../api';
 import { contactInitials } from '../conversationHelpers';
@@ -58,6 +61,46 @@ function quotaAmountPreview(total, quotaCount) {
   return commercialMoney(base);
 }
 
+function PencilIcon() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
+
+function SheetIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+      <path d="M14 2v6h6" />
+      <path d="M8 13h8" />
+      <path d="M8 17h6" />
+    </svg>
+  );
+}
+
 export default function CommercialReviewPanel({
   token,
   me,
@@ -76,7 +119,14 @@ export default function CommercialReviewPanel({
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [revision, setRevision] = useState(0);
+
+  // Modales
   const [showConvModal, setShowConvModal] = useState(false);
+  const [showOrderModal, setShowOrderModal] = useState(false);
+  const [editDraft, setEditDraft] = useState(null);
+  const [editCatalog, setEditCatalog] = useState([]);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState('');
 
   const id = detail.request.id;
   const busy = Boolean(busyAction);
@@ -103,6 +153,19 @@ export default function CommercialReviewPanel({
     };
   }, [token, id, detail.request.version, revision]);
 
+  // Cerrar modales con Escape
+  useEffect(() => {
+    if (!showOrderModal && !editDraft) return undefined;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape' && !busy) {
+        if (editDraft) setEditDraft(null);
+        else if (showOrderModal) setShowOrderModal(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showOrderModal, editDraft, busy]);
+
   async function run(actionName, action, successMessage) {
     setBusyAction(actionName);
     setError('');
@@ -117,6 +180,65 @@ export default function CommercialReviewPanel({
     } catch (e) {
       setError(e.message);
       setRevision((v) => v + 1);
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function openEditModal() {
+    if (!order) return;
+    setEditError('');
+    setEditLoading(true);
+    setEditDraft({
+      sku: order.sku || '',
+      offerId: order.flow.selectedOfferId || '',
+      deliveryMode: order.flow.deliveryMode || 'PICKUP',
+      deliveryAddress: order.flow.deliveryAddress || '',
+      contactName: order.flow.contactName || order.client.name || '',
+      contactPhone: order.flow.contactPhone || order.client.phone || '',
+    });
+    try {
+      const items = await getSalesStock(token).catch(() => []);
+      setEditCatalog(Array.isArray(items) ? items : []);
+    } finally {
+      setEditLoading(false);
+    }
+  }
+
+  async function submitEditModal(e) {
+    e.preventDefault();
+    if (!order || !editDraft) return;
+    const baseline = {
+      sku: order.sku || '',
+      offerId: order.flow.selectedOfferId || '',
+      deliveryMode: order.flow.deliveryMode || 'PICKUP',
+      deliveryAddress: order.flow.deliveryAddress || '',
+      contactName: order.flow.contactName || order.client.name || '',
+      contactPhone: order.flow.contactPhone || order.client.phone || '',
+    };
+    const changes = Object.fromEntries(
+      Object.entries(editDraft).filter(
+        ([key, value]) => value && value !== baseline[key],
+      ),
+    );
+    if (Object.keys(changes).length === 0) {
+      setEditDraft(null);
+      return;
+    }
+
+    setBusyAction('EDIT');
+    setEditError('');
+    try {
+      await editCommercialOrder(token, id, {
+        expectedVersion: order.version,
+        ...changes,
+      });
+      setEditDraft(null);
+      setRevision((v) => v + 1);
+      await onChanged();
+      setNotice('Datos del pedido actualizados correctamente.');
+    } catch (err) {
+      setEditError(err.message || 'No se pudieron guardar los cambios.');
     } finally {
       setBusyAction(null);
     }
@@ -139,19 +261,20 @@ export default function CommercialReviewPanel({
     detail.request?.client?.name ||
     'Cliente';
 
+  const canEditOrder =
+    Boolean(order) && !order.closedAt && order.status !== 'CANCELLED';
+
   const remainingHours = useMemo(() => {
     if (!order?.flow?.expiresAt) return null;
     const diffMs = new Date(order.flow.expiresAt).getTime() - Date.now();
     return diffMs / (1000 * 60 * 60);
   }, [order?.flow?.expiresAt]);
 
-  // Mostrar renovación únicamente si venció o si faltan <= 6 horas para vencer
   const showRenewalBanner =
     Boolean(order) &&
     order.flow.stage === 'REVIEW' &&
     (order.expired || (remainingHours !== null && remainingHours <= 6));
 
-  // Ocultar la leyenda genérica de renovación reciente para evitar ruido innecesario
   const meaningfulReviewReason = useMemo(() => {
     const reason = order?.flow?.reviewReason?.trim();
     if (!reason) return null;
@@ -191,7 +314,7 @@ export default function CommercialReviewPanel({
 
   return (
     <section className="cr-shell">
-      {/* Cabecera limpia y de alto contraste */}
+      {/* Cabecera limpia */}
       <header className="cr-header">
         <div className="cr-header-left">
           <div className="cr-avatar" aria-hidden="true">
@@ -229,6 +352,19 @@ export default function CommercialReviewPanel({
         </div>
 
         <div className="cr-header-actions">
+          {canEditOrder && (
+            <button
+              type="button"
+              className="cr-btn-icon"
+              onClick={openEditModal}
+              disabled={busy}
+              title="Modificar producto, entrega o contacto"
+              aria-label="Modificar datos del pedido"
+            >
+              <PencilIcon />
+            </button>
+          )}
+
           <button
             type="button"
             className="cr-btn-outline"
@@ -244,7 +380,6 @@ export default function CommercialReviewPanel({
         </div>
       </header>
 
-      {/* Feedback inmediato tras acciones (renovar, aprobar, rechazar) */}
       {notice && (
         <div className="cr-feedback is-success" role="status">
           <span>✓ {notice}</span>
@@ -282,7 +417,7 @@ export default function CommercialReviewPanel({
 
       {order && (
         <>
-          {/* Franja compacta del producto y referencia */}
+          {/* Franja compacta del producto */}
           <div className="cr-summary-strip">
             <div className="cr-summary-item cr-summary-product">
               <span className="cr-summary-label">Producto solicitado</span>
@@ -313,7 +448,6 @@ export default function CommercialReviewPanel({
             </div>
           )}
 
-          {/* Renovación: solo aparece cuando la vigencia venció o está por vencer */}
           {showRenewalBanner && (
             <div className={`cr-renewal-bar ${order.expired ? 'is-expired' : 'is-expiring'}`}>
               <div className="cr-renewal-text">
@@ -573,7 +707,7 @@ export default function CommercialReviewPanel({
                 )}
               </div>
 
-              {/* Columna Lateral: Dictamen crediticio conciso + Ficha */}
+              {/* Columna Lateral: Evaluación crediticia + Botón de Ficha modal */}
               <aside className="cr-side-col">
                 <div className={`cr-verdict-card ${verdictInfo.tone}`}>
                   <div className="cr-verdict-head">
@@ -613,52 +747,278 @@ export default function CommercialReviewPanel({
                   </p>
                 </div>
 
-                <details className="cr-details-drawer">
-                  <summary>Ficha comercial y entrega</summary>
-                  <div className="cr-details-body">
-                    <CommercialOrderCard
-                      key={`${id}-${revision}`}
-                      token={token}
-                      me={me}
-                      id={id}
-                      hideConversation
-                      onChanged={onChanged}
-                    />
-                  </div>
-                </details>
+                <button
+                  type="button"
+                  className="cr-sheet-trigger"
+                  onClick={() => setShowOrderModal(true)}
+                >
+                  <span className="cr-sheet-trigger-icon">
+                    <SheetIcon />
+                  </span>
+                  <span className="cr-sheet-trigger-copy">
+                    <strong>Ficha comercial y entrega</strong>
+                    <small>Ver plan, entrega y estado del cierre</small>
+                  </span>
+                  <span className="cr-sheet-trigger-arrow" aria-hidden="true">→</span>
+                </button>
               </aside>
             </div>
           ) : (
             <div className="cr-resolved-wrap">
               <div className="cr-resolved-banner">
-                <strong>
-                  {order.closedAt
-                    ? 'La venta ya quedó cerrada.'
-                    : 'Decisión registrada. El agente continuará con la elección del cliente y Ventas verá la ficha para el cierre.'}
-                </strong>
-                {detail.request?.reviewNote && (
-                  <p>Nota registrada: “{detail.request.reviewNote}”</p>
-                )}
-              </div>
-
-              <details className="cr-details-drawer" open>
-                <summary>Ficha comercial y entrega</summary>
-                <div className="cr-details-body">
-                  <CommercialOrderCard
-                    key={`${id}-${revision}`}
-                    token={token}
-                    me={me}
-                    id={id}
-                    hideConversation
-                    onChanged={onChanged}
-                  />
+                <div>
+                  <strong>
+                    {order.closedAt
+                      ? 'La venta ya quedó cerrada.'
+                      : 'Decisión registrada. El agente continuará con la elección del cliente y Ventas verá la ficha para el cierre.'}
+                  </strong>
+                  {detail.request?.reviewNote && (
+                    <p>Nota registrada: “{detail.request.reviewNote}”</p>
+                  )}
                 </div>
-              </details>
+
+                <button
+                  type="button"
+                  className="cr-btn-outline"
+                  onClick={() => setShowOrderModal(true)}
+                >
+                  <SheetIcon />
+                  <span>Abrir ficha comercial y entrega</span>
+                </button>
+              </div>
             </div>
           )}
         </>
       )}
 
+      {/* Modal 1: Ficha comercial y entrega (sin opción de modificar) */}
+      {showOrderModal && order &&
+        createPortal(
+          <div
+            className="cr-modal-overlay"
+            role="presentation"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) setShowOrderModal(false);
+            }}
+          >
+            <div
+              className="cr-modal cr-modal-lg"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="cr-sheet-modal-title"
+            >
+              <header className="cr-modal-header">
+                <div>
+                  <div className="cr-title-row">
+                    <h3 id="cr-sheet-modal-title">Ficha comercial y entrega</h3>
+                    <span className={`commerce-stage-pill ${commercialStageTone(order)}`}>
+                      {commercialStage(order)}
+                    </span>
+                  </div>
+                  <p className="cr-modal-sub">
+                    {order.client.name} · {order.business || 'Compra personal'} ({order.locality || 'Sin localidad'})
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="cr-modal-close"
+                  onClick={() => setShowOrderModal(false)}
+                  aria-label="Cerrar ficha"
+                >
+                  ×
+                </button>
+              </header>
+
+              <div className="cr-modal-body">
+                <CommercialOrderCard
+                  key={`${id}-${revision}`}
+                  token={token}
+                  me={me}
+                  id={id}
+                  hideConversation
+                  hideEdit
+                  hideHeader
+                  onChanged={onChanged}
+                />
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* Modal 2: Modificar datos del pedido (disparado desde el lapicito) */}
+      {editDraft && order &&
+        createPortal(
+          <div
+            className="cr-modal-overlay"
+            role="presentation"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget && !busy) setEditDraft(null);
+            }}
+          >
+            <div
+              className="cr-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="cr-edit-modal-title"
+            >
+              <header className="cr-modal-header">
+                <div>
+                  <h3 id="cr-edit-modal-title">Modificar datos del pedido</h3>
+                  <p className="cr-modal-sub">
+                    Cambiar producto o plan solicita una nueva revisión; cambiar entrega o contacto pide nueva aceptación al cliente.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="cr-modal-close"
+                  disabled={busy}
+                  onClick={() => setEditDraft(null)}
+                  aria-label="Cerrar edición"
+                >
+                  ×
+                </button>
+              </header>
+
+              <form className="cr-modal-form" onSubmit={submitEditModal}>
+                <div className="cr-modal-body">
+                  {editError && (
+                    <div className="cr-feedback is-error" role="alert">
+                      <span>{editError}</span>
+                    </div>
+                  )}
+
+                  <div className="cr-edit-grid">
+                    <label className="cr-field cr-edit-full">
+                      <span>Producto</span>
+                      {editCatalog.length > 0 ? (
+                        <select
+                          value={editDraft.sku}
+                          disabled={editLoading || busy}
+                          onChange={(e) =>
+                            setEditDraft({ ...editDraft, sku: e.target.value })
+                          }
+                        >
+                          {editCatalog.map((item) => (
+                            <option key={item.sku} value={item.sku}>
+                              {item.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={order.productSummary}
+                          disabled
+                        />
+                      )}
+                    </label>
+
+                    {order.flow.offers.length > 0 && (
+                      <label className="cr-field">
+                        <span>Forma de pago</span>
+                        <select
+                          value={editDraft.offerId}
+                          disabled={busy}
+                          onChange={(e) =>
+                            setEditDraft({ ...editDraft, offerId: e.target.value })
+                          }
+                        >
+                          <option value="">Sin elección</option>
+                          {order.flow.offers.map((o) => (
+                            <option key={o.id} value={o.id}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+
+                    <label className={`cr-field${order.flow.offers.length === 0 ? ' cr-edit-full' : ''}`}>
+                      <span>Modalidad de entrega</span>
+                      <select
+                        value={editDraft.deliveryMode}
+                        disabled={busy}
+                        onChange={(e) =>
+                          setEditDraft({ ...editDraft, deliveryMode: e.target.value })
+                        }
+                      >
+                        <option value="PICKUP">Retiro en sucursal</option>
+                        {order.delivery && (
+                          <option value="SHIPPING">Envío a domicilio</option>
+                        )}
+                      </select>
+                    </label>
+
+                    <label className="cr-field">
+                      <span>Nombre de contacto</span>
+                      <input
+                        required
+                        disabled={busy}
+                        value={editDraft.contactName}
+                        onChange={(e) =>
+                          setEditDraft({ ...editDraft, contactName: e.target.value })
+                        }
+                      />
+                    </label>
+
+                    <label className="cr-field">
+                      <span>Teléfono de contacto</span>
+                      <input
+                        required
+                        disabled={busy}
+                        value={editDraft.contactPhone}
+                        onChange={(e) =>
+                          setEditDraft({ ...editDraft, contactPhone: e.target.value })
+                        }
+                      />
+                    </label>
+
+                    {editDraft.deliveryMode === 'SHIPPING' && (
+                      <label className="cr-field cr-edit-full">
+                        <span>Dirección de entrega</span>
+                        <textarea
+                          required
+                          rows={2}
+                          disabled={busy}
+                          value={editDraft.deliveryAddress}
+                          onChange={(e) =>
+                            setEditDraft({
+                              ...editDraft,
+                              deliveryAddress: e.target.value,
+                            })
+                          }
+                          placeholder="Calle, altura y referencias…"
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                <footer className="cr-modal-footer">
+                  <button
+                    type="button"
+                    className="cr-btn-ghost"
+                    disabled={busy}
+                    onClick={() => setEditDraft(null)}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="cr-btn-primary"
+                    disabled={busy}
+                  >
+                    {busyAction === 'EDIT' ? 'Guardando…' : 'Guardar cambios'}
+                  </button>
+                </footer>
+              </form>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* Modal 3: Conversación con el cliente */}
       {showConvModal && (
         <FinancingConversationModal
           token={token}

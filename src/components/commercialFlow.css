@@ -1254,24 +1254,28 @@
   color: var(--cr-accent);
 }
 
-.cr-shell button.cr-btn-ghost {
+.cr-shell button.cr-btn-ghost,
+.cr-modal button.cr-btn-ghost {
   border: 1px solid transparent;
   background: transparent;
   color: var(--cr-muted);
 }
 
-.cr-shell button.cr-btn-ghost:hover:not(:disabled) {
+.cr-shell button.cr-btn-ghost:hover:not(:disabled),
+.cr-modal button.cr-btn-ghost:hover:not(:disabled) {
   background: var(--cr-subtle);
   color: var(--cr-text);
 }
 
-.cr-shell button.cr-btn-primary {
+.cr-shell button.cr-btn-primary,
+.cr-modal button.cr-btn-primary {
   border: 1px solid transparent;
   background: #2563eb;
   color: #ffffff;
 }
 
-.cr-shell button.cr-btn-primary:hover:not(:disabled) {
+.cr-shell button.cr-btn-primary:hover:not(:disabled),
+.cr-modal button.cr-btn-primary:hover:not(:disabled) {
   background: #1d4ed8;
   color: #ffffff;
 }
@@ -1891,48 +1895,233 @@
 }
 
 /* Acordeón de ficha comercial */
-.cr-details-drawer {
+.cr-sheet-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px;
   border-radius: 12px;
   border: 1px solid var(--cr-border);
   background: var(--cr-surface);
-  overflow: hidden;
+  color: var(--cr-text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.12s ease;
 }
 
-.cr-details-drawer > summary {
-  list-style: none;
-  cursor: pointer;
-  padding: 13px 16px;
-  font-size: 13px;
-  font-weight: 600;
+.cr-shell button.cr-sheet-trigger:hover:not(:disabled) {
+  border-color: var(--cr-accent);
+  background: var(--cr-subtle);
   color: var(--cr-text);
+}
+
+.cr-sheet-trigger-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--cr-accent-soft);
+  color: var(--cr-accent);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.cr-sheet-trigger-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.cr-sheet-trigger-copy strong {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--cr-text) !important;
+}
+
+.cr-sheet-trigger-copy small {
+  font-size: 11.5px;
+  color: var(--cr-muted) !important;
+}
+
+.cr-sheet-trigger-arrow {
+  font-size: 14px;
+  color: var(--cr-muted);
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.cr-shell button.cr-sheet-trigger:hover .cr-sheet-trigger-arrow {
+  transform: translateX(2px);
+  color: var(--cr-accent);
+}
+
+.cr-shell button.cr-btn-icon {
+  display: inline-grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  padding: 0;
+  border-radius: 9px;
+  border: 1px solid var(--cr-border-strong);
+  background: var(--cr-surface);
+  color: var(--cr-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cr-shell button.cr-btn-icon:hover:not(:disabled) {
+  border-color: var(--cr-accent);
+  background: var(--cr-accent-soft);
+  color: var(--cr-accent);
+}
+
+/* Modales de Ficha y Edición */
+.cr-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1250;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(10, 18, 32, 0.56);
+  backdrop-filter: blur(4px);
+}
+
+.cr-modal {
+  --cr-surface: #ffffff;
+  --cr-subtle: #f8fafc;
+  --cr-border: #e2e8f0;
+  --cr-border-strong: #cbd5e1;
+  --cr-text: #0f172a;
+  --cr-muted: #64748b;
+  --cr-accent: #2563eb;
+  --cr-accent-soft: rgba(37, 99, 235, 0.08);
+  --cr-danger: #dc2626;
+  --cr-danger-soft: #fef2f2;
+  --cr-danger-border: #fecaca;
+
+  width: min(640px, calc(100vw - 32px));
+  max-height: min(90vh, 840px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--cr-border);
+  background: var(--cr-surface);
+  color: var(--cr-text);
+  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.28);
+}
+
+.cr-modal.cr-modal-lg {
+  width: min(860px, calc(100vw - 32px));
+}
+
+[data-theme='dark'] .cr-modal {
+  --cr-surface: #131c2e;
+  --cr-subtle: #0f172a;
+  --cr-border: #24334d;
+  --cr-border-strong: #33486b;
+  --cr-text: #f1f5f9;
+  --cr-muted: #94a3b8;
+  --cr-accent: #60a5fa;
+  --cr-accent-soft: rgba(96, 165, 250, 0.14);
+  --cr-danger: #f87171;
+  --cr-danger-soft: rgba(239, 68, 68, 0.14);
+  --cr-danger-border: rgba(248, 113, 113, 0.35);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.6);
+}
+
+.cr-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--cr-border);
+  background: var(--cr-surface);
+}
+
+.cr-modal-header h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--cr-text) !important;
+}
+
+.cr-modal-sub {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--cr-muted) !important;
+  line-height: 1.45;
+}
+
+.cr-modal-close {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid var(--cr-border);
+  background: transparent;
+  color: var(--cr-muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cr-modal-close:hover:not(:disabled) {
+  background: var(--cr-subtle);
+  color: var(--cr-text);
+  border-color: var(--cr-border-strong);
+}
+
+.cr-modal-form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.cr-modal-body {
+  padding: 20px 24px 24px;
+  overflow-y: auto;
+  flex: 1;
+  background: var(--cr-surface);
+}
+
+.cr-modal-body .commerce-operation.is-embedded {
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  background: transparent !important;
+}
+
+.cr-modal-body .commerce-operation.is-embedded .commerce-customer-details {
+  margin-top: 0;
+}
+
+.cr-modal-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  user-select: none;
-}
-
-.cr-details-drawer > summary::-webkit-details-marker {
-  display: none;
-}
-
-.cr-details-drawer > summary::after {
-  content: '▸';
-  font-size: 12px;
-  color: var(--cr-muted);
-  transition: transform 0.15s ease;
-}
-
-.cr-details-drawer[open] > summary::after {
-  transform: rotate(90deg);
-}
-
-.cr-details-drawer > summary:hover {
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--cr-border);
   background: var(--cr-subtle);
 }
 
-.cr-details-body {
-  padding: 14px;
-  border-top: 1px solid var(--cr-border);
+.cr-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.cr-edit-full {
+  grid-column: 1 / -1;
 }
 
 .cr-resolved-wrap {
@@ -1942,6 +2131,11 @@
 }
 
 .cr-resolved-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
   padding: 16px 18px;
   border-radius: 12px;
   background: var(--cr-subtle);
@@ -1977,7 +2171,8 @@
 
   .cr-summary-strip,
   .cr-offers-grid,
-  .cr-params-grid {
+  .cr-params-grid,
+  .cr-edit-grid {
     grid-template-columns: 1fr;
   }
 

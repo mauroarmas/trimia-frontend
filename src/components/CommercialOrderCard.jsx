@@ -48,6 +48,8 @@ export default function CommercialOrderCard({
   onChanged,
   onClose,
   hideConversation = false,
+  hideEdit = false,
+  hideHeader = false,
   children,
 }) {
   const [order, setOrder] = useState(null);
@@ -158,38 +160,40 @@ export default function CommercialOrderCard({
   }
 
   const main = (
-    <section className="card commerce-operation">
-      <header className="commerce-heading">
-        <div className="commerce-heading-main">
-          <div className="commerce-title-row">
-            <h3>{order.client.name}</h3>
-            <span className={`commerce-stage-pill ${commercialStageTone(order)}`}>
-              {commercialStage(order)}
-            </span>
+    <section className={`card commerce-operation${hideHeader ? ' is-embedded' : ''}`}>
+      {!hideHeader && (
+        <header className="commerce-heading">
+          <div className="commerce-heading-main">
+            <div className="commerce-title-row">
+              <h3>{order.client.name}</h3>
+              <span className={`commerce-stage-pill ${commercialStageTone(order)}`}>
+                {commercialStage(order)}
+              </span>
+            </div>
+            <p className="commerce-subtitle">
+              {order.purchaseUse === 'PERSONAL' ? 'Compra personal' : order.business} · {order.locality}
+            </p>
           </div>
-          <p className="commerce-subtitle">
-            {order.purchaseUse === 'PERSONAL' ? 'Compra personal' : order.business} · {order.locality}
-          </p>
-        </div>
 
-        <div className="commerce-head-actions">
-          {!order.closedAt && order.status !== 'CANCELLED' && canClose && !editing && (
-            <button
-              type="button"
-              className="secondary"
-              disabled={busy}
-              onClick={beginEdit}
-            >
-              Modificar datos
-            </button>
-          )}
-          {onClose && (
-            <button type="button" className="secondary" onClick={onClose}>
-              Cerrar ficha
-            </button>
-          )}
-        </div>
-      </header>
+          <div className="commerce-head-actions">
+            {!hideEdit && !order.closedAt && order.status !== 'CANCELLED' && canClose && !editing && (
+              <button
+                type="button"
+                className="secondary"
+                disabled={busy}
+                onClick={beginEdit}
+              >
+                Modificar datos
+              </button>
+            )}
+            {onClose && (
+              <button type="button" className="secondary" onClick={onClose}>
+                Cerrar ficha
+              </button>
+            )}
+          </div>
+        </header>
+      )}
 
       <details className="commerce-customer-details">
         <summary>Datos del cliente y contacto</summary>
@@ -310,7 +314,7 @@ export default function CommercialOrderCard({
         </section>
       )}
 
-      {editing && (
+      {!hideEdit && editing && (
         <form
           onSubmit={(event) => {
             event.preventDefault();
