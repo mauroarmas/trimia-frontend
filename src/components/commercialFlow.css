@@ -1089,6 +1089,183 @@
 .commerce-success p { margin: 6px 0 0; }
 
 /* ==========================================================================
+   Modo oscuro explícito para la ficha comercial y pantalla completa
+   ========================================================================== */
+[data-theme='dark'] .commerce-heading,
+[data-theme='dark'] .commerce-chat-head {
+  border-bottom-color: var(--ui-line, rgba(148, 163, 184, 0.2));
+}
+
+[data-theme='dark'] .commerce-heading h3,
+[data-theme='dark'] .commerce-chat-head h3 {
+  color: var(--ui-text-strong, #f8fbff);
+}
+
+[data-theme='dark'] .commerce-heading p,
+[data-theme='dark'] .commerce-subtitle,
+[data-theme='dark'] .commerce-chat-head p {
+  color: var(--ui-muted, #8fa0b8);
+}
+
+[data-theme='dark'] .commerce-customer-details {
+  border-bottom-color: var(--ui-line, rgba(148, 163, 184, 0.2));
+}
+
+[data-theme='dark'] .commerce-customer-details > summary {
+  color: var(--ui-text-soft, #b8c4d6);
+}
+
+[data-theme='dark'] .commerce-customer-details > summary:hover {
+  color: var(--ui-text-strong, #f8fbff);
+}
+
+[data-theme='dark'] .commerce-data div {
+  background: var(--ui-panel-2, #172238);
+  border-color: var(--ui-line, rgba(148, 163, 184, 0.2));
+}
+
+[data-theme='dark'] .commerce-data div.is-highlight {
+  background: rgba(59, 130, 246, 0.12) !important;
+  border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+[data-theme='dark'] .commerce-data dt {
+  color: var(--ui-muted, #8fa0b8);
+}
+
+[data-theme='dark'] .commerce-data dd {
+  color: var(--ui-text-strong, #f8fbff) !important;
+}
+
+[data-theme='dark'] .commerce-price-val {
+  color: #34d399 !important;
+}
+
+[data-theme='dark'] .commerce-installments-box {
+  background: var(--ui-panel-2, #172238);
+  border-color: var(--ui-line, rgba(148, 163, 184, 0.2));
+}
+
+[data-theme='dark'] .commerce-installments-head h4,
+[data-theme='dark'] .commerce-edit-head h4,
+[data-theme='dark'] .commerce-close-head h4 {
+  color: var(--ui-text-strong, #f8fbff);
+}
+
+[data-theme='dark'] .commerce-quota-badge {
+  background: rgba(34, 211, 238, 0.16);
+  border: 1px solid rgba(34, 211, 238, 0.34);
+  color: #67e8f9;
+}
+
+[data-theme='dark'] .commerce-installments-meta {
+  color: var(--ui-text-soft, #b8c4d6);
+}
+
+[data-theme='dark'] .commerce-installments-meta strong {
+  color: var(--ui-text-strong, #f8fbff);
+}
+
+[data-theme='dark'] .commerce-schedule-details summary {
+  color: #38bdf8;
+}
+
+[data-theme='dark'] .commerce-schedule-wrap {
+  background: var(--ui-panel, #131c2e);
+  border-color: var(--ui-line, rgba(148, 163, 184, 0.2));
+}
+
+[data-theme='dark'] .commerce-schedule-wrap th {
+  background: var(--ui-th-bg, #172238);
+  color: var(--ui-muted, #8fa0b8);
+}
+
+[data-theme='dark'] .commerce-schedule-wrap td {
+  border-top-color: var(--ui-line-soft, rgba(148, 163, 184, 0.12));
+  color: var(--ui-text, #e6edf7);
+}
+
+[data-theme='dark'] .commerce-edit-box {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+[data-theme='dark'] .commerce-close-box {
+  background: var(--ui-panel-2, #172238);
+  border-color: var(--ui-line, rgba(148, 163, 184, 0.2));
+}
+
+[data-theme='dark'] .commerce-ready-tag.is-ready {
+  background: rgba(16, 185, 129, 0.16) !important;
+  color: #6ee7b7 !important;
+  border: 1px solid rgba(16, 185, 129, 0.32);
+}
+
+[data-theme='dark'] .commerce-ready-tag.is-locked {
+  background: rgba(245, 158, 11, 0.16) !important;
+  color: #fcd34d !important;
+  border: 1px solid rgba(245, 158, 11, 0.32);
+}
+
+[data-theme='dark'] .commerce-form label {
+  color: var(--ui-text-soft, #b8c4d6);
+}
+
+[data-theme='dark'] .commerce-form input,
+[data-theme='dark'] .commerce-form select,
+[data-theme='dark'] .commerce-form textarea {
+  background: #0f172a;
+  border-color: var(--ui-line-strong, rgba(148, 163, 184, 0.3));
+  color: var(--ui-text, #e6edf7);
+}
+
+[data-theme='dark'] .commerce-notice {
+  background: rgba(245, 158, 11, 0.14);
+  border-color: rgba(245, 158, 11, 0.36);
+  color: #fde68a;
+}
+
+[data-theme='dark'] .commerce-notice strong {
+  color: #fcd34d;
+}
+
+[data-theme='dark'] .commerce-success {
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(16, 185, 129, 0.36);
+  color: #d1fae5;
+}
+
+[data-theme='dark'] .commerce-success strong {
+  color: #6ee7b7;
+}
+
+[data-theme='dark'] .commerce-success p {
+  color: #a7f3d0;
+}
+
+[data-theme='dark'] .commerce-close-control-note {
+  background: rgba(139, 92, 246, 0.16);
+  border-color: rgba(139, 92, 246, 0.36);
+  color: #ddd6fe;
+}
+
+[data-theme='dark'] .commerce-inline-note {
+  color: var(--ui-muted, #8fa0b8);
+}
+
+[data-theme='dark'] .commerce-inline-note.is-warn {
+  color: #fcd34d !important;
+}
+
+[data-theme='dark'] .commerce-fullscreen-divider {
+  color: var(--ui-line-strong, rgba(148, 163, 184, 0.3));
+}
+
+[data-theme='dark'] .commerce-fullscreen-title {
+  color: var(--ui-text-soft, #b8c4d6);
+}
+
+/* ==========================================================================
    Revisión de Financiación — Diseño calmo, 2 columnas, claro y oscuro nativo
    ========================================================================== */
 .cr-shell {

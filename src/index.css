@@ -12255,6 +12255,32 @@ label {
   flex-wrap: wrap;
 }
 
+.sales-followup-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ui-text-soft, #64748b);
+}
+
+.sales-followup-inline select {
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--ui-line, var(--border));
+  background: var(--ui-panel, #ffffff);
+  color: var(--ui-text, #0f172a);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sales-followup-inline select:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
 .sales-crm-sheet-link {
   display: inline-flex;
   align-items: center;

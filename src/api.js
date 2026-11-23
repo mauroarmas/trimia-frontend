@@ -1341,6 +1341,8 @@ export const simulateProspectFollowUpDue = (token, id) =>
   request(`/sales/prospects/${id}/followup/simulate-due`, { method: 'POST', token });
 export const syncProspectCrm = (token, id) =>
   request(`/sales/prospects/${id}/crm-sync`, { method: 'POST', token });
+export const syncAllProspectsCrm = (token) =>
+  request('/sales/prospects/crm-sync', { method: 'POST', token });
 
 // Mensajería 022: preferencia única de no contacto y confirmación simulada de entrega.
 export const getContactPreference = (token, phone) =>

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import CommercialOrdersPanel from './CommercialOrdersPanel';
 import SalesConversationModal from './SalesConversationModal';
 import SalesClientForm from './SalesClientForm';
-import { InfoToggle } from './InfoNotes';
+import InfoNotes, { InfoToggle } from './InfoNotes';
 import PageHero from './PageHero';
 import { useSubtabRoute } from '../router';
 import {
@@ -15,7 +15,7 @@ import {
   getFollowUpRule,
   updateFollowUpRule,
   simulateProspectFollowUpDue,
-  syncProspectCrm,
+  syncAllProspectsCrm,
   optOutContactPreference,
   reactivateContactPreference,
   simulateFinancingNoticeDelivery,
@@ -26,44 +26,24 @@ const CRM_SHEETS_URL =
   import.meta.env.VITE_CRM_SHEETS_URL ||
   'https://docs.google.com/spreadsheets/d/1eU8lXoA6mcSh-s02NElqr8EWl1R2rR3TZAIFX1cENu4/edit';
 
-const INFO_POR_SUBTAB = {
-  prospects: [
-    [
-      'Clientes por contactar (CRM).',
-      'Listado de prospectos generados por el bot en WhatsApp y registrados en el CRM con los 17 campos canónicos.',
-    ],
+const INFO_PANEL_VENTAS = [
+  [
+    'Prospectos (CRM).',
+    'Listado de clientes potenciales derivados por el bot desde WhatsApp con los 17 campos canónicos, estado comercial, seguimiento y sincronización con el CRM.',
   ],
-  stock: [
-    [
-      'Catálogo Paljet.',
-      'Existencias según la última actualización de la fuente de prueba. Si un producto no tiene stock, se sugieren hasta 2 sustitutos con stock (RF09).',
-    ],
+  [
+    'Cierres de venta.',
+    'Seguimiento de operaciones comerciales con ficha completa del cliente, datos de entrega, plan de cuotas y conversación asociada.',
   ],
-  credit_check: [
-    [
-      '🛡️ Principio de Secreto Comercial (OE-10).',
-      'Este panel muestra únicamente el dictamen comercial aplicable. El informe financiero confidencial y las deudas detalladas del BCRA permanecen bajo resguardo de Administración.',
-    ],
+  [
+    'Consultar stock (Paljet).',
+    'Existencias según la última actualización de Paljet. Si un producto no tiene stock disponible, se sugieren hasta 2 sustitutos con stock (RF09).',
   ],
-  commercial_orders: [
-    [
-      'Cierres de venta.',
-      'Ficha completa con datos del cliente, entrega, cuotas y conversación.',
-    ],
+  [
+    'Simulación de crédito y secreto comercial.',
+    'Muestra únicamente el dictamen comercial aplicable para financiación. El informe financiero confidencial y las deudas detalladas del BCRA permanecen bajo resguardo de Administración (OE-10).',
   ],
-  close_sale: [
-    [
-      'Cierre de venta manual.',
-      'Asentá en TrimIA una venta acordada y facturada manualmente en Paljet (por fuera del flujo de financiación con cuotas).',
-    ],
-  ],
-  new_client: [
-    [
-      'Alta de cliente.',
-      'Al cerrar una venta financiada, se da de alta el cliente con su plan de cuotas.',
-    ],
-  ],
-};
+];
 
 const PROSPECT_STATUS_META = {
   NUEVO: { label: 'Nuevo', tone: 'is-new' },
@@ -137,6 +117,418 @@ function formatProspectNoteText(rawNotes) {
     .replace(/\[SEGUIMIENTO AUTOMÁTICO\]/gi, 'Seguimiento automático:');
 }
 
+const FOLLOWUP_STATUS_META = {
+  SCHEDULED: { label: 'Programado', tone: 'is-scheduled' },
+  BLOCKED: { label: 'Bloqueado', tone: 'is-blocked' },
+  COMPLETED: { label: 'Enviado', tone: 'is-completed' },
+  CANCELLED: { label: 'Cancelado', tone: 'is-cancelled' },
+};
+
+function getFollowUpStatusMeta(followUp) {
+  if (!followUp?.status) return null;
+  const key = String(followUp.status).toUpperCase();
+  const base = FOLLOWUP_STATUS_META[key] || {
+    label: key.replace(/_/g, ' '),
+    tone: 'is-default',
+  };
+  if (key === 'COMPLETED') {
+    return {
+      ...base,
+      label: `Enviado (${followUp.attemptCount || 1}/1)`,
+    };
+  }
+  return base;
+}
+
+function getFollowUpCommLabel(comm) {
+  if (!comm?.status) return '';
+  if (comm.status === 'ACCEPTED') return 'Aceptado (sin confirmar entrega)';
+  if (comm.status === 'DELIVERED') return 'Entregado (simulado)';
+  if (comm.status === 'FAILED') return 'Fallido';
+  if (comm.status === 'UNCERTAIN') return 'Incierto — requiere atención';
+  if (comm.status === 'PENDING') return 'Pendiente';
+  return comm.status;
+}
+
+function ProspectDetailModal({
+  prospect,
+  followUpHours,
+  isTaking,
+  isSimulating,
+  followUpText,
+  followUpBusy,
+  isGeneralSupervisor,
+  banner,
+  onDismissBanner,
+  onFollowUpTextChange,
+  onSubmitFollowUp,
+  onTakeover,
+  onCloseManualSale,
+  onConfirmDelivery,
+  onSimulateDue,
+  onOptOut,
+  onReactivate,
+  onClose,
+}) {
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key === 'Escape') onClose();
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  const name = prospect.name || prospect.nombreApellido || 'Cliente';
+  const phone = prospect.phone || prospect.telefono || '';
+  const product =
+    prospect.productInterest || prospect.productoInteres || 'Maquinaria gastronómica';
+  const notes = prospect.notes || prospect.notasSeguimiento || '';
+  const formattedNote = notes ? formatProspectNoteText(notes) : '';
+  const statusMeta = getProspectStatusMeta(prospect.status);
+  const followUpMeta = getFollowUpStatusMeta(prospect.followUp);
+  const createdLabel = prospect.createdAt
+    ? new Date(prospect.createdAt).toLocaleDateString('es-AR')
+    : 'Reciente';
+
+  return (
+    <div
+      className="modal-overlay sales-prospect-modal-overlay"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="modal-content sales-prospect-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="sales-prospect-modal-title"
+      >
+        <header className="sales-prospect-modal-head">
+          <div className="sales-prospect-modal-identity">
+            <span
+              className="sales-prospect-avatar sales-prospect-modal-avatar"
+              aria-hidden="true"
+            >
+              {getInitials(name)}
+            </span>
+            <div className="sales-prospect-modal-titles">
+              <div className="sales-prospect-modal-name-row">
+                <h3 id="sales-prospect-modal-title">{name}</h3>
+                <span className={`sales-status-pill ${statusMeta.tone}`}>
+                  {statusMeta.label}
+                </span>
+                {prospect.syncStatus === 'PENDING' ? (
+                  <span
+                    className="sales-crm-pending-pill"
+                    title="CRM pendiente de sincronizar"
+                  >
+                    <span className="sync-pulse" aria-hidden="true" />
+                    CRM pend.
+                  </span>
+                ) : (
+                  <span className="sales-crm-synced-pill">CRM sincronizado</span>
+                )}
+              </div>
+              <div className="sales-prospect-modal-meta">
+                {phone && <span className="sales-prospect-phone-mono">{phone}</span>}
+                {phone && prospect.comercio && <span aria-hidden="true">·</span>}
+                {prospect.comercio && <span>{prospect.comercio}</span>}
+                {(phone || prospect.comercio) && <span aria-hidden="true">·</span>}
+                <span>Alta: {createdLabel}</span>
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="sales-prospect-modal-close"
+            onClick={onClose}
+            aria-label="Cerrar ficha del prospecto"
+            title="Cerrar (Esc)"
+          >
+            ✕
+          </button>
+        </header>
+
+        <div className="sales-prospect-modal-body">
+          {banner && (
+            <div className={`fin-banner is-${banner.tone || 'success'}`} role="status">
+              <span>{banner.text}</span>
+              <button
+                type="button"
+                className="fin-banner-dismiss"
+                onClick={onDismissBanner}
+                aria-label="Cerrar aviso"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* Acciones comerciales principales */}
+          <div className="sales-prospect-modal-primary-bar">
+            <button
+              type="button"
+              className="button primary sales-prospect-modal-cta"
+              disabled={isTaking}
+              title={
+                prospect.conversationId
+                  ? 'Tomar control y abrir conversación en TrimIA'
+                  : 'Este prospecto no tiene una conversación vinculada en TrimIA'
+              }
+              onClick={onTakeover}
+            >
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                aria-hidden="true"
+              >
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+              <span>{isTaking ? 'Abriendo conversación…' : 'Retomar en TrimIA'}</span>
+            </button>
+
+            <button
+              type="button"
+              className="secondary sales-prospect-modal-secondary-cta"
+              onClick={onCloseManualSale}
+            >
+              <span>Cerrar venta manual →</span>
+            </button>
+          </div>
+
+          {/* Resumen comercial y seguimiento automático */}
+          <div className="sales-prospect-modal-grid">
+            <section className="sales-detail-block">
+              <span className="sales-detail-block-kicker">Interés comercial</span>
+              <strong className="sales-modal-product-title">{product}</strong>
+
+              {prospect.handoff ? (
+                <dl className="sales-handoff-grid sales-modal-dl">
+                  <div>
+                    <dt>Producto derivado</dt>
+                    <dd>{prospect.handoff.producto}</dd>
+                  </div>
+                  {prospect.handoff.precioEstimado != null && (
+                    <div>
+                      <dt>Precio consultado</dt>
+                      <dd>${prospect.handoff.precioEstimado.toLocaleString('es-AR')}</dd>
+                    </div>
+                  )}
+                  {prospect.handoff.modalidad && (
+                    <div>
+                      <dt>Modalidad</dt>
+                      <dd>
+                        {prospect.handoff.modalidad === 'CASH' ? 'Contado' : 'Financiado'}
+                      </dd>
+                    </div>
+                  )}
+                  {prospect.handoff.estadoCredito && (
+                    <div>
+                      <dt>Dictamen comercial</dt>
+                      <dd>{prospect.handoff.estadoCredito}</dd>
+                    </div>
+                  )}
+                  <div className="is-wide">
+                    <dt>Motivo de derivación</dt>
+                    <dd>{prospect.handoff.motivoAlerta}</dd>
+                  </div>
+                  {prospect.handoff.observaciones && (
+                    <div className="is-wide">
+                      <dt>Observaciones</dt>
+                      <dd>{prospect.handoff.observaciones}</dd>
+                    </div>
+                  )}
+                </dl>
+              ) : (
+                <p className="sales-modal-muted-note">
+                  Sin resumen adicional de derivación IA.
+                </p>
+              )}
+            </section>
+
+            <section className="sales-detail-block">
+              <div className="sales-detail-block-head">
+                <span className="sales-detail-block-kicker">
+                  Seguimiento automático ({followUpHours} h)
+                </span>
+                {followUpMeta && (
+                  <span className={`sales-followup-pill ${followUpMeta.tone}`}>
+                    {followUpMeta.label}
+                  </span>
+                )}
+              </div>
+
+              {prospect.followUp ? (
+                <>
+                  <dl className="sales-handoff-grid sales-modal-dl">
+                    {prospect.followUp.scheduledFor &&
+                      prospect.followUp.status === 'SCHEDULED' && (
+                        <div className="is-wide">
+                          <dt>Próxima fecha programada</dt>
+                          <dd>
+                            {new Date(prospect.followUp.scheduledFor).toLocaleString(
+                              'es-AR',
+                            )}
+                          </dd>
+                        </div>
+                      )}
+                    {prospect.followUp.communication && (
+                      <div className="is-wide">
+                        <dt>Último resultado simulado</dt>
+                        <dd>
+                          {getFollowUpCommLabel(prospect.followUp.communication)}
+                          {` · Intentos: ${prospect.followUp.communication.attemptCount || 1}/3`}
+                          {prospect.followUp.communication.deliveredAt
+                            ? ` · ${new Date(
+                                prospect.followUp.communication.deliveredAt,
+                              ).toLocaleString('es-AR')}`
+                            : prospect.followUp.communication.acceptedAt
+                              ? ` · ${new Date(
+                                  prospect.followUp.communication.acceptedAt,
+                                ).toLocaleString('es-AR')}`
+                              : ''}
+                        </dd>
+                      </div>
+                    )}
+                    {prospect.followUp.reasonLabel && (
+                      <div className="is-wide">
+                        <dt>Motivo / Detalle</dt>
+                        <dd>{prospect.followUp.reasonLabel}</dd>
+                      </div>
+                    )}
+                  </dl>
+                  {prospect.followUp.communication?.status === 'ACCEPTED' && (
+                    <div className="sales-modal-inline-action">
+                      <button
+                        type="button"
+                        className="secondary fin-btn-sm"
+                        onClick={onConfirmDelivery}
+                      >
+                        ✓ Confirmar entrega simulada
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="sales-modal-muted-note">
+                  Este prospecto no tiene seguimiento automático activo.
+                </p>
+              )}
+            </section>
+          </div>
+
+          {/* Notas comerciales + carga directa de seguimiento */}
+          <section className="sales-detail-block sales-modal-notes-section">
+            <span className="sales-detail-block-kicker">
+              Seguimiento comercial y notas (CRM)
+            </span>
+
+            {formattedNote ? (
+              <div className="sales-modal-notes-history">{formattedNote}</div>
+            ) : (
+              <p className="sales-modal-muted-note">
+                Todavía no hay notas de seguimiento registradas para este cliente.
+              </p>
+            )}
+
+            <form
+              className="sales-modal-followup-form"
+              onSubmit={(e) => onSubmitFollowUp(e, prospect)}
+            >
+              <label htmlFor={`modal-followup-${prospect.id}`}>
+                Agregar nota de seguimiento
+              </label>
+              <textarea
+                id={`modal-followup-${prospect.id}`}
+                rows={2}
+                required
+                placeholder="Ej. Se envió cotización actualizada y coordinamos llamada mañana."
+                value={followUpText}
+                onChange={(e) => onFollowUpTextChange(e.target.value)}
+              />
+              <div className="sales-followup-actions">
+                <button
+                  type="submit"
+                  className="fin-btn-sm"
+                  disabled={followUpBusy || !followUpText.trim()}
+                >
+                  {followUpBusy ? 'Guardando…' : 'Guardar nota en CRM'}
+                </button>
+                {followUpText && (
+                  <button
+                    type="button"
+                    className="secondary fin-btn-sm"
+                    onClick={() => onFollowUpTextChange('')}
+                    disabled={followUpBusy}
+                  >
+                    Limpiar
+                  </button>
+                )}
+              </div>
+            </form>
+          </section>
+
+          {/* Opciones operativas */}
+          <section className="sales-detail-block sales-modal-tools-section">
+            <span className="sales-detail-block-kicker">Opciones operativas</span>
+            <div className="sales-modal-tools-row">
+              <button
+                type="button"
+                className="secondary sales-modal-tool-btn"
+                disabled={isSimulating}
+                onClick={onSimulateDue}
+              >
+                <span aria-hidden="true">⏱</span>
+                <span>
+                  {isSimulating
+                    ? 'Evaluando…'
+                    : `Simular vencimiento (${followUpHours} h)`}
+                </span>
+              </button>
+
+              {phone && prospect.followUp?.reasonCode !== 'CONTACT_OPT_OUT' && (
+                <button
+                  type="button"
+                  className="danger sales-modal-tool-btn"
+                  onClick={onOptOut}
+                >
+                  <span aria-hidden="true">🔕</span>
+                  <span>Registrar no contacto (022)</span>
+                </button>
+              )}
+
+              {phone &&
+                isGeneralSupervisor &&
+                prospect.followUp?.reasonCode === 'CONTACT_OPT_OUT' && (
+                  <button
+                    type="button"
+                    className="secondary sales-modal-tool-btn is-reactivate"
+                    onClick={onReactivate}
+                  >
+                    <span aria-hidden="true">🔔</span>
+                    <span>Reactivar avisos (Supervisión)</span>
+                  </button>
+                )}
+            </div>
+          </section>
+        </div>
+
+        <footer className="sales-prospect-modal-foot">
+          <span className="sales-modal-esc-hint">Esc para cerrar</span>
+          <button type="button" className="secondary" onClick={onClose}>
+            Cerrar
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
 const SALES_VALID_SUBTABS = [
   'prospects',
   'stock',
@@ -164,24 +556,17 @@ export default function SalesPanel({ token, me }) {
   const [prospectsError, setProspectsError] = useState('');
   const [prospectSearch, setProspectSearch] = useState('');
   const [prospectStatusFilter, setProspectStatusFilter] = useState('ALL');
-  const [followUpTargetId, setFollowUpTargetId] = useState(null);
+  const [prospectFollowUpFilter, setProspectFollowUpFilter] = useState('ALL');
+  const [prospectCrmFilter, setProspectCrmFilter] = useState('ALL');
+  const [selectedProspectId, setSelectedProspectId] = useState(null);
   const [followUpText, setFollowUpText] = useState('');
   const [followUpBusy, setFollowUpBusy] = useState(false);
   const [takingProspectId, setTakingProspectId] = useState(null);
   const [followUpRule, setFollowUpRule] = useState(null);
-  const [ruleDraftEnabled, setRuleDraftEnabled] = useState(false);
   const [ruleDraftHours, setRuleDraftHours] = useState(48);
   const [ruleBusy, setRuleBusy] = useState(false);
   const [simulatingProspectId, setSimulatingProspectId] = useState(null);
-  const [syncingProspectId, setSyncingProspectId] = useState(null);
-  const [cardMenuOpenId, setCardMenuOpenId] = useState(null);
-
-  useEffect(() => {
-    if (!cardMenuOpenId) return;
-    const handleOutside = () => setCardMenuOpenId(null);
-    window.addEventListener('click', handleOutside);
-    return () => window.removeEventListener('click', handleOutside);
-  }, [cardMenuOpenId]);
+  const [syncingAllCrm, setSyncingAllCrm] = useState(false);
 
   const isGeneralSupervisor = Boolean(
     me?.isGeneralSupervisor || me?.email === 'diego.bazan@credimision.com',
@@ -221,7 +606,6 @@ export default function SalesPanel({ token, me }) {
       const rule = await getFollowUpRule(token);
       if (rule) {
         setFollowUpRule(rule);
-        setRuleDraftEnabled(Boolean(rule.enabled));
         setRuleDraftHours(Number(rule.inactivityHours) || 48);
       }
     } catch {
@@ -387,6 +771,7 @@ export default function SalesPanel({ token, me }) {
     setTakingProspectId(p.id);
     try {
       await salesProspectAction(token, p.id, 'takeover');
+      setSelectedProspectId(null);
       setContactProspect(p);
     } catch (err) {
       setBanner({ tone: 'error', text: err.message });
@@ -413,7 +798,6 @@ export default function SalesPanel({ token, me }) {
             ? 'Seguimiento guardado en TrimIA (pendiente de sincronización con CRM).'
             : 'Seguimiento comercial registrado correctamente.',
       });
-      setFollowUpTargetId(null);
       setFollowUpText('');
       await loadProspects();
     } catch (err) {
@@ -423,25 +807,26 @@ export default function SalesPanel({ token, me }) {
     }
   }
 
-  async function handleSaveFollowUpRule(e) {
-    e.preventDefault();
-    if (!followUpRule || !isGeneralSupervisor) return;
+  async function handleChangeFollowUpHours(nextHours) {
+    const hours = Number(nextHours);
+    if (!followUpRule || !isGeneralSupervisor || !hours) return;
+    setRuleDraftHours(hours);
     setRuleBusy(true);
     try {
       const updated = await updateFollowUpRule(token, {
-        enabled: Boolean(ruleDraftEnabled),
-        inactivityHours: Number(ruleDraftHours) || 48,
+        enabled: Boolean(followUpRule.enabled),
+        inactivityHours: hours,
         expectedVersion: followUpRule.version,
       });
       setFollowUpRule(updated);
-      setRuleDraftEnabled(Boolean(updated.enabled));
-      setRuleDraftHours(Number(updated.inactivityHours) || 48);
+      setRuleDraftHours(Number(updated.inactivityHours) || hours);
       setBanner({
         tone: 'success',
-        text: `Regla global de seguimiento actualizada (${updated.enabled ? 'Activa' : 'Pausada'} · ${updated.inactivityHours} h).`,
+        text: `Recordatorios y seguimientos actualizados a ${updated.inactivityHours} horas.`,
       });
       await loadProspects();
     } catch (err) {
+      setRuleDraftHours(Number(followUpRule.inactivityHours) || 48);
       setBanner({ tone: 'error', text: err.message });
       await loadFollowUpRule();
     } finally {
@@ -469,22 +854,36 @@ export default function SalesPanel({ token, me }) {
     }
   }
 
-  async function handleSyncProspectCrm(prospect) {
-    setSyncingProspectId(prospect.id);
+  async function handleSyncAllProspectsCrm() {
+    setSyncingAllCrm(true);
     try {
-      const res = await syncProspectCrm(token, prospect.id);
-      setBanner({
-        tone: res?.syncStatus === 'SYNCED' ? 'success' : 'warn',
-        text:
-          res?.syncStatus === 'SYNCED'
-            ? `Sincronización CRM completada con Google Sheets (fila ${res.sheetRowNumber || 'actualizada'}).`
-            : `Sincronización CRM en estado ${res?.syncStatus || 'PENDING'}${res?.lastError ? `: ${res.lastError}` : ''}.`,
-      });
+      const res = await syncAllProspectsCrm(token);
+      if (res?.totalPending === 0) {
+        setBanner({
+          tone: 'success',
+          text: 'Todos los prospectos ya están sincronizados y al día con Google Sheets.',
+        });
+      } else if (res?.remainingPending === 0) {
+        setBanner({
+          tone: 'success',
+          text: `Sincronización CRM completada: ${res.synced} de ${res.totalPending} prospectos actualizados en Google Sheets.`,
+        });
+      } else if (res?.synced > 0) {
+        setBanner({
+          tone: 'warn',
+          text: `Se sincronizaron ${res.synced} de ${res.totalPending} prospectos. Quedan ${res.remainingPending} pendientes (reintento automático cada 60 s).`,
+        });
+      } else {
+        setBanner({
+          tone: 'error',
+          text: `No se pudo sincronizar con Google Sheets (${res?.remainingPending ?? 0} pendientes). Verificá la credencial de Google Sheets en n8n.`,
+        });
+      }
       await loadProspects();
     } catch (err) {
       setBanner({ tone: 'error', text: err.message });
     } finally {
-      setSyncingProspectId(null);
+      setSyncingAllCrm(false);
     }
   }
 
@@ -542,17 +941,6 @@ export default function SalesPanel({ token, me }) {
     }
   }
 
-  useEffect(() => {
-    if (!mostrarInfo) return undefined;
-
-    function handleInfoKeyDown(e) {
-      if (e.key === 'Escape') setMostrarInfo(false);
-    }
-
-    document.addEventListener('keydown', handleInfoKeyDown);
-    return () => document.removeEventListener('keydown', handleInfoKeyDown);
-  }, [mostrarInfo]);
-
   // Métricas y filtros de prospectos
   const prospectSummary = useMemo(() => {
     const counts = {
@@ -561,11 +949,13 @@ export default function SalesPanel({ token, me }) {
       EN_CONTACTO: 0,
       CALIFICA: 0,
       HANDOFF: 0,
+      PENDING_CRM: 0,
     };
     for (const p of prospects) {
       const st = (p.status || 'NUEVO').toUpperCase();
       counts[st] = (counts[st] || 0) + 1;
       if (p.handoff) counts.HANDOFF += 1;
+      if (p.syncStatus === 'PENDING') counts.PENDING_CRM += 1;
     }
     return counts;
   }, [prospects]);
@@ -575,6 +965,16 @@ export default function SalesPanel({ token, me }) {
     return prospects.filter((p) => {
       const st = (p.status || 'NUEVO').toUpperCase();
       if (prospectStatusFilter !== 'ALL' && st !== prospectStatusFilter) {
+        return false;
+      }
+      if (prospectFollowUpFilter !== 'ALL') {
+        const fuStatus = (p.followUp?.status || 'NONE').toUpperCase();
+        if (fuStatus !== prospectFollowUpFilter) return false;
+      }
+      if (prospectCrmFilter === 'PENDING' && p.syncStatus !== 'PENDING') {
+        return false;
+      }
+      if (prospectCrmFilter === 'SYNCED' && p.syncStatus === 'PENDING') {
         return false;
       }
       if (!q) return true;
@@ -588,13 +988,56 @@ export default function SalesPanel({ token, me }) {
         p.productoInteres,
         p.notes,
         p.notasSeguimiento,
+        p.followUp?.reasonLabel,
       ]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [prospects, prospectStatusFilter, prospectSearch]);
+  }, [
+    prospects,
+    prospectStatusFilter,
+    prospectFollowUpFilter,
+    prospectCrmFilter,
+    prospectSearch,
+  ]);
+
+  const hasProspectFilters =
+    prospectStatusFilter !== 'ALL' ||
+    prospectFollowUpFilter !== 'ALL' ||
+    prospectCrmFilter !== 'ALL' ||
+    prospectSearch.trim() !== '';
+
+  function clearProspectFilters() {
+    setProspectStatusFilter('ALL');
+    setProspectFollowUpFilter('ALL');
+    setProspectCrmFilter('ALL');
+    setProspectSearch('');
+  }
+
+  const selectedProspect = useMemo(
+    () =>
+      selectedProspectId
+        ? prospects.find((p) => p.id === selectedProspectId) || null
+        : null,
+    [prospects, selectedProspectId],
+  );
+
+  function openProspectModal(p) {
+    if (window.getSelection && window.getSelection().toString().trim()) {
+      return;
+    }
+    setFollowUpText('');
+    setSelectedProspectId(p.id);
+  }
+
+  const closeProspectModal = useCallback(() => {
+    setSelectedProspectId(null);
+    setFollowUpText('');
+  }, []);
+
+  const effectiveFollowUpHours = Number(followUpRule?.inactivityHours) || Number(ruleDraftHours) || 48;
 
   // Métricas y filtro rápido de stock
   const stockSummary = useMemo(() => {
@@ -642,6 +1085,33 @@ export default function SalesPanel({ token, me }) {
 
   return (
     <div className="sales-panel">
+      {selectedProspect && (
+        <ProspectDetailModal
+          prospect={selectedProspect}
+          followUpHours={effectiveFollowUpHours}
+          isTaking={takingProspectId === selectedProspect.id}
+          isSimulating={simulatingProspectId === selectedProspect.id}
+          followUpText={followUpText}
+          followUpBusy={followUpBusy}
+          isGeneralSupervisor={isGeneralSupervisor}
+          banner={banner}
+          onDismissBanner={() => setBanner(null)}
+          onFollowUpTextChange={setFollowUpText}
+          onSubmitFollowUp={submitFollowUp}
+          onTakeover={() => handleTakeProspect(selectedProspect)}
+          onCloseManualSale={() => {
+            setCloseProspectId(selectedProspect.id);
+            closeProspectModal();
+            setActiveSubtab('close_sale');
+          }}
+          onConfirmDelivery={() => handleConfirmFollowUpDelivery(selectedProspect)}
+          onSimulateDue={() => handleSimulateFollowUpDue(selectedProspect)}
+          onOptOut={() => handleOptOutProspect(selectedProspect)}
+          onReactivate={() => handleReactivateProspect(selectedProspect)}
+          onClose={closeProspectModal}
+        />
+      )}
+
       {contactProspect && (
         <SalesConversationModal
           token={token}
@@ -658,7 +1128,21 @@ export default function SalesPanel({ token, me }) {
         kicker="Operaciones comerciales"
         title="Panel de Ventas"
         description="Atención comercial de clientes derivados del bot, consulta de stock según su última actualización y alta de ventas."
+        action={
+          <InfoToggle
+            open={mostrarInfo}
+            onToggle={() => setMostrarInfo((v) => !v)}
+          />
+        }
       />
+
+      {mostrarInfo && (
+        <InfoNotes
+          title="Panel de Ventas"
+          onClose={() => setMostrarInfo(false)}
+          notes={INFO_PANEL_VENTAS}
+        />
+      )}
 
       <div className="submenu-bar sales-submenu-bar">
         <div className="sales-nav-left">
@@ -671,8 +1155,21 @@ export default function SalesPanel({ token, me }) {
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
               </svg>
-              <span>Clientes por contactar</span>
+              <span>Prospectos</span>
               <span className="fin-tab-count">{prospects.length}</span>
+            </button>
+            <button
+              type="button"
+              className={`submenu-pill${activeSubtab === 'commercial_orders' ? ' active' : ''}`}
+              onClick={() => setActiveSubtab('commercial_orders')}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+              </svg>
+              <span>Cierres de venta</span>
+              {ordersCount !== null && (
+                <span className="fin-tab-count">{ordersCount}</span>
+              )}
             </button>
             <button
               type="button"
@@ -693,19 +1190,6 @@ export default function SalesPanel({ token, me }) {
                 <rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/>
               </svg>
               <span>Simulación de crédito</span>
-            </button>
-            <button
-              type="button"
-              className={`submenu-pill${activeSubtab === 'commercial_orders' ? ' active' : ''}`}
-              onClick={() => setActiveSubtab('commercial_orders')}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
-              </svg>
-              <span>Cierres de venta</span>
-              {ordersCount !== null && (
-                <span className="fin-tab-count">{ordersCount}</span>
-              )}
             </button>
           </div>
 
@@ -731,31 +1215,6 @@ export default function SalesPanel({ token, me }) {
               </button>
             </div>
           </details>
-        </div>
-
-        <div className="sales-info-anchor">
-          <InfoToggle open={mostrarInfo} onToggle={() => setMostrarInfo((v) => !v)} />
-          {mostrarInfo && (
-            <section
-              className="sales-info-popover"
-              role="dialog"
-              aria-labelledby="sales-info-title"
-            >
-              <button
-                type="button"
-                className="sales-info-close"
-                aria-label="Cerrar información"
-                onClick={() => setMostrarInfo(false)}
-              >
-                ×
-              </button>
-              <span className="sales-info-kicker">Ayuda de esta sección</span>
-              <h3 id="sales-info-title">
-                {INFO_POR_SUBTAB[activeSubtab][0][0].replace(/\.$/, '')}
-              </h3>
-              <p>{INFO_POR_SUBTAB[activeSubtab][0][1]}</p>
-            </section>
-          )}
         </div>
       </div>
 
@@ -784,10 +1243,59 @@ export default function SalesPanel({ token, me }) {
             <div>
               <h3>Prospectos comerciales derivados por el Asistente</h3>
               <p className="sales-section-subtitle">
-                Sincronizados con el CRM en Google Sheets y auditados en PostgreSQL.
+                Sincronización automática cada 60 s con el CRM en Google Sheets y auditoría en PostgreSQL.
               </p>
             </div>
             <div className="sales-section-actions">
+              {followUpRule && (
+                <label
+                  className="sales-followup-inline"
+                  title={
+                    isGeneralSupervisor
+                      ? 'Plazo de inactividad para recordatorios y seguimientos automáticos'
+                      : 'Solo editable por Supervisión General'
+                  }
+                >
+                  <span>Recordatorios y Seguimientos</span>
+                  <select
+                    value={String(ruleDraftHours)}
+                    disabled={!isGeneralSupervisor || ruleBusy}
+                    onChange={(e) => handleChangeFollowUpHours(e.target.value)}
+                    aria-label="Recordatorios y Seguimientos"
+                  >
+                    {![24, 48, 72].includes(Number(ruleDraftHours)) && (
+                      <option value={String(ruleDraftHours)}>
+                        {ruleDraftHours} Horas
+                      </option>
+                    )}
+                    <option value="24">24 Horas</option>
+                    <option value="48">48 Horas</option>
+                    <option value="72">72 Horas</option>
+                  </select>
+                </label>
+              )}
+              <button
+                type="button"
+                className={`btn-pill-action sales-crm-sync-all-btn${
+                  prospectSummary.PENDING_CRM > 0 ? ' has-pending' : ' is-synced'
+                }`}
+                onClick={handleSyncAllProspectsCrm}
+                disabled={syncingAllCrm || loadingProspects}
+                title="Sincronizar todos los prospectos pendientes con Google Sheets"
+              >
+                <span>
+                  {syncingAllCrm
+                    ? '↻ Sincronizando CRM…'
+                    : prospectSummary.PENDING_CRM > 0
+                      ? '↻ Sincronizar CRM'
+                      : '✓ CRM al día'}
+                </span>
+                {prospectSummary.PENDING_CRM > 0 && !syncingAllCrm && (
+                  <span className="sales-crm-btn-badge">
+                    {prospectSummary.PENDING_CRM}
+                  </span>
+                )}
+              </button>
               <a
                 href={CRM_SHEETS_URL}
                 target="_blank"
@@ -807,107 +1315,6 @@ export default function SalesPanel({ token, me }) {
               </button>
             </div>
           </header>
-
-          {followUpRule && (
-            <div
-              className="sales-handoff-box"
-              style={{
-                marginBottom: 16,
-                borderLeft: followUpRule.enabled
-                  ? '4px solid #10b981'
-                  : '4px solid #f59e0b',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: 8,
-                  marginBottom: 8,
-                }}
-              >
-                <span className="sales-handoff-kicker">
-                  Seguimiento comercial automático
-                </span>
-                <span className="sales-source-pill">
-                  {isGeneralSupervisor
-                    ? 'Editable · Supervisión General'
-                    : 'Solo lectura · Ventas'}
-                </span>
-              </div>
-
-              {isGeneralSupervisor ? (
-                <form
-                  onSubmit={handleSaveFollowUpRule}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    gap: 12,
-                  }}
-                >
-                  <label
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      fontWeight: 600,
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={ruleDraftEnabled}
-                      onChange={(e) => setRuleDraftEnabled(e.target.checked)}
-                    />
-                    <span>
-                      {ruleDraftEnabled ? 'Regla activa' : 'Regla pausada'}
-                    </span>
-                  </label>
-                  <label
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                    }}
-                  >
-                    <span>Plazo de inactividad (horas):</span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={720}
-                      value={ruleDraftHours}
-                      onChange={(e) => setRuleDraftHours(e.target.value)}
-                      style={{ width: 76, padding: '4px 8px' }}
-                    />
-                  </label>
-                  <span style={{ fontSize: 12, opacity: 0.8 }}>
-                    Máx. intentos: {followUpRule.maxAttempts || 1} · Versión{' '}
-                    {followUpRule.version}
-                  </span>
-                  <button
-                    type="submit"
-                    className="fin-btn-sm"
-                    disabled={ruleBusy}
-                  >
-                    {ruleBusy ? 'Guardando…' : 'Guardar regla'}
-                  </button>
-                </form>
-              ) : (
-                <p style={{ margin: 0, fontSize: 13 }}>
-                  Estado:{' '}
-                  <strong>
-                    {followUpRule.enabled ? 'Activa' : 'Pausada'}
-                  </strong>{' '}
-                  · Plazo de inactividad:{' '}
-                  <strong>{followUpRule.inactivityHours} horas</strong> · Máx.{' '}
-                  {followUpRule.maxAttempts || 1} intento automático por
-                  oportunidad.
-                </p>
-              )}
-            </div>
-          )}
 
           {prospects.length > 0 && (
             <div className="sales-kpi-strip is-clickable">
@@ -950,44 +1357,87 @@ export default function SalesPanel({ token, me }) {
             </div>
           )}
 
-          <div className="sales-toolbar-row">
-            <div className="sales-toolbar-summary">
-              <span className="sales-summary-count">
-                Mostrando <strong>{filteredProspects.length}</strong> de {prospects.length} prospectos
-              </span>
-              {prospectStatusFilter !== 'ALL' && (
+          <div className="sales-prospects-toolbar">
+            <div className="sales-prospects-filters">
+              <div className="sales-search-box">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.35-4.35" strokeLinecap="round" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Buscar cliente, teléfono, negocio o producto…"
+                  value={prospectSearch}
+                  onChange={(e) => setProspectSearch(e.target.value)}
+                />
+                {prospectSearch && (
+                  <button
+                    type="button"
+                    className="sup-search-clear"
+                    onClick={() => setProspectSearch('')}
+                    aria-label="Limpiar búsqueda"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              <select
+                className="sales-filter-select"
+                value={prospectStatusFilter}
+                onChange={(e) => setProspectStatusFilter(e.target.value)}
+                aria-label="Filtrar por estado"
+              >
+                <option value="ALL">Todos los estados</option>
+                <option value="NUEVO">Nuevo</option>
+                <option value="EN_CONTACTO">En contacto</option>
+                <option value="CALIFICA">Califica</option>
+                <option value="COTIZADO">Cotizado</option>
+                <option value="PENDIENTE_CREDITO">Crédito pendiente</option>
+                <option value="NO_CALIFICA">No califica</option>
+              </select>
+
+              <select
+                className="sales-filter-select"
+                value={prospectFollowUpFilter}
+                onChange={(e) => setProspectFollowUpFilter(e.target.value)}
+                aria-label="Filtrar por seguimiento automático"
+              >
+                <option value="ALL">Todo seguimiento</option>
+                <option value="SCHEDULED">Programado</option>
+                <option value="BLOCKED">Bloqueado</option>
+                <option value="COMPLETED">Enviado</option>
+                <option value="CANCELLED">Cancelado</option>
+                <option value="NONE">Sin seguimiento</option>
+              </select>
+
+              <select
+                className="sales-filter-select"
+                value={prospectCrmFilter}
+                onChange={(e) => setProspectCrmFilter(e.target.value)}
+                aria-label="Filtrar por estado de sincronización CRM"
+              >
+                <option value="ALL">Todo CRM</option>
+                <option value="PENDING">CRM pendiente</option>
+                <option value="SYNCED">CRM sincronizado</option>
+              </select>
+
+              {hasProspectFilters && (
                 <button
                   type="button"
                   className="sales-filter-reset"
-                  onClick={() => setProspectStatusFilter('ALL')}
-                  title="Restablecer filtro a Todos"
+                  onClick={clearProspectFilters}
+                  title="Restablecer todos los filtros"
                 >
-                  Filtro: {getProspectStatusMeta(prospectStatusFilter).label} ✕
+                  Limpiar ✕
                 </button>
               )}
             </div>
 
-            <div className="sales-search-box">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.35-4.35" strokeLinecap="round" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Buscar cliente, teléfono, negocio o producto…"
-                value={prospectSearch}
-                onChange={(e) => setProspectSearch(e.target.value)}
-              />
-              {prospectSearch && (
-                <button
-                  type="button"
-                  className="sup-search-clear"
-                  onClick={() => setProspectSearch('')}
-                  aria-label="Limpiar búsqueda"
-                >
-                  ✕
-                </button>
-              )}
+            <div className="sales-toolbar-summary">
+              <span className="sales-summary-count">
+                Mostrando <strong>{filteredProspects.length}</strong> de {prospects.length} prospectos
+              </span>
             </div>
           </div>
 
@@ -1008,383 +1458,181 @@ export default function SalesPanel({ token, me }) {
               <strong>
                 {prospects.length === 0
                   ? 'No hay clientes pendientes por contactar'
-                  : 'Ningún prospecto coincide con tu búsqueda'}
+                  : 'Ningún prospecto coincide con los filtros'}
               </strong>
               <p>
                 {prospects.length === 0
                   ? 'Cuando el asistente derive oportunidades comerciales aparecerán en esta bandeja.'
-                  : 'Probá seleccionando "Todos" o limpiando el filtro de búsqueda.'}
+                  : 'Probá limpiando los filtros o modificando el texto de búsqueda.'}
               </p>
+              {hasProspectFilters && (
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={clearProspectFilters}
+                >
+                  Limpiar filtros
+                </button>
+              )}
             </div>
           ) : (
-            <div className="sales-prospects-grid">
-              {filteredProspects.map((p) => {
-                const name = p.name || p.nombreApellido || 'Cliente';
-                const phone = p.phone || p.telefono || '';
-                const product =
-                  p.productInterest || p.productoInteres || 'Maquinaria gastronómica';
-                const notes = p.notes || p.notasSeguimiento || '';
-                const statusMeta = getProspectStatusMeta(p.status);
-                const isFollowUpOpen = followUpTargetId === p.id;
-                const isTaking = takingProspectId === p.id;
+            <div className="sales-table-wrap">
+              <table className="sales-table sales-prospects-table">
+                <thead>
+                  <tr>
+                    <th>Cliente</th>
+                    <th>Interés comercial</th>
+                    <th>Estado</th>
+                    <th>Seguimiento ({effectiveFollowUpHours} h)</th>
+                    <th className="sales-col-action">Fecha</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredProspects.map((p) => {
+                    const name = p.name || p.nombreApellido || 'Cliente';
+                    const phone = p.phone || p.telefono || '';
+                    const product =
+                      p.productInterest || p.productoInteres || 'Maquinaria gastronómica';
+                    const notes = p.notes || p.notasSeguimiento || '';
+                    const statusMeta = getProspectStatusMeta(p.status);
+                    const followUpMeta = getFollowUpStatusMeta(p.followUp);
+                    const isSelected = selectedProspectId === p.id;
+                    const formattedNote = notes ? formatProspectNoteText(notes) : '';
 
-                return (
-                  <article key={p.id} className="sales-prospect-card">
-                    <div className="sales-prospect-body">
-                      <header className="sales-prospect-top">
-                        <div className="sales-prospect-person">
-                          <div className="sales-prospect-avatar" aria-hidden="true">
-                            {getInitials(name)}
-                          </div>
-                          <div className="sales-prospect-title-wrap">
-                            <strong className="sales-prospect-name">{name}</strong>
-                            <div className="sales-prospect-subline">
-                              {p.comercio && (
-                                <span className="sales-prospect-comercio" title="Comercio / Negocio">
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                                    <polyline points="9 22 9 12 15 12 15 22"/>
-                                  </svg>
-                                  {p.comercio}
-                                </span>
-                              )}
-                              {phone && (
-                                <span className="sales-phone-chip">
-                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
-                                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
-                                  </svg>
-                                  {phone}
-                                </span>
-                              )}
-                              {p.syncStatus === 'PENDING' && (
-                                <span className="sales-sync-dot" title="CRM pendiente de sincronizar">
-                                  <span className="sync-pulse" />
-                                  CRM pend.
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        <span className={`sales-status-pill ${statusMeta.tone}`}>
-                          {statusMeta.label}
-                        </span>
-                      </header>
-
-                      {/* Producto de Interés */}
-                      <div className="sales-prospect-interest">
-                        <span className="sales-interest-kicker">Interés comercial</span>
-                        <div className="sales-interest-val">{product}</div>
-                      </div>
-
-                      {p.handoff && (
-                        <div className="sales-handoff-box">
-                          <span className="sales-handoff-kicker">Resumen de derivación IA</span>
-                          <dl className="sales-handoff-grid">
-                            <div>
-                              <dt>Producto</dt>
-                              <dd>{p.handoff.producto}</dd>
-                            </div>
-                            {p.handoff.precioEstimado != null && (
-                              <div>
-                                <dt>Precio consultado</dt>
-                                <dd>${p.handoff.precioEstimado.toLocaleString('es-AR')}</dd>
-                              </div>
-                            )}
-                            {p.handoff.modalidad && (
-                              <div>
-                                <dt>Modalidad</dt>
-                                <dd>
-                                  {p.handoff.modalidad === 'CASH'
-                                    ? 'Contado'
-                                    : 'Financiado'}
-                                </dd>
-                              </div>
-                            )}
-                            {p.handoff.estadoCredito && (
-                              <div>
-                                <dt>Dictamen comercial</dt>
-                                <dd>{p.handoff.estadoCredito}</dd>
-                              </div>
-                            )}
-                            <div className="is-wide">
-                              <dt>Motivo de derivación</dt>
-                              <dd>{p.handoff.motivoAlerta}</dd>
-                            </div>
-                            {p.handoff.observaciones && (
-                              <div className="is-wide">
-                                <dt>Observaciones</dt>
-                                <dd>{p.handoff.observaciones}</dd>
-                              </div>
-                            )}
-                          </dl>
-                        </div>
-                      )}
-
-                      {/* Observaciones: solo si existen notas registradas */}
-                      {notes && (
-                        <div className="sales-prospect-notes" title={notes}>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                          </svg>
-                          <span>{formatProspectNoteText(notes)}</span>
-                        </div>
-                      )}
-
-                      {p.followUp && (
-                        <div
-                          className="sales-handoff-box"
-                          style={{ marginTop: 10 }}
-                        >
-                          <span className="sales-handoff-kicker">
-                            Seguimiento comercial automático (48 h)
-                          </span>
-                          <dl className="sales-handoff-grid">
-                            <div>
-                              <dt>Estado</dt>
-                              <dd>
-                                {p.followUp.status === 'SCHEDULED'
-                                  ? 'Programado'
-                                  : p.followUp.status === 'BLOCKED'
-                                    ? 'Bloqueado'
-                                    : p.followUp.status === 'COMPLETED'
-                                      ? `Enviado (${p.followUp.attemptCount || 1}/1)`
-                                      : p.followUp.status === 'CANCELLED'
-                                        ? 'Cancelado'
-                                        : p.followUp.status}
-                              </dd>
-                            </div>
-                            {p.followUp.scheduledFor &&
-                              p.followUp.status === 'SCHEDULED' && (
-                                <div>
-                                  <dt>Próxima fecha</dt>
-                                  <dd>
-                                    {new Date(
-                                      p.followUp.scheduledFor,
-                                    ).toLocaleString('es-AR')}
-                                  </dd>
-                                </div>
-                              )}
-                            {p.followUp.communication && (
-                              <div>
-                                <dt>Último resultado simulado</dt>
-                                <dd>
-                                  {p.followUp.communication.status === 'ACCEPTED'
-                                    ? 'Aceptado (sin confirmar entrega)'
-                                    : p.followUp.communication.status === 'DELIVERED'
-                                      ? 'Entregado (simulado)'
-                                      : p.followUp.communication.status === 'FAILED'
-                                        ? 'Fallido'
-                                        : p.followUp.communication.status === 'UNCERTAIN'
-                                          ? 'Incierto — requiere atención'
-                                          : p.followUp.communication.status === 'PENDING'
-                                            ? 'Pendiente'
-                                            : p.followUp.communication.status}
-                                  {` · Intentos: ${p.followUp.communication.attemptCount || 1}/3`}
-                                  {p.followUp.communication.deliveredAt
-                                    ? ` · ${new Date(
-                                        p.followUp.communication.deliveredAt,
-                                      ).toLocaleString('es-AR')}`
-                                    : p.followUp.communication.acceptedAt
-                                      ? ` · ${new Date(
-                                          p.followUp.communication.acceptedAt,
-                                        ).toLocaleString('es-AR')}`
-                                      : ''}
-                                </dd>
-                              </div>
-                            )}
-                            <div className="is-wide">
-                              <dt>Motivo / Detalle</dt>
-                              <dd>{p.followUp.reasonLabel}</dd>
-                            </div>
-                          </dl>
-                          {p.followUp.communication?.status === 'ACCEPTED' && (
-                            <div style={{ marginTop: 8 }}>
-                              <button
-                                type="button"
-                                className="secondary fin-btn-sm"
-                                onClick={() => handleConfirmFollowUpDelivery(p)}
-                              >
-                                ✓ Confirmar entrega simulada
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {isFollowUpOpen && (
-                        <form
-                          className="sales-followup-box"
-                          onSubmit={(e) => submitFollowUp(e, p)}
-                        >
-                          <label htmlFor={`followup-${p.id}`}>
-                            Nuevo seguimiento comercial para CRM
-                          </label>
-                          <textarea
-                            id={`followup-${p.id}`}
-                            rows={3}
-                            required
-                            placeholder="Ej. Se envió cotización actualizada y coordinamos llamada mañana."
-                            value={followUpText}
-                            onChange={(e) => setFollowUpText(e.target.value)}
-                          />
-                          <div className="sales-followup-actions">
-                            <button
-                              type="submit"
-                              className="fin-btn-sm"
-                              disabled={followUpBusy || !followUpText.trim()}
-                            >
-                              {followUpBusy ? 'Guardando…' : 'Guardar nota'}
-                            </button>
-                            <button
-                              type="button"
-                              className="secondary fin-btn-sm"
-                              onClick={() => {
-                                setFollowUpTargetId(null);
-                                setFollowUpText('');
-                              }}
-                            >
-                              Cancelar
-                            </button>
-                          </div>
-                        </form>
-                      )}
-                    </div>
-
-                    <footer className="sales-prospect-foot">
-                      <div className="sales-prospect-foot-meta">
-                        <span className="sales-prospect-date">
-                          {p.createdAt
-                            ? new Date(p.createdAt).toLocaleDateString('es-AR')
-                            : 'Reciente'}
-                        </span>
-                        <button
-                          type="button"
-                          className="sales-link-btn"
-                          onClick={() => {
-                            setCloseProspectId(p.id);
-                            setActiveSubtab('close_sale');
-                          }}
-                        >
-                          Cerrar venta manual →
-                        </button>
-                      </div>
-
-                      <div className="sales-prospect-actions-clean">
-                        <button
-                          type="button"
-                          className="button secondary sales-btn-followup"
-                          onClick={() => {
-                            if (isFollowUpOpen) {
-                              setFollowUpTargetId(null);
-                              setFollowUpText('');
-                            } else {
-                              setFollowUpTargetId(p.id);
-                              setFollowUpText('');
-                            }
-                          }}
-                          title="Añadir nota de seguimiento"
-                        >
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                            <path d="M12 20h9"/>
-                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-                          </svg>
-                          <span>Seguimiento</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          className="button primary sales-btn-takeover"
-                          disabled={isTaking}
-                          title={
-                            p.conversationId
-                              ? 'Tomar control y abrir conversación en TrimIA'
-                              : 'Este prospecto no tiene una conversación vinculada en TrimIA'
+                    return (
+                      <tr
+                        key={p.id}
+                        className={`sales-prospect-row${isSelected ? ' is-selected' : ''}`}
+                        tabIndex={0}
+                        role="button"
+                        aria-label={`Abrir ficha y opciones de ${name}`}
+                        title="Clic para abrir ficha y opciones del prospecto"
+                        onClick={() => openProspectModal(p)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            openProspectModal(p);
                           }
-                          onClick={() => handleTakeProspect(p)}
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
-                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                          </svg>
-                          <span>{isTaking ? 'Abriendo…' : 'Retomar en TrimIA'}</span>
-                        </button>
-
-                        <div className="sales-card-menu-anchor">
-                          <button
-                            type="button"
-                            className="sales-more-btn"
-                            aria-label="Más acciones"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setCardMenuOpenId(cardMenuOpenId === p.id ? null : p.id);
-                            }}
-                            title="Más opciones"
-                          >
-                            ···
-                          </button>
-
-                          {cardMenuOpenId === p.id && (
-                            <div className="sales-card-dropdown" role="menu" onClick={(e) => e.stopPropagation()}>
-                              <button
-                                type="button"
-                                className="sales-card-menu-item"
-                                onClick={() => {
-                                  setCardMenuOpenId(null);
-                                  handleSyncProspectCrm(p);
-                                }}
-                                disabled={syncingProspectId === p.id}
-                              >
-                                <span>↻</span>
-                                <span>{syncingProspectId === p.id ? 'Sincronizando…' : 'Reintentar sync CRM'}</span>
-                              </button>
-                              <button
-                                type="button"
-                                className="sales-card-menu-item"
-                                onClick={() => {
-                                  setCardMenuOpenId(null);
-                                  handleSimulateFollowUpDue(p);
-                                }}
-                                disabled={simulatingProspectId === p.id}
-                              >
-                                <span>⏱</span>
-                                <span>{simulatingProspectId === p.id ? 'Evaluando…' : 'Simular vencimiento (48 h)'}</span>
-                              </button>
-                              {phone && p.followUp?.reasonCode !== 'CONTACT_OPT_OUT' && (
-                                <button
-                                  type="button"
-                                  className="sales-card-menu-item"
-                                  onClick={() => {
-                                    setCardMenuOpenId(null);
-                                    handleOptOutProspect(p);
-                                  }}
-                                >
-                                  <span>🔕</span>
-                                  <span>Registrar no contacto (022)</span>
-                                </button>
-                              )}
-                              {phone &&
-                                isGeneralSupervisor &&
-                                p.followUp?.reasonCode === 'CONTACT_OPT_OUT' && (
-                                  <button
-                                    type="button"
-                                    className="sales-card-menu-item"
-                                    onClick={() => {
-                                      setCardMenuOpenId(null);
-                                      handleReactivateProspect(p);
-                                    }}
+                        }}
+                      >
+                        <td>
+                          <div className="sales-prospect-client-cell">
+                            <span
+                              className="sales-prospect-avatar sales-table-avatar"
+                              aria-hidden="true"
+                            >
+                              {getInitials(name)}
+                            </span>
+                            <div className="sales-prospect-client-info">
+                              <div className="sales-prospect-name-line">
+                                <strong className="sales-cell-primary">{name}</strong>
+                                {p.syncStatus === 'PENDING' && (
+                                  <span
+                                    className="sales-crm-pending-pill"
+                                    title="CRM pendiente de sincronizar"
                                   >
-                                    <span>🔔</span>
-                                    <span>Reactivar avisos (Supervisión)</span>
-                                  </button>
+                                    <span className="sync-pulse" aria-hidden="true" />
+                                    CRM pend.
+                                  </span>
                                 )}
+                              </div>
+                              <div className="sales-prospect-table-sub">
+                                {phone && (
+                                  <span className="sales-prospect-phone-mono">{phone}</span>
+                                )}
+                                {phone && p.comercio && <span aria-hidden="true">·</span>}
+                                {p.comercio && (
+                                  <span className="sales-prospect-biz" title={p.comercio}>
+                                    {p.comercio}
+                                  </span>
+                                )}
+                              </div>
                             </div>
+                          </div>
+                        </td>
+
+                        <td>
+                          <div className="sales-prospect-product-cell">
+                            <div className="sales-cell-primary">{product}</div>
+                            {p.handoff?.precioEstimado != null ? (
+                              <div className="sales-cell-sub">
+                                ${p.handoff.precioEstimado.toLocaleString('es-AR')}
+                                {p.handoff.modalidad
+                                  ? ` · ${p.handoff.modalidad === 'CASH' ? 'Contado' : 'Financiado'}`
+                                  : ''}
+                                {p.handoff.estadoCredito ? ` · ${p.handoff.estadoCredito}` : ''}
+                              </div>
+                            ) : formattedNote ? (
+                              <div
+                                className="sales-cell-sub sales-prospect-truncate"
+                                title={formattedNote}
+                              >
+                                {formattedNote}
+                              </div>
+                            ) : null}
+                          </div>
+                        </td>
+
+                        <td>
+                          <span className={`sales-status-pill ${statusMeta.tone}`}>
+                            {statusMeta.label}
+                          </span>
+                        </td>
+
+                        <td>
+                          {followUpMeta ? (
+                            <div className="sales-prospect-followup-cell">
+                              <span className={`sales-followup-pill ${followUpMeta.tone}`}>
+                                {followUpMeta.label}
+                              </span>
+                              {p.followUp.status === 'SCHEDULED' && p.followUp.scheduledFor ? (
+                                <span className="sales-cell-sub sales-prospect-date-sub">
+                                  {new Date(p.followUp.scheduledFor).toLocaleString('es-AR', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </span>
+                              ) : p.followUp.communication ? (
+                                <span
+                                  className="sales-cell-sub sales-prospect-truncate"
+                                  title={getFollowUpCommLabel(p.followUp.communication)}
+                                >
+                                  {getFollowUpCommLabel(p.followUp.communication)}
+                                </span>
+                              ) : p.followUp.reasonLabel ? (
+                                <span
+                                  className="sales-cell-sub sales-prospect-truncate"
+                                  title={p.followUp.reasonLabel}
+                                >
+                                  {p.followUp.reasonLabel}
+                                </span>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <span className="sales-muted-dash">—</span>
                           )}
-                        </div>
-                      </div>
-                    </footer>
-                  </article>
-                );
-              })}
+                        </td>
+
+                        <td className="sales-col-action sales-prospect-date-col">
+                          <span className="sales-prospect-date-arrow">
+                            <span>
+                              {p.createdAt
+                                ? new Date(p.createdAt).toLocaleDateString('es-AR')
+                                : 'Reciente'}
+                            </span>
+                            <span className="sales-row-chevron" aria-hidden="true">
+                              ›
+                            </span>
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </section>

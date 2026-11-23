@@ -7,11 +7,11 @@ import CommercialOrderCard, {
 } from './CommercialOrderCard';
 
 const ORDER_FILTERS = [
-  { id: 'ALL', label: 'Todos' },
   { id: 'READY', label: 'Listos para cerrar' },
   { id: 'CHOOSING', label: 'Esperando cliente' },
   { id: 'REVIEW', label: 'En revisión' },
   { id: 'CLOSED', label: 'Cerrados' },
+  { id: 'ALL', label: 'Todos' },
 ];
 
 function matchesOrderFilter(row, filterId) {
@@ -28,7 +28,7 @@ export default function CommercialOrdersPanel({ token, me, onCountChange }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
-  const [stageFilter, setStageFilter] = useState('ALL');
+  const [stageFilter, setStageFilter] = useState('READY');
   const [search, setSearch] = useState('');
   const [error, setError] = useState('');
   const detailRef = useRef(null);
