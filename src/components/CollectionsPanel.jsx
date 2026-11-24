@@ -293,9 +293,29 @@ export default function CollectionsPanel({ token, me, isCollector, initialClient
       {successMsg && <p className="success-msg">{successMsg}</p>}
 
       <div className="collection-metrics" aria-label="Resumen de cobranzas">
-        <button className="collection-metric" onClick={() => setTab('clients')}><strong>{kpis?.clientsWithPendingQuotas ?? 0}</strong><span>Cuotas pendientes</span><small>Ver cartera →</small></button>
-        <button className="collection-metric collection-metric-warning" onClick={() => { setTab('proofs'); setProofStatus('PENDING_REVIEW'); }}><strong>{kpis?.proofsToReview ?? 0}</strong><span>Comprobantes para revisar</span><small>Revisar comprobantes →</small></button>
-        <div className="collection-metric"><strong>{kpis?.confirmedThisWeek ?? 0}</strong><span>Pagos confirmados esta semana</span><small>Con verificación bancaria</small></div>
+        <button
+          className={`collection-metric${(kpis?.clientsWithPendingQuotas ?? 0) === 0 ? ' is-zero' : ''}`}
+          onClick={() => setTab('clients')}
+        >
+          <strong>{kpis?.clientsWithPendingQuotas ?? 0}</strong>
+          <span>Cuotas pendientes</span>
+          <small>Ver cartera →</small>
+        </button>
+        <button
+          className={`collection-metric collection-metric-warning${(kpis?.proofsToReview ?? 0) === 0 ? ' is-zero' : ''}`}
+          onClick={() => { setTab('proofs'); setProofStatus('PENDING_REVIEW'); }}
+        >
+          <strong>{kpis?.proofsToReview ?? 0}</strong>
+          <span>Comprobantes para revisar</span>
+          <small>Revisar comprobantes →</small>
+        </button>
+        <div
+          className={`collection-metric is-static${(kpis?.confirmedThisWeek ?? 0) === 0 ? ' is-zero' : ''}`}
+        >
+          <strong>{kpis?.confirmedThisWeek ?? 0}</strong>
+          <span>Pagos confirmados esta semana</span>
+          <small>Con verificación bancaria</small>
+        </div>
       </div>
 
       <div className="submenu-bar collections-tabs">

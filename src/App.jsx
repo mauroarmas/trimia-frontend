@@ -3,7 +3,6 @@ import Login from './components/Login';
 import SupervisorPanel from './components/SupervisorPanel';
 import ChatSimulator from './components/ChatSimulator';
 import KnowledgeIngest from './components/KnowledgeIngest';
-import Interview from './components/Interview';
 import WebChat from './components/WebChat';
 import EscalationsQueue from './components/EscalationsQueue';
 import CollectionsPanel from './components/CollectionsPanel';
@@ -100,6 +99,7 @@ export default function App() {
   const [tab, setTab] = useState(() => parseRouteFromLocation().tab);
   const [interviewStart, setInterviewStart] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState('');
   const [theme, setTheme] = useState(() => {
@@ -118,6 +118,26 @@ export default function App() {
       // ignore storage errors
     }
   }, [theme]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return undefined;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setMobileMenuOpen(false);
+    };
+    const mql = window.matchMedia('(min-width: 769px)');
+    const onMediaChange = (event) => {
+      if (event.matches) setMobileMenuOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    mql.addEventListener('change', onMediaChange);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener('keydown', onKeyDown);
+      mql.removeEventListener('change', onMediaChange);
+    };
+  }, [mobileMenuOpen]);
 
   useEffect(() => {
     function handlePopState() {
@@ -278,9 +298,11 @@ export default function App() {
 
   const defaultTab = visibleTabs[0]?.id;
   const currentTab = visibleTabs.some((t) => t.id === tab) ? tab : defaultTab;
+  const currentTabLabel = visibleTabs.find((t) => t.id === currentTab)?.label || 'TrimIA';
 
   function selectTab(nextTabId) {
     setTab(nextTabId);
+    setMobileMenuOpen(false);
     const parsed = parseRouteFromLocation();
     const keepSubtab = parsed.tab === nextTabId ? parsed.subtab : undefined;
     navigateToRoute(nextTabId, keepSubtab, { replace: false });
@@ -292,11 +314,78 @@ export default function App() {
   }
 
   return (
-    <div className={`app-layout${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
-      {/* Sidebar Fija Lateral */}
-      <aside className="app-sidebar">
+    <div className={`app-layout${sidebarCollapsed ? ' sidebar-collapsed' : ''}${mobileMenuOpen ? ' mobile-menu-open' : ''}`}>
+      {/* Barra superior móvil (solo visible en <= 768px) */}
+      <header className="mobile-topbar">
+        <button
+          type="button"
+          className="mobile-topbar-btn"
+          aria-label={mobileMenuOpen ? 'Cerrar menú de navegación' : 'Abrir menú de navegación'}
+          aria-expanded={mobileMenuOpen}
+          aria-controls="app-sidebar-panel"
+          onClick={() => setMobileMenuOpen((open) => !open)}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            {mobileMenuOpen ? (
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            ) : (
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            )}
+          </svg>
+        </button>
+
+        <div className="mobile-topbar-brand">
+          <img src="/logo-sidebar.png" alt="TrimIA" className="mobile-topbar-logo" />
+          <span className="mobile-topbar-section">{currentTabLabel}</span>
+        </div>
+
+        <button
+          type="button"
+          className="mobile-topbar-btn"
+          onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+          title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+          aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+        >
+          {theme === 'dark' ? (
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <circle cx="12" cy="12" r="5" />
+              <line x1="12" y1="1" x2="12" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="23" />
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+              <line x1="1" y1="12" x2="3" y2="12" />
+              <line x1="21" y1="12" x2="23" y2="12" />
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+            </svg>
+          ) : (
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+          )}
+        </button>
+      </header>
+
+      {mobileMenuOpen && (
+        <div
+          className="mobile-sidebar-backdrop"
+          aria-hidden="true"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Sidebar Lateral (fija en Desktop, Drawer off-canvas en Mobile) */}
+      <aside id="app-sidebar-panel" className="app-sidebar">
         <div className="sidebar-header">
           <img src="/logo-sidebar.png" alt="TrimIA" className="sidebar-logo" />
+          <button
+            type="button"
+            className="mobile-drawer-close"
+            aria-label="Cerrar menú"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            ✕
+          </button>
         </div>
 
         <nav className="sidebar-nav">

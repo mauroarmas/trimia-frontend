@@ -76,6 +76,7 @@ export default function ChatSimulator({ token, me }) {
   const [avisoCierre, setAvisoCierre] = useState('');
 
   const ultimoIdRef = useRef(null);
+  const mensajesPorIdRef = useRef(new Map());
   const activePhoneRef = useRef(phone);
   const sendingRef = useRef(false);
   const viewportRef = useRef(null);
@@ -94,19 +95,18 @@ export default function ChatSimulator({ token, me }) {
   }, [phone, convId, me?.id]);
 
   const agregarMensajes = useCallback((nuevos) => {
-    if (!nuevos || nuevos.length === 0) return;
+    if (!nuevos || nuevos.length === 0) return ultimoIdRef.current;
 
-    setMessages((previos) => {
-      const porId = new Map(previos.map((m) => [m.id, m]));
-      for (const m of nuevos) {
-        if (m?.id) porId.set(m.id, m);
-      }
-      const todos = [...porId.values()].sort(
-        (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
-      );
-      ultimoIdRef.current = todos.at(-1)?.id ?? null;
-      return todos;
-    });
+    const porId = new Map(mensajesPorIdRef.current);
+    for (const m of nuevos) {
+      if (m?.id) porId.set(m.id, m);
+    }
+    const todos = [...porId.values()].sort(
+      (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
+    );
+    mensajesPorIdRef.current = porId;
+    ultimoIdRef.current = todos.at(-1)?.id ?? null;
+    setMessages(todos);
 
     // Limpiar mensajes optimistas que ya llegaron persistidos desde el servidor
     const userContents = nuevos
@@ -124,9 +124,12 @@ export default function ChatSimulator({ token, me }) {
         return remaining;
       });
     }
+
+    return ultimoIdRef.current;
   }, []);
 
   const limpiarHiloActual = useCallback(() => {
+    mensajesPorIdRef.current = new Map();
     ultimoIdRef.current = null;
     setConvId(null);
     setMessages([]);
@@ -193,6 +196,11 @@ export default function ChatSimulator({ token, me }) {
         if (cancelado || !conv) return;
         agregarMensajes(conv.messages ?? []);
         setConversation(conv);
+        if (conv.status !== 'ACTIVE') {
+          setWaitingReply(false);
+        } else if ((conv.messages ?? []).at(-1)?.role === 'ASSISTANT') {
+          setWaitingReply(false);
+        }
       } catch {
         // Ignorar fallos transitorios de refresco auxiliar
       }
@@ -200,6 +208,7 @@ export default function ChatSimulator({ token, me }) {
 
     async function conectar() {
       try {
+        let cursorAfter = ultimoIdRef.current ?? undefined;
         if (!historialCargado) {
           setLoadingConv(true);
           const conv = await getConversation(token, convId);
@@ -207,12 +216,18 @@ export default function ChatSimulator({ token, me }) {
           setLoadingConv(false);
 
           if (conv) {
-            agregarMensajes(conv.messages ?? []);
+            cursorAfter = agregarMensajes(conv.messages ?? []) ?? undefined;
             setConversation(conv);
+            const ultimo = (conv.messages ?? []).at(-1);
             if (conv.status !== 'ACTIVE') {
               setWaitingReply(false);
-            } else if ((conv.messages ?? []).at(-1)?.role === 'ASSISTANT') {
+            } else if (ultimo?.role === 'ASSISTANT') {
               setWaitingReply(false);
+            } else if (
+              ultimo?.role === 'USER' &&
+              Date.now() - new Date(ultimo.createdAt).getTime() < 90000
+            ) {
+              setWaitingReply(true);
             }
           }
           historialCargado = true;
@@ -224,7 +239,7 @@ export default function ChatSimulator({ token, me }) {
           token,
           `/supervisor/conversations/${convId}/stream`,
           {
-            after: ultimoIdRef.current ?? undefined,
+            after: cursorAfter,
             onMessage: (m) => {
               if (cancelado) return;
               agregarMensajes([m]);
@@ -301,12 +316,33 @@ export default function ChatSimulator({ token, me }) {
     };
   }, [convId, token, agregarMensajes, limpiarHiloActual]);
 
-  // Tope de seguridad para el indicador de escritura ("escribiendo...")
+  // Respaldo activo mientras se espera respuesta + tope de seguridad para "escribiendo..."
   useEffect(() => {
     if (!waitingReply) return undefined;
-    const timer = setTimeout(() => setWaitingReply(false), 45000);
-    return () => clearTimeout(timer);
-  }, [waitingReply]);
+    const stopTimer = setTimeout(() => setWaitingReply(false), 45000);
+    const syncInterval = convId
+      ? setInterval(async () => {
+          try {
+            const conv = await getConversation(token, convId);
+            if (!conv) return;
+            agregarMensajes(conv.messages ?? []);
+            setConversation(conv);
+            if (conv.status !== 'ACTIVE') {
+              setWaitingReply(false);
+            } else if ((conv.messages ?? []).at(-1)?.role === 'ASSISTANT') {
+              setWaitingReply(false);
+            }
+          } catch {
+            // Silencioso: el stream SSE sigue siendo el canal primario
+          }
+        }, 2200)
+      : null;
+
+    return () => {
+      clearTimeout(stopTimer);
+      if (syncInterval) clearInterval(syncInterval);
+    };
+  }, [waitingReply, convId, token, agregarMensajes]);
 
   // Auto-scroll suave al fondo cuando entran mensajes o cambia el indicador de escritura
   useEffect(() => {
@@ -386,6 +422,7 @@ export default function ChatSimulator({ token, me }) {
       activePhoneRef.current = trimmedPhone;
 
       if (res.conversationId !== convId) {
+        mensajesPorIdRef.current = new Map();
         ultimoIdRef.current = null;
         setMessages([]);
         setConversation(null);

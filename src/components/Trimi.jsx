@@ -287,7 +287,7 @@ export default function Trimi({
           <g className="trimi-outfit-consejo">
             <polygon points="42,59 50,62.5 42,66" fill="#183B70" />
             <polygon points="58,59 50,62.5 58,66" fill="#183B70" />
-            <circle cx="50,62.5" r="2.2" fill="#10284D" />
+            <circle cx="50" cy="62.5" r="2.2" fill="#10284D" />
           </g>
         )}
 

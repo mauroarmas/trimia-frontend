@@ -7,8 +7,26 @@
 .collection-metric small { color: #677b94; font-size: 12px; margin-top: 7px; }
 .collections-panel .collection-metric-warning { border-color: #ecd6a3; }
 .collection-metric-warning strong { color: #966510; }
-.collections-panel .collections-tabs { margin-bottom: 18px; overflow-x: auto; }
+.collections-panel .collections-tabs { margin-bottom: 18px; overflow-x: auto; scrollbar-width: none; }
+.collections-panel .collections-tabs::-webkit-scrollbar { display: none; }
 .collections-panel .submenu-pill { font-size: 13px; padding: 10px 14px; white-space: nowrap; }
+@media (max-width: 768px) {
+  .collections-panel .collections-tabs {
+    width: 100%;
+    -webkit-overflow-scrolling: touch;
+    mask-image: linear-gradient(90deg, #000 0%, #000 calc(100% - 28px), transparent 100%);
+    -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 calc(100% - 28px), transparent 100%);
+  }
+  .collections-panel .collections-tabs .submenu-pills {
+    display: inline-flex !important;
+    min-width: max-content;
+    padding-right: 26px !important;
+    scroll-snap-type: x proximity;
+  }
+  .collections-panel .collections-tabs .submenu-pill {
+    scroll-snap-align: start;
+  }
+}
 .collection-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
 .collections-panel h3 { font-size: 18px; margin: 0 0 6px; }
 .collection-section-heading p, .collection-section-heading > span { color: #64758b; margin: 0; font-size: 13px; }

@@ -24,6 +24,8 @@ import { statusBadgeClass } from '../statusBadge';
 import PageHero from './PageHero';
 import TokenEconomicsModal from './TokenEconomicsModal';
 import { estimateMetricsEconomics, formatUsd } from '../tokenEconomics';
+import { AGENT_BOT_THEMES } from '../agentBotThemes';
+import AgentRobotAvatar from './AgentRobotAvatar';
 
 const STATUS_FILTER_PILLS = [
   ['', 'Todas'],
@@ -32,139 +34,6 @@ const STATUS_FILTER_PILLS = [
   ['HUMAN_HANDLING', 'Control manual'],
   ['CLOSED', 'Cerradas'],
 ];
-
-const AGENT_BOT_THEMES = {
-  SALES: {
-    c: '#2563eb',
-    soft: '#dbeafe',
-    ink: '#1d4ed8',
-    chestPath: 'M42 78 l4 4 l8 -8',
-  },
-  ADMIN: {
-    c: '#7c3aed',
-    soft: '#ede9fe',
-    ink: '#6d28d9',
-    chestPath: 'M42 74v8 M48 74v8 M54 74v8',
-  },
-  COLLECTIONS: {
-    c: '#0d9488',
-    soft: '#ccfbf1',
-    ink: '#0f766e',
-    chestPath: 'M43 78 a5 5 0 1 0 10 0 a5 5 0 1 0 -10 0',
-  },
-  LOGISTICS: {
-    c: '#ea580c',
-    soft: '#ffedd5',
-    ink: '#9a3412',
-    chestPath: 'M41 75h12v8h-12z',
-  },
-  DEPOSITS: {
-    c: '#0891b2',
-    soft: '#cffafe',
-    ink: '#155e75',
-    chestPath: 'M43 74h10v10h-10z M43 79h10',
-  },
-};
-
-function AgentRobotAvatar({ agentType, label, size = 'card' }) {
-  const theme = AGENT_BOT_THEMES[agentType] || AGENT_BOT_THEMES.SALES;
-  const isModal = size === 'lg';
-  const svg = (
-    <svg
-      className={`sup-bot-svg${isModal ? ' is-lg' : ''}`}
-      viewBox="0 0 96 98"
-      width={isModal ? 50 : 96}
-      height={isModal ? 50 : 98}
-      role={isModal ? undefined : 'img'}
-      aria-label={isModal ? undefined : label}
-      aria-hidden={isModal ? 'true' : undefined}
-      style={
-        isModal
-          ? { '--agent-c': theme.c, '--agent-soft': theme.soft, '--agent-ink': theme.ink }
-          : undefined
-      }
-    >
-      {!isModal && (
-        <ellipse
-          className="sup-bot-shadow"
-          cx="48"
-          cy="94"
-          rx="18"
-          ry="3"
-          fill="#0f172a"
-          opacity=".14"
-        />
-      )}
-      <g className={isModal ? undefined : 'sup-bot-float'}>
-        <line
-          x1="48"
-          y1="11"
-          x2="48"
-          y2="21"
-          stroke="var(--agent-c)"
-          strokeWidth="3"
-          strokeLinecap="round"
-        />
-        <circle
-          className={isModal ? undefined : 'sup-bot-ant'}
-          cx="48"
-          cy="8"
-          r="4.5"
-          fill="var(--agent-c)"
-        />
-        <rect x="12" y="34" width="7" height="14" rx="3.5" fill="var(--agent-c)" />
-        <rect x="77" y="34" width="7" height="14" rx="3.5" fill="var(--agent-c)" />
-        <rect
-          x="20"
-          y="20"
-          width="56"
-          height="44"
-          rx="16"
-          fill="var(--agent-soft)"
-          stroke="var(--agent-c)"
-          strokeWidth="3"
-        />
-        <rect x="28" y="29" width="40" height="26" rx="11" fill="#0f172a" />
-        <g className={isModal ? undefined : 'sup-bot-eyes'}>
-          <ellipse cx="40" cy="41" rx="4.5" ry="5.5" fill="#ffffff" />
-          <ellipse cx="56" cy="41" rx="4.5" ry="5.5" fill="#ffffff" />
-        </g>
-        <path
-          d="M42 50 q6 4 12 0"
-          fill="none"
-          stroke="#ffffff"
-          strokeWidth="2"
-          strokeLinecap="round"
-          opacity=".8"
-        />
-        <rect x="30" y="67" width="36" height="22" rx="10" fill="var(--agent-c)" />
-        <path
-          d={theme.chestPath}
-          fill="none"
-          stroke="#ffffff"
-          strokeWidth="2.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <rect
-          className={isModal ? undefined : 'sup-bot-arm'}
-          x="64"
-          y="70"
-          width="16"
-          height="7"
-          rx="3.5"
-          fill="var(--agent-c)"
-        />
-      </g>
-    </svg>
-  );
-
-  if (isModal) {
-    return <span className="sup-agent-modal-avatar">{svg}</span>;
-  }
-
-  return svg;
-}
 
 export default function SupervisorPanel({
   token,

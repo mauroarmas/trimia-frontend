@@ -664,6 +664,11 @@ export function sendWebMessage(token, message) {
   return request('/messaging/web', { method: 'POST', token, body: { message } });
 }
 
+/** Obtiene la conversación web abierta actual del empleado autenticado, si existe. */
+export function getActiveWebConversation(token) {
+  return request('/messaging/web/active', { token });
+}
+
 /** Historial propio, cronológico ascendente. 403 sobre una conversación ajena. */
 export function getWebMessages(token, convId, params = {}) {
   const qs = new URLSearchParams(params).toString();
@@ -738,6 +743,7 @@ export async function openConversationStream(
 
   const res = await fetch(`${API_BASE}${path}${qs}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'text/event-stream' },
+    cache: 'no-store',
     signal: controller.signal,
   });
 

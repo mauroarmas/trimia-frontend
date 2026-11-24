@@ -2939,6 +2939,16 @@ h1, h2, h3, h4 {
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .sup-bot-float,
+  .sup-bot-shadow,
+  .sup-bot-eyes,
+  .sup-bot-ant,
+  .sup-bot-arm {
+    animation: none !important;
+  }
+}
+
 @keyframes sup-bot-ping {
   0% {
     box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.55);

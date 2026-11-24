@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   sendWebMessage,
+  getActiveWebConversation,
   getWebMessages,
   openConversationStream,
   closeWebConversation,
@@ -71,6 +72,7 @@ export default function WebChat({ token, me, onOpenSimulator }) {
   const [aviso, setAviso] = useState(null);
 
   const ultimoIdRef = useRef(null);
+  const mensajesPorIdRef = useRef(new Map());
   const sendingRef = useRef(false);
   const viewportRef = useRef(null);
   const textareaRef = useRef(null);
@@ -79,19 +81,18 @@ export default function WebChat({ token, me, onOpenSimulator }) {
   const [totalAreas, setTotalAreas] = useState(0);
 
   const agregarMensajes = useCallback((nuevos) => {
-    if (!nuevos || nuevos.length === 0) return;
+    if (!nuevos || nuevos.length === 0) return ultimoIdRef.current;
 
-    setMessages((previos) => {
-      const porId = new Map(previos.map((m) => [m.id, m]));
-      for (const m of nuevos) {
-        if (m?.id) porId.set(m.id, m);
-      }
-      const todos = [...porId.values()].sort(
-        (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
-      );
-      ultimoIdRef.current = todos.at(-1)?.id ?? null;
-      return todos;
-    });
+    const porId = new Map(mensajesPorIdRef.current);
+    for (const m of nuevos) {
+      if (m?.id) porId.set(m.id, m);
+    }
+    const todos = [...porId.values()].sort(
+      (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
+    );
+    mensajesPorIdRef.current = porId;
+    ultimoIdRef.current = todos.at(-1)?.id ?? null;
+    setMessages(todos);
 
     const userContents = nuevos
       .filter((m) => m.role === 'USER')
@@ -108,10 +109,13 @@ export default function WebChat({ token, me, onOpenSimulator }) {
         return remaining;
       });
     }
+
+    return ultimoIdRef.current;
   }, []);
 
   const olvidarConversacion = useCallback(() => {
     localStorage.removeItem(claveConv);
+    mensajesPorIdRef.current = new Map();
     ultimoIdRef.current = null;
     setConvId(null);
     setMessages([]);
@@ -120,6 +124,28 @@ export default function WebChat({ token, me, onOpenSimulator }) {
     setStreamConnected(false);
     setEsperandoRespuesta(false);
   }, [claveConv]);
+
+  // Pre-descubrir conversación web activa si localStorage estaba vacío, para conectar SSE antes del primer mensaje
+  useEffect(() => {
+    if (convId || sendingRef.current) return undefined;
+    let cancelado = false;
+
+    getActiveWebConversation(token)
+      .then((res) => {
+        if (cancelado || sendingRef.current) return;
+        if (res?.conversationId) {
+          localStorage.setItem(claveConv, res.conversationId);
+          setConvId(res.conversationId);
+        }
+      })
+      .catch(() => {
+        // Silencioso: si no hay hilo activo o falla, se creará al enviar el primer mensaje
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [convId, token, claveConv]);
 
   useEffect(() => {
     if (!me || me.role !== 'SUPERVISOR') return undefined;
@@ -155,6 +181,11 @@ export default function WebChat({ token, me, onOpenSimulator }) {
         agregarMensajes(res.data ?? []);
         if (res.conversation) {
           setConversation(res.conversation);
+          if (res.conversation.status && res.conversation.status !== 'ACTIVE') {
+            setEsperandoRespuesta(false);
+          } else if ((res.data ?? []).at(-1)?.role === 'ASSISTANT') {
+            setEsperandoRespuesta(false);
+          }
         }
       } catch {
         // Ignorar fallos transitorios de refresco
@@ -163,17 +194,24 @@ export default function WebChat({ token, me, onOpenSimulator }) {
 
     async function conectar() {
       try {
+        let cursorAfter = ultimoIdRef.current ?? undefined;
         if (!historialCargado) {
           setLoadingConv(true);
           const res = await getWebMessages(token, convId, { limit: 100 });
           if (cancelado) return;
           setLoadingConv(false);
-          agregarMensajes(res.data ?? []);
+          cursorAfter = agregarMensajes(res.data ?? []) ?? undefined;
           setConversation(res.conversation);
+          const ultimo = (res.data ?? []).at(-1);
           if (res.conversation?.status && res.conversation.status !== 'ACTIVE') {
             setEsperandoRespuesta(false);
-          } else if ((res.data ?? []).at(-1)?.role === 'ASSISTANT') {
+          } else if (ultimo?.role === 'ASSISTANT') {
             setEsperandoRespuesta(false);
+          } else if (
+            ultimo?.role === 'USER' &&
+            Date.now() - new Date(ultimo.createdAt).getTime() < 90000
+          ) {
+            setEsperandoRespuesta(true);
           }
           historialCargado = true;
         }
@@ -184,7 +222,7 @@ export default function WebChat({ token, me, onOpenSimulator }) {
           token,
           `/messaging/web/${convId}/stream`,
           {
-            after: ultimoIdRef.current ?? undefined,
+            after: cursorAfter,
             onMessage: (m) => {
               if (cancelado) return;
               agregarMensajes([m]);
@@ -275,12 +313,34 @@ export default function WebChat({ token, me, onOpenSimulator }) {
     };
   }, [convId, token, agregarMensajes, olvidarConversacion]);
 
-  // Tope de seguridad para el indicador de escritura
+  // Respaldo activo mientras se espera respuesta + tope de seguridad
   useEffect(() => {
     if (!esperandoRespuesta) return undefined;
-    const timer = setTimeout(() => setEsperandoRespuesta(false), 45000);
-    return () => clearTimeout(timer);
-  }, [esperandoRespuesta]);
+    const stopTimer = setTimeout(() => setEsperandoRespuesta(false), 45000);
+    const syncInterval = convId
+      ? setInterval(async () => {
+          try {
+            const res = await getWebMessages(token, convId, { limit: 100 });
+            agregarMensajes(res.data ?? []);
+            if (res.conversation) {
+              setConversation(res.conversation);
+              if (res.conversation.status && res.conversation.status !== 'ACTIVE') {
+                setEsperandoRespuesta(false);
+              } else if ((res.data ?? []).at(-1)?.role === 'ASSISTANT') {
+                setEsperandoRespuesta(false);
+              }
+            }
+          } catch {
+            // Silencioso: el stream SSE sigue siendo el canal primario
+          }
+        }, 2200)
+      : null;
+
+    return () => {
+      clearTimeout(stopTimer);
+      if (syncInterval) clearInterval(syncInterval);
+    };
+  }, [esperandoRespuesta, convId, token, agregarMensajes]);
 
   // Auto-scroll suave al fondo cuando llegan mensajes o cambia el estado
   useEffect(() => {
@@ -360,6 +420,8 @@ export default function WebChat({ token, me, onOpenSimulator }) {
     try {
       const res = await sendWebMessage(token, msgText);
       if (res.conversationId !== convId) {
+        mensajesPorIdRef.current = new Map();
+        ultimoIdRef.current = null;
         localStorage.setItem(claveConv, res.conversationId);
         setConvId(res.conversationId);
       }
